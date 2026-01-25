@@ -4,7 +4,6 @@ namespace App\Livewire\Crm\Users;
 
 use App\Enums\UserRole;
 use App\Models\User;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 
@@ -56,21 +55,22 @@ class Index extends Component
 
         $data = $this->validate($rules);
 
-        $user = User::updateOrCreate(
-            ['id' => $this->userId],
-            [
-                'name' => $data['name'],
-                'email' => $data['email'],
-                'phone' => $data['phone'] ?? null,
-                'role' => UserRole::from($data['role']),
-                'active' => (bool) $data['active'],
-            ],
-        );
+        $values = [
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'phone' => $data['phone'] ?? null,
+            'role' => UserRole::from($data['role']),
+            'active' => (bool) $data['active'],
+        ];
 
         if (filled($data['password'] ?? null)) {
-            $user->password = Hash::make($data['password']);
-            $user->save();
+            $values['password'] = $data['password'];
         }
+
+        $user = User::updateOrCreate(
+            ['id' => $this->userId],
+            $values,
+        );
 
         $this->resetForm();
         $this->userId = null;
@@ -114,4 +114,3 @@ class Index extends Component
         ])->layout('layouts.crm', ['title' => 'Gebruikers']);
     }
 }
-
