@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return auth()->check()
         ? redirect()->route('dashboard')
-        : view('welcome');
+        : redirect()->route('login');
 });
 
 Route::middleware(['auth', 'active'])->group(function () {
