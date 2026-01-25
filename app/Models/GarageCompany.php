@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class GarageCompany extends Model
 {
@@ -101,6 +102,10 @@ class GarageCompany extends Model
     public function activeMrrExcl(): Attribute
     {
         return Attribute::get(function () {
+            $sumExpr = GarageCompanyModule::hasAantalColumn()
+                ? DB::raw('(prijs_maand_excl * aantal)')
+                : 'prijs_maand_excl';
+
             return (float) $this->modules()
                 ->where('actief', true)
                 ->where(function ($q) {
@@ -109,7 +114,7 @@ class GarageCompany extends Model
                 ->where(function ($q) {
                     $q->whereNull('einddatum')->orWhere('einddatum', '>=', now()->toDateString());
                 })
-                ->sum('prijs_maand_excl');
+                ->sum($sumExpr);
         });
     }
 
@@ -124,11 +129,14 @@ class GarageCompany extends Model
                 ->where(function ($q) {
                     $q->whereNull('einddatum')->orWhere('einddatum', '>=', now()->toDateString());
                 })
-                ->get(['prijs_maand_excl', 'btw_percentage']);
+                ->get(GarageCompanyModule::hasAantalColumn()
+                    ? ['prijs_maand_excl', 'btw_percentage', 'aantal']
+                    : ['prijs_maand_excl', 'btw_percentage']);
 
             $btw = 0.0;
             foreach ($rows as $row) {
-                $btw += (float) $row->prijs_maand_excl * ((float) $row->btw_percentage / 100);
+                $aantal = GarageCompanyModule::hasAantalColumn() ? max(1, (int) ($row->aantal ?? 1)) : 1;
+                $btw += ((float) $row->prijs_maand_excl * $aantal) * ((float) $row->btw_percentage / 100);
             }
 
             return $btw;
@@ -154,4 +162,3 @@ class GarageCompany extends Model
         return $this->demo_aangevraagd_op->lt(now()->subDays($dagen));
     }
 }
-

@@ -16,7 +16,7 @@ class Modules extends Component
     public int $garageCompanyId;
 
     /**
-     * @var array<int, array{assignment_id:int,module_id:int,naam:string,actief:bool,prijs_maand_excl:string,btw_percentage:string}>
+     * @var array<int, array{assignment_id:int,module_id:int,naam:string,aantal:int,actief:bool,prijs_maand_excl:string,btw_percentage:string}>
      */
     public array $rows = [];
 
@@ -44,6 +44,7 @@ class Modules extends Component
 
         foreach ($this->rows as $i => $row) {
             $rules["rows.$i.module_id"] = ['required', 'integer', 'exists:modules,id'];
+            $rules["rows.$i.aantal"] = ['required', 'integer', 'min:0', 'max:999'];
             $rules["rows.$i.prijs_maand_excl"] = ['required', 'numeric', 'min:0'];
             $rules["rows.$i.btw_percentage"] = ['required', 'numeric', 'min:0', 'max:100'];
             $rules["rows.$i.actief"] = ['boolean'];
@@ -54,6 +55,11 @@ class Modules extends Component
         $validated = Validator::make(['rows' => $this->rows], $rules, $messages)->validate();
 
         foreach ($validated['rows'] as $row) {
+            if ($row['actief'] && (int) $row['aantal'] < 1) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    "rows.{$this->rowIndexByModuleId((int) $row['module_id'])}.aantal" => "Actieve module vereist aantal ≥ 1.",
+                ]);
+            }
             if ($row['actief'] && (float) $row['prijs_maand_excl'] <= 0) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     "rows.{$this->rowIndexByModuleId((int) $row['module_id'])}.prijs_maand_excl" => "Actieve module vereist prijs > 0.",
@@ -63,14 +69,20 @@ class Modules extends Component
 
         DB::transaction(function () use ($validated) {
             foreach ($validated['rows'] as $row) {
+                $updates = [
+                    'actief' => (bool) $row['actief'],
+                    'prijs_maand_excl' => $row['prijs_maand_excl'],
+                    'btw_percentage' => $row['btw_percentage'],
+                ];
+
+                if (GarageCompanyModule::hasAantalColumn()) {
+                    $updates['aantal'] = (int) $row['aantal'];
+                }
+
                 GarageCompanyModule::query()
                     ->where('garage_company_id', $this->garageCompanyId)
                     ->where('module_id', $row['module_id'])
-                    ->update([
-                        'actief' => (bool) $row['actief'],
-                        'prijs_maand_excl' => $row['prijs_maand_excl'],
-                        'btw_percentage' => $row['btw_percentage'],
-                    ]);
+                    ->update($updates);
             }
         });
 
@@ -96,6 +108,7 @@ class Modules extends Component
                     'module_id' => $moduleId,
                 ],
                 [
+                    'aantal' => 1,
                     'actief' => false,
                     'prijs_maand_excl' => 0,
                     'btw_percentage' => 21.00,
@@ -117,6 +130,7 @@ class Modules extends Component
             'assignment_id' => $r->id,
             'module_id' => $r->module_id,
             'naam' => $r->module->naam,
+            'aantal' => GarageCompanyModule::hasAantalColumn() ? (int) ($r->aantal ?? 1) : 1,
             'actief' => (bool) $r->actief,
             'prijs_maand_excl' => (string) $r->prijs_maand_excl,
             'btw_percentage' => (string) $r->btw_percentage,
@@ -147,8 +161,9 @@ class Modules extends Component
                 continue;
             }
             $prijs = (float) $row['prijs_maand_excl'];
-            $totaalExcl += $prijs;
-            $btw += $prijs * ((float) $row['btw_percentage'] / 100);
+            $aantal = max(1, (int) ($row['aantal'] ?? 1));
+            $totaalExcl += $prijs * $aantal;
+            $btw += ($prijs * $aantal) * ((float) $row['btw_percentage'] / 100);
             $actieveModules++;
         }
 

@@ -250,6 +250,7 @@ CREATE TABLE IF NOT EXISTS `garage_company_modules` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `garage_company_id` bigint unsigned NOT NULL,
   `module_id` bigint unsigned NOT NULL,
+  `aantal` int unsigned NOT NULL DEFAULT 1,
   `actief` tinyint(1) NOT NULL DEFAULT 0,
   `prijs_maand_excl` decimal(10,2) NOT NULL,
   `startdatum` date DEFAULT NULL,
@@ -346,4 +347,3 @@ INSERT IGNORE INTO `modules` (`naam`, `omschrijving`, `default_visible`, `create
 ('Rapportages', 'Rapportages en inzichten', 1, NOW(), NOW()),
 ('SEPA Incasso', 'SEPA incasso ondersteuning', 1, NOW(), NOW()),
 ('Koppelingen', 'Externe koppelingen / API', 0, NOW(), NOW());
-

@@ -44,7 +44,7 @@ class Create extends Component
     public ?string $tags = null;
 
     /**
-     * @var array<int, array{module_id:int,naam:string,actief:bool,prijs_maand_excl:string,btw_percentage:string}>
+     * @var array<int, array{module_id:int,naam:string,aantal:int,actief:bool,prijs_maand_excl:string,btw_percentage:string}>
      */
     public array $moduleRows = [];
 
@@ -91,6 +91,7 @@ class Create extends Component
         foreach ($this->moduleRows as $i => $row) {
             $rules["moduleRows.$i.module_id"] = ['required', 'integer', 'exists:modules,id'];
             $rules["moduleRows.$i.actief"] = ['boolean'];
+            $rules["moduleRows.$i.aantal"] = ['required', 'integer', 'min:0', 'max:999'];
             $rules["moduleRows.$i.prijs_maand_excl"] = ['required', 'numeric', 'min:0'];
             $rules["moduleRows.$i.btw_percentage"] = ['required', 'numeric', 'min:0', 'max:100'];
             $messages["moduleRows.$i.prijs_maand_excl.required"] = "Prijs is verplicht voor {$row['naam']}.";
@@ -100,6 +101,11 @@ class Create extends Component
         $moduleRows = $validatedModules['moduleRows'] ?? [];
 
         foreach ($moduleRows as $row) {
+            if ($row['actief'] && (int) $row['aantal'] < 1) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    "moduleRows.{$this->moduleRowIndexByModuleId((int) $row['module_id'])}.aantal" => 'Actieve module vereist aantal ≥ 1.',
+                ]);
+            }
             if ($row['actief'] && (float) $row['prijs_maand_excl'] <= 0) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     "moduleRows.{$this->moduleRowIndexByModuleId((int) $row['module_id'])}.prijs_maand_excl" => 'Actieve module vereist prijs > 0.',
@@ -155,15 +161,22 @@ class Create extends Component
             ]);
 
             foreach ($moduleRows as $row) {
-                GarageCompanyModule::create([
+                $values = [
                     'garage_company_id' => $company->id,
                     'module_id' => (int) $row['module_id'],
+                    'aantal' => (int) $row['aantal'],
                     'actief' => (bool) $row['actief'],
                     'prijs_maand_excl' => (float) $row['prijs_maand_excl'],
                     'btw_percentage' => (float) $row['btw_percentage'],
                     'startdatum' => null,
                     'einddatum' => null,
-                ]);
+                ];
+
+                if (! GarageCompanyModule::hasAantalColumn()) {
+                    unset($values['aantal']);
+                }
+
+                GarageCompanyModule::create($values);
             }
 
             Activity::create([
@@ -228,6 +241,7 @@ class Create extends Component
         $this->moduleRows = $modules->map(fn ($m) => [
             'module_id' => (int) $m->id,
             'naam' => $m->naam,
+            'aantal' => 1,
             'actief' => false,
             'prijs_maand_excl' => '0',
             'btw_percentage' => '21',
@@ -249,18 +263,23 @@ class Create extends Component
     {
         $totaalExcl = 0.0;
         $btw = 0.0;
+        $actieveModules = 0;
         foreach ($this->moduleRows as $row) {
             if (! $row['actief']) {
                 continue;
             }
             $prijs = (float) $row['prijs_maand_excl'];
-            $totaalExcl += $prijs;
-            $btw += $prijs * ((float) $row['btw_percentage'] / 100);
+            $aantal = max(1, (int) ($row['aantal'] ?? 1));
+            $totaalExcl += $prijs * $aantal;
+            $btw += ($prijs * $aantal) * ((float) $row['btw_percentage'] / 100);
+            $actieveModules++;
         }
 
         return view('livewire.crm.garage-companies.create', [
             'statuses' => GarageCompanyStatus::cases(),
             'sources' => GarageCompanySource::cases(),
+            'actieveModules' => $actieveModules,
+            'totaalModules' => count($this->moduleRows),
             'totaalExcl' => $totaalExcl,
             'btw' => $btw,
             'totaalIncl' => $totaalExcl + $btw,

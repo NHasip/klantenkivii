@@ -151,8 +151,16 @@ class Index extends Component
 
         $modulesQuery = $this->activeModulesQuery();
 
-        $mrrExcl = (float) (clone $modulesQuery)->sum('prijs_maand_excl');
-        $mrrBtw = (float) (clone $modulesQuery)->sum(DB::raw('(prijs_maand_excl * (btw_percentage / 100))'));
+        $mrrExclExpr = GarageCompanyModule::hasAantalColumn()
+            ? DB::raw('(prijs_maand_excl * aantal)')
+            : 'prijs_maand_excl';
+
+        $mrrBtwExpr = GarageCompanyModule::hasAantalColumn()
+            ? DB::raw('((prijs_maand_excl * aantal) * (btw_percentage / 100))')
+            : DB::raw('(prijs_maand_excl * (btw_percentage / 100))');
+
+        $mrrExcl = (float) (clone $modulesQuery)->sum($mrrExclExpr);
+        $mrrBtw = (float) (clone $modulesQuery)->sum($mrrBtwExpr);
         $mrrIncl = $mrrExcl + $mrrBtw;
 
         $today = CarbonImmutable::now('Europe/Amsterdam')->toDateString();
@@ -170,7 +178,9 @@ class Index extends Component
             })
             ->select('modules.id', 'modules.naam')
             ->selectRaw('COUNT(gcm.id) as active_subscriptions')
-            ->selectRaw('COALESCE(SUM(gcm.prijs_maand_excl), 0) as mrr_excl')
+            ->selectRaw(GarageCompanyModule::hasAantalColumn()
+                ? 'COALESCE(SUM(gcm.prijs_maand_excl * gcm.aantal), 0) as mrr_excl'
+                : 'COALESCE(SUM(gcm.prijs_maand_excl), 0) as mrr_excl')
             ->selectRaw('COALESCE(MIN(gcm.btw_percentage), 21.00) as btw_min')
             ->selectRaw('COALESCE(MAX(gcm.btw_percentage), 21.00) as btw_max')
             ->selectRaw('SUM(CASE WHEN gcm.id IS NOT NULL AND gcm.prijs_maand_excl <= 0 THEN 1 ELSE 0 END) as invalid_price_count')
@@ -185,7 +195,9 @@ class Index extends Component
         $topCustomers = (clone $modulesQuery)
             ->join('garage_companies', 'garage_companies.id', '=', 'garage_company_modules.garage_company_id')
             ->select('garage_companies.id', 'garage_companies.bedrijfsnaam', 'garage_companies.plaats', 'garage_companies.status')
-            ->selectRaw('SUM(garage_company_modules.prijs_maand_excl) as mrr_excl')
+            ->selectRaw(GarageCompanyModule::hasAantalColumn()
+                ? 'SUM(garage_company_modules.prijs_maand_excl * garage_company_modules.aantal) as mrr_excl'
+                : 'SUM(garage_company_modules.prijs_maand_excl) as mrr_excl')
             ->groupBy('garage_companies.id', 'garage_companies.bedrijfsnaam', 'garage_companies.plaats', 'garage_companies.status')
             ->orderByDesc('mrr_excl')
             ->limit(10)

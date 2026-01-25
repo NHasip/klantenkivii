@@ -92,7 +92,11 @@
 
         <div class="rounded-xl border border-zinc-200 bg-white p-6">
             <div class="text-sm font-semibold">Modules</div>
-            <div class="mt-1 text-xs text-zinc-500">Geef aan welke modules actief zijn. Bij een actieve module is prijs &gt; 0 verplicht.</div>
+            <div class="mt-1 text-xs text-zinc-500">
+                Geef aan welke modules actief zijn. Bij een actieve module is prijs &gt; 0 verplicht.
+                <span class="ml-2">Actief: {{ $actieveModules }} / {{ $totaalModules }}</span>
+                <span class="ml-2">Actief &rarr; aantal &ge; 1 verplicht.</span>
+            </div>
             <div class="mt-3 text-sm text-zinc-700">
                 <span class="font-semibold">Totaal:</span>
                 &euro; {{ number_format($totaalExcl, 2, ',', '.') }} excl. btw
@@ -108,6 +112,7 @@
                         <tr>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Actief</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Module</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Aantal</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Prijs (excl. btw)</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">BTW %</th>
                         </tr>
@@ -119,6 +124,10 @@
                                     <input type="checkbox" class="rounded border-zinc-300" wire:model.live="moduleRows.{{ $i }}.actief" />
                                 </td>
                                 <td class="px-4 py-3 text-sm font-semibold">{{ $row['naam'] }}</td>
+                                <td class="px-4 py-3">
+                                    <input type="number" step="1" min="0" max="999" class="w-24 rounded-md border-zinc-300 text-sm" wire:model.live="moduleRows.{{ $i }}.aantal" />
+                                    @error("moduleRows.$i.aantal") <div class="mt-1 text-xs text-rose-600">{{ $message }}</div> @enderror
+                                </td>
                                 <td class="px-4 py-3">
                                     <input type="number" step="0.01" min="0" class="w-40 rounded-md border-zinc-300 text-sm" wire:model.live="moduleRows.{{ $i }}.prijs_maand_excl" />
                                     @error("moduleRows.$i.prijs_maand_excl") <div class="mt-1 text-xs text-rose-600">{{ $message }}</div> @enderror

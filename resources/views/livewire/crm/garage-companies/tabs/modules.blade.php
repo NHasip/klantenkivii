@@ -34,6 +34,7 @@
                 <tr>
                     <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Actief</th>
                     <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Module</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Aantal</th>
                     <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Prijs (excl. btw)</th>
                     <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">BTW %</th>
                 </tr>
@@ -46,6 +47,10 @@
                         </td>
                         <td class="px-4 py-3 text-sm font-semibold">
                             {{ $row['naam'] }}
+                        </td>
+                        <td class="px-4 py-3">
+                            <input type="number" step="1" min="0" max="999" class="w-24 rounded-md border-zinc-300 text-sm" wire:model.live="rows.{{ $i }}.aantal" />
+                            @error("rows.$i.aantal") <div class="mt-1 text-xs text-rose-600">{{ $message }}</div> @enderror
                         </td>
                         <td class="px-4 py-3">
                             <input type="number" step="0.01" min="0" class="w-40 rounded-md border-zinc-300 text-sm" wire:model.live="rows.{{ $i }}.prijs_maand_excl" />
