@@ -136,34 +136,75 @@
         </div>
 
         <div class="rounded-xl border border-zinc-200 bg-white p-6 lg:col-span-2">
-            <div class="flex items-center justify-between gap-3">
-                <div class="text-sm font-semibold">MRR per module (actief)</div>
-                <div class="text-xs text-zinc-500">Bedragen excl. btw</div>
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <div class="text-sm font-semibold">Modules</div>
+                    <div class="mt-1 text-xs text-zinc-500">
+                        Aantal modules: {{ number_format($kpis['modules_total'], 0, ',', '.') }} ·
+                        Actieve modules: {{ number_format($kpis['modules_active'], 0, ',', '.') }} ·
+                        Actieve abonnementen: {{ number_format($kpis['modules_active_subscriptions'], 0, ',', '.') }}
+                        @if($kpis['modules_invalid_price_count'] > 0)
+                            · <span class="font-semibold text-rose-700">{{ number_format($kpis['modules_invalid_price_count'], 0, ',', '.') }} met prijs 0 (actief)</span>
+                        @endif
+                    </div>
+                </div>
+                <div class="text-xs text-zinc-700">
+                    Totaal: <span class="font-semibold">&euro; {{ number_format($kpis['mrr_excl'], 2, ',', '.') }}</span> excl. btw
+                    &middot; BTW <span class="font-semibold">&euro; {{ number_format($kpis['mrr_btw'], 2, ',', '.') }}</span>
+                    &middot; <span class="font-semibold">&euro; {{ number_format($kpis['mrr_incl'], 2, ',', '.') }}</span> incl. btw
+                </div>
             </div>
 
             <div class="mt-4 overflow-hidden rounded-lg border border-zinc-200">
                 <table class="min-w-full divide-y divide-zinc-100">
                     <thead class="bg-zinc-50">
                         <tr>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Actief</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Module</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Abonnementen</th>
-                            <th class="px-4 py-3 text-right text-xs font-semibold text-zinc-600">MRR excl.</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold text-zinc-600">Prijs (excl. btw)</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold text-zinc-600">BTW %</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-zinc-100">
-                        @forelse($mrrPerModule as $row)
+                        @forelse($modulesOverview as $row)
                             <tr class="hover:bg-zinc-50">
+                                <td class="px-4 py-3 text-sm">
+                                    <div class="inline-flex items-center gap-2">
+                                        <span class="inline-flex items-center rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-xs font-semibold text-zinc-700">
+                                            {{ number_format((int) $row->active_subscriptions, 0, ',', '.') }}
+                                        </span>
+                                        @if((int) $row->active_subscriptions > 0 && (int) $row->invalid_price_count > 0)
+                                            <span class="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-700">
+                                                prijs 0
+                                            </span>
+                                        @endif
+                                    </div>
+                                </td>
                                 <td class="px-4 py-3 text-sm font-semibold">{{ $row->naam }}</td>
-                                <td class="px-4 py-3 text-sm">{{ number_format((int) $row->subscriptions, 0, ',', '.') }}</td>
-                                <td class="px-4 py-3 text-right text-sm font-semibold">€ {{ number_format((float) $row->mrr_excl, 2, ',', '.') }}</td>
+                                <td class="px-4 py-3 text-right text-sm font-semibold">&euro; {{ number_format((float) $row->mrr_excl, 2, ',', '.') }}</td>
+                                <td class="px-4 py-3 text-right text-sm text-zinc-700">
+                                    @php
+                                        $btwMin = (float) $row->btw_min;
+                                        $btwMax = (float) $row->btw_max;
+                                    @endphp
+                                    @if(abs($btwMin - $btwMax) < 0.001)
+                                        {{ number_format($btwMin, 0, ',', '.') }}
+                                    @else
+                                        {{ number_format($btwMin, 0, ',', '.') }}&ndash;{{ number_format($btwMax, 0, ',', '.') }}
+                                    @endif
+                                </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="3" class="px-4 py-6 text-center text-sm text-zinc-500">Nog geen actieve modules.</td>
+                                <td colspan="4" class="px-4 py-6 text-center text-sm text-zinc-500">Nog geen modules.</td>
                             </tr>
                         @endforelse
                     </tbody>
                 </table>
+            </div>
+
+            <div class="mt-3 text-xs text-zinc-500">
+                Let op: in klantdossiers geldt “actief” &rarr; prijs &gt; 0 (excl. btw) verplicht.
             </div>
         </div>
     </div>

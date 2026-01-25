@@ -140,6 +140,7 @@ class Modules extends Component
 
         $totaalExcl = 0.0;
         $btw = 0.0;
+        $actieveModules = 0;
 
         foreach ($this->rows as $row) {
             if (! $row['actief']) {
@@ -148,10 +149,13 @@ class Modules extends Component
             $prijs = (float) $row['prijs_maand_excl'];
             $totaalExcl += $prijs;
             $btw += $prijs * ((float) $row['btw_percentage'] / 100);
+            $actieveModules++;
         }
 
         return view('livewire.crm.garage-companies.tabs.modules', [
             'company' => $company,
+            'actieveModules' => $actieveModules,
+            'totaalModules' => count($this->rows),
             'totaalExcl' => $totaalExcl,
             'btw' => $btw,
             'totaalIncl' => $totaalExcl + $btw,

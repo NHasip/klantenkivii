@@ -1,13 +1,17 @@
-<div class="space-y-6">
-    <div class="flex items-center justify-between gap-3">
-        <div>
-            <div class="text-sm font-semibold">Modules &amp; prijzen</div>
-            <div class="mt-1 text-xs text-zinc-500">Activeer modules en leg prijsafspraken vast per maand.</div>
+    <div class="space-y-6">
+        <div class="flex items-center justify-between gap-3">
+            <div>
+                <div class="text-sm font-semibold">Modules &amp; prijzen</div>
+            <div class="mt-1 text-xs text-zinc-500">
+                Activeer modules en leg prijsafspraken vast per maand.
+                <span class="ml-2">Actief: {{ $actieveModules }} / {{ $totaalModules }}</span>
+                <span class="ml-2">Actief &rarr; prijs &gt; 0 verplicht.</span>
+            </div>
+            </div>
+            <button type="button" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700" wire:click="save">
+                Opslaan
+            </button>
         </div>
-        <button type="button" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700" wire:click="save">
-            Opslaan
-        </button>
-    </div>
 
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div class="rounded-xl border border-zinc-200 bg-zinc-50 p-4">

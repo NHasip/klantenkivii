@@ -5,6 +5,7 @@ namespace App\Livewire\Crm\Reports;
 use App\Models\GarageCompany;
 use App\Models\GarageCompanyModule;
 use App\Models\KiviiSeat;
+use App\Models\Module;
 use App\Models\SepaMandate;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -146,20 +147,40 @@ class Index extends Component
             ->whereDoesntHave('activeMandate')
             ->count();
 
+        $modulesTotal = Module::query()->count();
+
         $modulesQuery = $this->activeModulesQuery();
 
         $mrrExcl = (float) (clone $modulesQuery)->sum('prijs_maand_excl');
         $mrrBtw = (float) (clone $modulesQuery)->sum(DB::raw('(prijs_maand_excl * (btw_percentage / 100))'));
         $mrrIncl = $mrrExcl + $mrrBtw;
 
-        $mrrPerModule = (clone $modulesQuery)
-            ->join('modules', 'modules.id', '=', 'garage_company_modules.module_id')
+        $today = CarbonImmutable::now('Europe/Amsterdam')->toDateString();
+
+        $modulesOverview = Module::query()
+            ->leftJoin('garage_company_modules as gcm', function ($join) use ($today) {
+                $join->on('gcm.module_id', '=', 'modules.id')
+                    ->where('gcm.actief', true)
+                    ->where(function ($q) use ($today) {
+                        $q->whereNull('gcm.startdatum')->orWhere('gcm.startdatum', '<=', $today);
+                    })
+                    ->where(function ($q) use ($today) {
+                        $q->whereNull('gcm.einddatum')->orWhere('gcm.einddatum', '>=', $today);
+                    });
+            })
             ->select('modules.id', 'modules.naam')
-            ->selectRaw('COUNT(*) as subscriptions')
-            ->selectRaw('SUM(garage_company_modules.prijs_maand_excl) as mrr_excl')
+            ->selectRaw('COUNT(gcm.id) as active_subscriptions')
+            ->selectRaw('COALESCE(SUM(gcm.prijs_maand_excl), 0) as mrr_excl')
+            ->selectRaw('COALESCE(MIN(gcm.btw_percentage), 21.00) as btw_min')
+            ->selectRaw('COALESCE(MAX(gcm.btw_percentage), 21.00) as btw_max')
+            ->selectRaw('SUM(CASE WHEN gcm.id IS NOT NULL AND gcm.prijs_maand_excl <= 0 THEN 1 ELSE 0 END) as invalid_price_count')
             ->groupBy('modules.id', 'modules.naam')
-            ->orderByDesc('mrr_excl')
+            ->orderBy('modules.naam')
             ->get();
+
+        $modulesActive = (int) $modulesOverview->filter(fn ($row) => (int) $row->active_subscriptions > 0)->count();
+        $modulesActiveSubscriptions = (int) $modulesOverview->sum(fn ($row) => (int) $row->active_subscriptions);
+        $modulesInvalidPriceCount = (int) $modulesOverview->sum(fn ($row) => (int) $row->invalid_price_count);
 
         $topCustomers = (clone $modulesQuery)
             ->join('garage_companies', 'garage_companies.id', '=', 'garage_company_modules.garage_company_id')
@@ -190,12 +211,16 @@ class Index extends Component
                 'mandates_active' => $mandatesActive,
                 'mandates_pending' => $mandatesPending,
                 'active_without_mandate' => $activeWithoutMandate,
+                'modules_total' => $modulesTotal,
+                'modules_active' => $modulesActive,
+                'modules_active_subscriptions' => $modulesActiveSubscriptions,
+                'modules_invalid_price_count' => $modulesInvalidPriceCount,
                 'mrr_excl' => $mrrExcl,
                 'mrr_btw' => $mrrBtw,
                 'mrr_incl' => $mrrIncl,
             ],
             'funnel' => $funnel,
-            'mrrPerModule' => $mrrPerModule,
+            'modulesOverview' => $modulesOverview,
             'topCustomers' => $topCustomers,
             'cancellationsByMonth' => $cancellationsByMonth,
         ])->layout('layouts.crm', ['title' => 'Rapportages']);
