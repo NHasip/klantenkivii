@@ -43,6 +43,14 @@
 
         @stack('modals')
 
+        @livewireScriptConfig
         @livewireScripts
+        <script data-navigate-once>
+            document.addEventListener('DOMContentLoaded', () => {
+                if (window.Livewire && typeof window.Livewire.start === 'function' && !window.Livewire.initialRenderIsFinished) {
+                    window.Livewire.start();
+                }
+            });
+        </script>
     </body>
 </html>
