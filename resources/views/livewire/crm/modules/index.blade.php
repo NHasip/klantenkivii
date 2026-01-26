@@ -39,26 +39,33 @@
         </table>
     </div>
 
-    <div class="rounded-xl border border-zinc-200 bg-white p-5">
-        <div class="text-sm font-semibold">{{ $moduleId ? 'Module bewerken' : 'Module toevoegen' }}</div>
-        <form wire:submit="save" class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-                <label class="block text-xs font-medium text-zinc-600">Naam *</label>
-                <input class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model.live="naam" />
-                @error('naam') <div class="mt-1 text-xs text-rose-600">{{ $message }}</div> @enderror
+    @if($showForm)
+        <div class="rounded-xl border border-zinc-200 bg-white p-5">
+            <div class="flex items-center justify-between gap-3">
+                <div class="text-sm font-semibold">{{ $moduleId ? 'Module bewerken' : 'Module toevoegen' }}</div>
+                <button type="button" class="rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold hover:bg-zinc-50" wire:click="cancel">
+                    Annuleren
+                </button>
             </div>
-            <div class="flex items-center gap-2 pt-6">
-                <input type="checkbox" class="rounded border-zinc-300" wire:model.live="default_visible" id="default_visible">
-                <label for="default_visible" class="text-sm">Default zichtbaar</label>
-            </div>
-            <div class="sm:col-span-2">
-                <label class="block text-xs font-medium text-zinc-600">Omschrijving</label>
-                <textarea class="mt-1 w-full rounded-md border-zinc-300 text-sm" rows="3" wire:model.live="omschrijving"></textarea>
-            </div>
-            <div class="sm:col-span-2 flex justify-end">
-                <button type="submit" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700">Opslaan</button>
-            </div>
-        </form>
-    </div>
-</div>
 
+            <form wire:submit="save" class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                    <label class="block text-xs font-medium text-zinc-600">Naam *</label>
+                    <input class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model.live="naam" />
+                    @error('naam') <div class="mt-1 text-xs text-rose-600">{{ $message }}</div> @enderror
+                </div>
+                <div class="flex items-center gap-2 pt-6">
+                    <input type="checkbox" class="rounded border-zinc-300" wire:model.live="default_visible" id="default_visible">
+                    <label for="default_visible" class="text-sm">Default zichtbaar</label>
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="block text-xs font-medium text-zinc-600">Omschrijving</label>
+                    <textarea class="mt-1 w-full rounded-md border-zinc-300 text-sm" rows="3" wire:model.live="omschrijving"></textarea>
+                </div>
+                <div class="sm:col-span-2 flex justify-end">
+                    <button type="submit" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700">Opslaan</button>
+                </div>
+            </form>
+        </div>
+    @endif
+</div>

@@ -60,7 +60,7 @@
                     <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Klant</th>
                     <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Status</th>
                     <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Terugkerende omzet (excl. btw)</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Seats</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Gebruikers</th>
                     <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Bijgewerkt</th>
                 </tr>
             </thead>

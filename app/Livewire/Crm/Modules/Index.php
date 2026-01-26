@@ -10,6 +10,8 @@ class Index extends Component
 {
     public ?int $moduleId = null;
 
+    public bool $showForm = false;
+
     public string $naam = '';
     public ?string $omschrijving = null;
     public bool $default_visible = true;
@@ -18,6 +20,7 @@ class Index extends Component
     {
         $this->resetForm();
         $this->moduleId = null;
+        $this->showForm = true;
     }
 
     public function startEdit(int $id): void
@@ -27,6 +30,14 @@ class Index extends Component
         $this->naam = $module->naam;
         $this->omschrijving = $module->omschrijving;
         $this->default_visible = (bool) $module->default_visible;
+        $this->showForm = true;
+    }
+
+    public function cancel(): void
+    {
+        $this->resetForm();
+        $this->moduleId = null;
+        $this->showForm = false;
     }
 
     public function save(): void
@@ -44,6 +55,7 @@ class Index extends Component
 
         $this->resetForm();
         $this->moduleId = null;
+        $this->showForm = false;
         session()->flash('status', 'Module opgeslagen.');
     }
 
@@ -69,4 +81,3 @@ class Index extends Component
         ])->layout('layouts.crm', ['title' => 'Modules']);
     }
 }
-

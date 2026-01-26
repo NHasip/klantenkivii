@@ -1,10 +1,10 @@
 <div class="space-y-6">
     <div class="flex items-center justify-between gap-3">
         <div>
-            <div class="text-sm font-semibold">Seats &amp; Kivii gebruikers</div>
-            <div class="mt-1 text-xs text-zinc-500">Totaal actieve seats: <span class="font-semibold">{{ $actieveSeats }}</span></div>
+            <div class="text-sm font-semibold">Gebruikers</div>
+            <div class="mt-1 text-xs text-zinc-500">Totaal actieve gebruikers: <span class="font-semibold">{{ $actieveSeats }}</span></div>
         </div>
-        <button type="button" class="rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold hover:bg-zinc-50" wire:click="startCreate">Nieuwe seat</button>
+        <button type="button" class="rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold hover:bg-zinc-50" wire:click="startCreate">Nieuwe gebruiker</button>
     </div>
 
     <div class="overflow-hidden rounded-xl border border-zinc-200 bg-white">
@@ -32,15 +32,21 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" class="px-4 py-10 text-center text-sm text-zinc-600">Nog geen seats.</td>
+                        <td colspan="5" class="px-4 py-10 text-center text-sm text-zinc-600">Nog geen gebruikers.</td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
     </div>
 
+    @if($showForm)
     <div class="rounded-xl border border-zinc-200 bg-white p-5">
-        <div class="text-sm font-semibold">{{ $seatId ? 'Seat bewerken' : 'Seat toevoegen' }}</div>
+        <div class="flex items-center justify-between gap-3">
+            <div class="text-sm font-semibold">{{ $seatId ? 'Gebruiker bewerken' : 'Gebruiker toevoegen' }}</div>
+            <button type="button" class="rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold hover:bg-zinc-50" wire:click="cancel">
+                Annuleren
+            </button>
+        </div>
 
         <form wire:submit="save" class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
@@ -70,5 +76,5 @@
             </div>
         </form>
     </div>
+    @endif
 </div>
-

@@ -13,6 +13,8 @@ class Persons extends Component
 {
     public int $garageCompanyId;
 
+    public bool $showForm = false;
+
     public ?int $personId = null;
 
     public string $voornaam = '';
@@ -32,6 +34,7 @@ class Persons extends Component
     {
         $this->resetForm();
         $this->personId = null;
+        $this->showForm = true;
     }
 
     public function startEdit(int $id): void
@@ -48,6 +51,14 @@ class Persons extends Component
         $this->telefoon = $person->telefoon;
         $this->is_primary = (bool) $person->is_primary;
         $this->active = (bool) $person->active;
+        $this->showForm = true;
+    }
+
+    public function cancel(): void
+    {
+        $this->resetForm();
+        $this->personId = null;
+        $this->showForm = false;
     }
 
     public function save(): void
@@ -89,14 +100,15 @@ class Persons extends Component
         Activity::create([
             'garage_company_id' => $company->id,
             'type' => ActivityType::Systeem,
-            'titel' => 'Klantpersoon bijgewerkt',
+            'titel' => 'Contactpersoon bijgewerkt',
             'inhoud' => "{$person->voornaam} {$person->achternaam} ({$person->email})",
             'created_by' => auth()->id(),
         ]);
 
         $this->resetForm();
         $this->personId = null;
-        session()->flash('status', 'Klantpersoon opgeslagen.');
+        $this->showForm = false;
+        session()->flash('status', 'Contactpersoon opgeslagen.');
     }
 
     public function delete(int $id): void
@@ -106,7 +118,7 @@ class Persons extends Component
             ->findOrFail($id);
 
         $person->delete();
-        session()->flash('status', 'Klantpersoon verwijderd.');
+        session()->flash('status', 'Contactpersoon verwijderd.');
     }
 
     private function resetForm(): void
@@ -135,4 +147,3 @@ class Persons extends Component
         ]);
     }
 }
-

@@ -16,6 +16,13 @@ class Show extends Component
     public function mount(GarageCompany $garageCompany): void
     {
         $this->garageCompany = $garageCompany;
+
+        if ($this->tab === 'seats') {
+            $this->redirect(
+                route('crm.garage_companies.show', ['garageCompany' => $garageCompany->id, 'tab' => 'gebruikers']),
+                navigate: true,
+            );
+        }
     }
 
     public function render()
@@ -23,15 +30,14 @@ class Show extends Component
         return view('livewire.crm.garage-companies.show', [
             'tabs' => [
                 'overzicht' => 'Overzicht',
-                'klantpersonen' => 'Klantpersonen',
+                'klantpersonen' => 'Contactpersonen',
                 'demo_status' => 'Demo & status',
                 'incasso' => 'Incasso',
                 'modules' => 'Modules & prijzen',
-                'seats' => 'Seats',
+                'gebruikers' => 'Gebruikers',
                 'timeline' => 'Notities & timeline',
                 'taken_afspraken' => 'Taken & afspraken',
             ],
         ])->layout('layouts.crm', ['title' => $this->garageCompany->bedrijfsnaam]);
     }
 }
-

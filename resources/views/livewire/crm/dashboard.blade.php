@@ -145,7 +145,7 @@
                 </ul>
             </div>
             <div class="mt-4">
-                <div class="text-xs font-semibold text-zinc-500">Top 10 actieve seats</div>
+                <div class="text-xs font-semibold text-zinc-500">Top 10 actieve gebruikers</div>
                 <ul class="mt-2 space-y-1">
                     @foreach($seatsTop10 as $c)
                         <li class="flex items-center justify-between">

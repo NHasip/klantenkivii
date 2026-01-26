@@ -13,6 +13,8 @@ class Seats extends Component
 {
     public int $garageCompanyId;
 
+    public bool $showForm = false;
+
     public ?int $seatId = null;
 
     public string $naam = '';
@@ -30,6 +32,7 @@ class Seats extends Component
     {
         $this->resetForm();
         $this->seatId = null;
+        $this->showForm = true;
     }
 
     public function startEdit(int $id): void
@@ -44,6 +47,14 @@ class Seats extends Component
         $this->rol_in_kivii = $seat->rol_in_kivii;
         $this->actief = (bool) $seat->actief;
         $this->aangemaakt_op = optional($seat->aangemaakt_op)->toDateString();
+        $this->showForm = true;
+    }
+
+    public function cancel(): void
+    {
+        $this->resetForm();
+        $this->seatId = null;
+        $this->showForm = false;
     }
 
     public function save(): void
@@ -69,14 +80,15 @@ class Seats extends Component
         Activity::create([
             'garage_company_id' => $company->id,
             'type' => ActivityType::Systeem,
-            'titel' => 'Seat bijgewerkt',
+            'titel' => 'Gebruiker bijgewerkt',
             'inhoud' => "{$seat->naam} ({$seat->email})",
             'created_by' => auth()->id(),
         ]);
 
         $this->resetForm();
         $this->seatId = null;
-        session()->flash('status', 'Seat opgeslagen.');
+        $this->showForm = false;
+        session()->flash('status', 'Gebruiker opgeslagen.');
     }
 
     public function delete(int $id): void
@@ -85,7 +97,7 @@ class Seats extends Component
             ->where('garage_company_id', $this->garageCompanyId)
             ->findOrFail($id);
         $seat->delete();
-        session()->flash('status', 'Seat verwijderd.');
+        session()->flash('status', 'Gebruiker verwijderd.');
     }
 
     private function resetForm(): void
@@ -115,4 +127,3 @@ class Seats extends Component
         ]);
     }
 }
-

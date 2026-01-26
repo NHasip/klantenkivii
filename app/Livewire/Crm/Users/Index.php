@@ -11,6 +11,8 @@ class Index extends Component
 {
     public ?int $userId = null;
 
+    public bool $showForm = false;
+
     public string $name = '';
     public string $email = '';
     public ?string $phone = null;
@@ -22,6 +24,7 @@ class Index extends Component
     {
         $this->resetForm();
         $this->userId = null;
+        $this->showForm = true;
     }
 
     public function startEdit(int $id): void
@@ -35,6 +38,14 @@ class Index extends Component
         $this->role = $user->role->value;
         $this->active = (bool) $user->active;
         $this->password = null;
+        $this->showForm = true;
+    }
+
+    public function cancel(): void
+    {
+        $this->resetForm();
+        $this->userId = null;
+        $this->showForm = false;
     }
 
     public function save(): void
@@ -74,6 +85,7 @@ class Index extends Component
 
         $this->resetForm();
         $this->userId = null;
+        $this->showForm = false;
         session()->flash('status', 'Gebruiker opgeslagen.');
     }
 
