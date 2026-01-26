@@ -93,7 +93,7 @@
         <div class="rounded-xl border border-zinc-200 bg-white p-6">
             <div class="text-sm font-semibold">Modules</div>
             <div class="mt-1 text-xs text-zinc-500">
-                Geef aan welke modules actief zijn. Bij een actieve module is prijs &gt; 0 verplicht.
+                Geef aan welke modules actief zijn. Prijs 0 is toegestaan.
                 <span class="ml-2">Actief: {{ $actieveModules }} / {{ $totaalModules }}</span>
                 <span class="ml-2">Actief &rarr; aantal &ge; 1 verplicht.</span>
             </div>

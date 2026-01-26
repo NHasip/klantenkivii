@@ -5,7 +5,7 @@
             <div class="mt-1 text-xs text-zinc-500">
                 Activeer modules en leg prijsafspraken vast per maand.
                 <span class="ml-2">Actief: {{ $actieveModules }} / {{ $totaalModules }}</span>
-                <span class="ml-2">Actief &rarr; prijs &gt; 0 verplicht.</span>
+                <span class="ml-2">Actief &rarr; aantal &ge; 1 verplicht. Prijs 0 is toegestaan.</span>
             </div>
             </div>
             <button type="button" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700" wire:click="save">

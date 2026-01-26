@@ -31,7 +31,7 @@
                     @else
                         <div class="sm:col-span-2 flex justify-end">
                             <div class="hidden sm:block text-xs text-zinc-500 self-center">
-                                Tip: kies “Aangepast” voor datumrange.
+                                Tip: kies &ldquo;Aangepast&rdquo; voor datumrange.
                             </div>
                         </div>
                     @endif
@@ -140,12 +140,10 @@
                 <div>
                     <div class="text-sm font-semibold">Modules</div>
                     <div class="mt-1 text-xs text-zinc-500">
-                        Aantal modules: {{ number_format($kpis['modules_total'], 0, ',', '.') }} ·
-                        Actieve modules: {{ number_format($kpis['modules_active'], 0, ',', '.') }} ·
-                        Actieve abonnementen: {{ number_format($kpis['modules_active_subscriptions'], 0, ',', '.') }}
-                        @if($kpis['modules_invalid_price_count'] > 0)
-                            · <span class="font-semibold text-rose-700">{{ number_format($kpis['modules_invalid_price_count'], 0, ',', '.') }} met prijs 0 (actief)</span>
-                        @endif
+                        Aantal modules: {{ number_format($kpis['modules_total'], 0, ',', '.') }} &middot;
+                        Actieve modules: {{ number_format($kpis['modules_active'], 0, ',', '.') }} &middot;
+                        Actieve abonnementen: {{ number_format($kpis['modules_active_subscriptions'], 0, ',', '.') }} &middot;
+                        Totaal aantallen: {{ number_format($kpis['modules_total_aantal'], 0, ',', '.') }}
                     </div>
                 </div>
                 <div class="text-xs text-zinc-700">
@@ -161,6 +159,7 @@
                         <tr>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Actief</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Module</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold text-zinc-600">Aantal</th>
                             <th class="px-4 py-3 text-right text-xs font-semibold text-zinc-600">Prijs (excl. btw)</th>
                             <th class="px-4 py-3 text-right text-xs font-semibold text-zinc-600">BTW %</th>
                         </tr>
@@ -173,14 +172,10 @@
                                         <span class="inline-flex items-center rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-xs font-semibold text-zinc-700">
                                             {{ number_format((int) $row->active_subscriptions, 0, ',', '.') }}
                                         </span>
-                                        @if((int) $row->active_subscriptions > 0 && (int) $row->invalid_price_count > 0)
-                                            <span class="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-700">
-                                                prijs 0
-                                            </span>
-                                        @endif
                                     </div>
                                 </td>
                                 <td class="px-4 py-3 text-sm font-semibold">{{ $row->naam }}</td>
+                                <td class="px-4 py-3 text-right text-sm text-zinc-700">{{ number_format((int) $row->total_aantal, 0, ',', '.') }}</td>
                                 <td class="px-4 py-3 text-right text-sm font-semibold">&euro; {{ number_format((float) $row->mrr_excl, 2, ',', '.') }}</td>
                                 <td class="px-4 py-3 text-right text-sm text-zinc-700">
                                     @php
@@ -196,7 +191,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="4" class="px-4 py-6 text-center text-sm text-zinc-500">Nog geen modules.</td>
+                                <td colspan="5" class="px-4 py-6 text-center text-sm text-zinc-500">Nog geen modules.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -204,7 +199,7 @@
             </div>
 
             <div class="mt-3 text-xs text-zinc-500">
-                Let op: in klantdossiers geldt “actief” &rarr; prijs &gt; 0 (excl. btw) verplicht.
+                Let op: in klantdossiers geldt &ldquo;actief&rdquo; &rarr; aantal &ge; 1. Prijs 0 is toegestaan.
             </div>
         </div>
     </div>
@@ -226,7 +221,7 @@
                             <tr class="hover:bg-zinc-50">
                                 <td class="px-4 py-3 text-sm font-semibold">{{ $row->bedrijfsnaam }}</td>
                                 <td class="px-4 py-3 text-sm text-zinc-600">{{ $row->plaats }}</td>
-                                <td class="px-4 py-3 text-right text-sm font-semibold">€ {{ number_format((float) $row->mrr_excl, 2, ',', '.') }}</td>
+                                <td class="px-4 py-3 text-right text-sm font-semibold">&euro; {{ number_format((float) $row->mrr_excl, 2, ',', '.') }}</td>
                             </tr>
                         @empty
                             <tr>

@@ -179,18 +179,20 @@ class Index extends Component
             ->select('modules.id', 'modules.naam')
             ->selectRaw('COUNT(gcm.id) as active_subscriptions')
             ->selectRaw(GarageCompanyModule::hasAantalColumn()
+                ? 'COALESCE(SUM(gcm.aantal), 0) as total_aantal'
+                : 'COUNT(gcm.id) as total_aantal')
+            ->selectRaw(GarageCompanyModule::hasAantalColumn()
                 ? 'COALESCE(SUM(gcm.prijs_maand_excl * gcm.aantal), 0) as mrr_excl'
                 : 'COALESCE(SUM(gcm.prijs_maand_excl), 0) as mrr_excl')
             ->selectRaw('COALESCE(MIN(gcm.btw_percentage), 21.00) as btw_min')
             ->selectRaw('COALESCE(MAX(gcm.btw_percentage), 21.00) as btw_max')
-            ->selectRaw('SUM(CASE WHEN gcm.id IS NOT NULL AND gcm.prijs_maand_excl <= 0 THEN 1 ELSE 0 END) as invalid_price_count')
             ->groupBy('modules.id', 'modules.naam')
             ->orderBy('modules.naam')
             ->get();
 
         $modulesActive = (int) $modulesOverview->filter(fn ($row) => (int) $row->active_subscriptions > 0)->count();
         $modulesActiveSubscriptions = (int) $modulesOverview->sum(fn ($row) => (int) $row->active_subscriptions);
-        $modulesInvalidPriceCount = (int) $modulesOverview->sum(fn ($row) => (int) $row->invalid_price_count);
+        $modulesTotalAantal = (int) $modulesOverview->sum(fn ($row) => (int) $row->total_aantal);
 
         $topCustomers = (clone $modulesQuery)
             ->join('garage_companies', 'garage_companies.id', '=', 'garage_company_modules.garage_company_id')
@@ -226,7 +228,7 @@ class Index extends Component
                 'modules_total' => $modulesTotal,
                 'modules_active' => $modulesActive,
                 'modules_active_subscriptions' => $modulesActiveSubscriptions,
-                'modules_invalid_price_count' => $modulesInvalidPriceCount,
+                'modules_total_aantal' => $modulesTotalAantal,
                 'mrr_excl' => $mrrExcl,
                 'mrr_btw' => $mrrBtw,
                 'mrr_incl' => $mrrIncl,

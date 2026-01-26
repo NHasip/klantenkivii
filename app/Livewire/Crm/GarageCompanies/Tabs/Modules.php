@@ -57,12 +57,7 @@ class Modules extends Component
         foreach ($validated['rows'] as $row) {
             if ($row['actief'] && (int) $row['aantal'] < 1) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
-                    "rows.{$this->rowIndexByModuleId((int) $row['module_id'])}.aantal" => "Actieve module vereist aantal ≥ 1.",
-                ]);
-            }
-            if ($row['actief'] && (float) $row['prijs_maand_excl'] <= 0) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    "rows.{$this->rowIndexByModuleId((int) $row['module_id'])}.prijs_maand_excl" => "Actieve module vereist prijs > 0.",
+                    "rows.{$this->rowIndexByModuleId((int) $row['module_id'])}.aantal" => "Actieve module vereist aantal >= 1.",
                 ]);
             }
         }
