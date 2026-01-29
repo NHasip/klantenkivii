@@ -16,8 +16,12 @@ class DemoStatus extends Component
     public string $status = 'lead';
     public ?string $demo_aangevraagd_op = null;
     public ?string $demo_gepland_op = null;
+    public ?int $demo_duur_dagen = null;
+    public ?string $demo_eind_op = null;
     public ?string $proefperiode_start = null;
     public ?string $actief_vanaf = null;
+    public ?int $demo_verleng_dagen = null;
+    public ?string $demo_verleng_notitie = null;
 
     public function mount(int $garageCompanyId): void
     {
@@ -31,12 +35,56 @@ class DemoStatus extends Component
         $company->fill([
             'demo_aangevraagd_op' => $this->demo_aangevraagd_op,
             'demo_gepland_op' => $this->demo_gepland_op,
+            'demo_duur_dagen' => $this->demo_duur_dagen,
             'proefperiode_start' => $this->proefperiode_start,
             'actief_vanaf' => $this->actief_vanaf,
         ]);
+
+        if ($this->demo_aangevraagd_op && $this->demo_duur_dagen) {
+            $company->demo_eind_op = \Illuminate\Support\Carbon::parse($this->demo_aangevraagd_op)
+                ->addDays((int) $this->demo_duur_dagen);
+        }
         $company->save();
 
         session()->flash('status', 'Datums opgeslagen.');
+    }
+
+    public function extendDemo(): void
+    {
+        if (! $this->demo_verleng_dagen || $this->demo_verleng_dagen < 1) {
+            session()->flash('status', 'Vul een geldig aantal dagen in.');
+            return;
+        }
+
+        $company = GarageCompany::findOrFail($this->garageCompanyId);
+
+        if (! $company->demo_eind_op && $company->demo_aangevraagd_op) {
+            $basisDagen = $company->demo_duur_dagen ?? 0;
+            $company->demo_eind_op = $company->demo_aangevraagd_op->copy()->addDays($basisDagen);
+        }
+
+        if (! $company->demo_eind_op) {
+            session()->flash('status', 'Stel eerst een demo einddatum in.');
+            return;
+        }
+
+        $company->demo_eind_op = $company->demo_eind_op->copy()->addDays($this->demo_verleng_dagen);
+        $company->demo_duur_dagen = (int) ($company->demo_duur_dagen ?? 0) + (int) $this->demo_verleng_dagen;
+        $company->save();
+
+        Activity::create([
+            'garage_company_id' => $company->id,
+            'type' => ActivityType::Demo,
+            'titel' => "Demo verlengd met {$this->demo_verleng_dagen} dagen",
+            'inhoud' => $this->demo_verleng_notitie ?: null,
+            'created_by' => auth()->id(),
+        ]);
+
+        $this->demo_verleng_dagen = null;
+        $this->demo_verleng_notitie = null;
+        $this->refreshFromModel();
+
+        session()->flash('status', 'Demo verlengd.');
     }
 
     public function setStatus(string $to): void
@@ -96,6 +144,8 @@ class DemoStatus extends Component
         $this->status = $company->status->value;
         $this->demo_aangevraagd_op = optional($company->demo_aangevraagd_op)->format('Y-m-d\TH:i');
         $this->demo_gepland_op = optional($company->demo_gepland_op)->format('Y-m-d\TH:i');
+        $this->demo_duur_dagen = $company->demo_duur_dagen;
+        $this->demo_eind_op = optional($company->demo_eind_op)->format('Y-m-d\TH:i');
         $this->proefperiode_start = optional($company->proefperiode_start)->format('Y-m-d\TH:i');
         $this->actief_vanaf = optional($company->actief_vanaf)->format('Y-m-d\TH:i');
     }
@@ -130,4 +180,3 @@ class DemoStatus extends Component
         ]);
     }
 }
-

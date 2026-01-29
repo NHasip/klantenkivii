@@ -6,6 +6,7 @@ use App\Enums\ActivityType;
 use App\Enums\GarageCompanyStatus;
 use App\Enums\SepaMandateStatus;
 use App\Models\Activity;
+use App\Models\CustomerFeedback;
 use App\Models\GarageCompany;
 use App\Models\GarageCompanyModule;
 use App\Models\Module;
@@ -22,6 +23,36 @@ class Dashboard extends Component
     public ?string $start = null;
 
     public ?string $end = null;
+
+    public ?int $feedback_company_id = null;
+
+    public string $feedback_inhoud = '';
+
+    public function addFeedback(): void
+    {
+        $data = $this->validate([
+            'feedback_company_id' => ['required', 'integer', 'exists:garage_companies,id'],
+            'feedback_inhoud' => ['required', 'string', 'max:2000'],
+        ]);
+
+        CustomerFeedback::create([
+            'garage_company_id' => $data['feedback_company_id'],
+            'inhoud' => $data['feedback_inhoud'],
+            'created_by' => auth()->id(),
+        ]);
+
+        $this->feedback_company_id = null;
+        $this->feedback_inhoud = '';
+
+        session()->flash('status', 'Feedback toegevoegd.');
+    }
+
+    public function toggleFeedbackDone(int $feedbackId): void
+    {
+        $item = CustomerFeedback::findOrFail($feedbackId);
+        $item->done_at = $item->done_at ? null : now();
+        $item->save();
+    }
 
     public function render()
     {
@@ -91,6 +122,54 @@ class Dashboard extends Component
             ->pluck('totaal', 'status')
             ->toArray();
 
+        $openActions = Activity::query()
+            ->whereIn('garage_company_id', $companyIds)
+            ->whereIn('type', [ActivityType::Taak, ActivityType::Afspraak])
+            ->whereNull('done_at');
+
+        $actiesOverdue = (clone $openActions)
+            ->whereNotNull('due_at')
+            ->where('due_at', '<', now())
+            ->count();
+
+        $actiesKomend7 = (clone $openActions)
+            ->whereBetween('due_at', [now(), now()->addDays(7)->endOfDay()])
+            ->count();
+
+        $actiesZonderDeadline = (clone $openActions)
+            ->whereNull('due_at')
+            ->count();
+
+        $demoBase = (clone $companies)
+            ->whereNotNull('demo_eind_op')
+            ->whereIn('status', [GarageCompanyStatus::DemoAangevraagd, GarageCompanyStatus::DemoGepland]);
+
+        $demoVerlopen = (clone $demoBase)
+            ->where('demo_eind_op', '<', now())
+            ->orderBy('demo_eind_op', 'desc')
+            ->limit(10)
+            ->get();
+
+        $demoVerlooptBinnen3 = (clone $demoBase)
+            ->whereBetween('demo_eind_op', [now(), now()->addDays(3)->endOfDay()])
+            ->orderBy('demo_eind_op')
+            ->limit(10)
+            ->get();
+
+        $demoVerlooptBinnen7 = (clone $demoBase)
+            ->whereBetween('demo_eind_op', [now()->addDays(4)->startOfDay(), now()->addDays(7)->endOfDay()])
+            ->orderBy('demo_eind_op')
+            ->limit(10)
+            ->get();
+
+        $demoZonderEind = (clone $companies)
+            ->whereIn('status', [GarageCompanyStatus::DemoAangevraagd, GarageCompanyStatus::DemoGepland])
+            ->whereNotNull('demo_aangevraagd_op')
+            ->whereNull('demo_eind_op')
+            ->orderBy('demo_aangevraagd_op')
+            ->limit(10)
+            ->get();
+
         $demoOuderDan7 = (clone $companies)
             ->where('status', GarageCompanyStatus::DemoAangevraagd)
             ->whereNotNull('demo_aangevraagd_op')
@@ -159,9 +238,48 @@ class Dashboard extends Component
 
         $laatsteActiviteiten = Activity::query()
             ->whereIn('garage_company_id', $companyIds)
+            ->with('garageCompany')
             ->latest()
             ->limit(10)
             ->get();
+
+        $feedbackItems = CustomerFeedback::query()
+            ->whereIn('garage_company_id', $companyIds)
+            ->with('garageCompany')
+            ->orderByRaw('case when done_at is null then 0 else 1 end, created_at desc')
+            ->limit(10)
+            ->get();
+
+        $feedbackCompanies = (clone $companies)
+            ->orderBy('bedrijfsnaam')
+            ->get(['id', 'bedrijfsnaam']);
+
+        $alerts = collect()
+            ->merge($demoVerlopen->map(fn ($c) => [
+                'level' => 'kritiek',
+                'label' => 'Demo verlopen',
+                'company' => $c,
+                'date' => $c->demo_eind_op,
+            ]))
+            ->merge($demoVerlooptBinnen3->map(fn ($c) => [
+                'level' => 'hoog',
+                'label' => 'Demo verloopt binnen 3 dagen',
+                'company' => $c,
+                'date' => $c->demo_eind_op,
+            ]))
+            ->merge($demoVerlooptBinnen7->map(fn ($c) => [
+                'level' => 'medium',
+                'label' => 'Demo verloopt binnen 7 dagen',
+                'company' => $c,
+                'date' => $c->demo_eind_op,
+            ]))
+            ->merge($demoZonderEind->map(fn ($c) => [
+                'level' => 'laag',
+                'label' => 'Demo zonder einddatum',
+                'company' => $c,
+                'date' => $c->demo_aangevraagd_op,
+            ]))
+            ->take(12);
 
         return view('livewire.crm.dashboard', [
             'from' => $from,
@@ -175,7 +293,14 @@ class Dashboard extends Component
             'conversieDemoNaarActief30' => $conversieDemoNaarActief30,
             'avgDemoNaarActief' => $avgDemoNaarActief,
             'pipeline' => $pipeline,
+            'actiesOverdue' => $actiesOverdue,
+            'actiesKomend7' => $actiesKomend7,
+            'actiesZonderDeadline' => $actiesZonderDeadline,
             'demoOuderDan7' => $demoOuderDan7,
+            'demoVerlopen' => $demoVerlopen,
+            'demoVerlooptBinnen3' => $demoVerlooptBinnen3,
+            'demoVerlooptBinnen7' => $demoVerlooptBinnen7,
+            'demoZonderEind' => $demoZonderEind,
             'zonderMandaatNaDemo7' => $zonderMandaatNaDemo7,
             'actiefZonderActiefMandaat' => $actiefZonderActiefMandaat,
             'mandatenPending' => $mandatenPending,
@@ -185,6 +310,9 @@ class Dashboard extends Component
             'afsprakenKomend' => $afsprakenKomend,
             'takenOpen' => $takenOpen,
             'laatsteActiviteiten' => $laatsteActiviteiten,
+            'feedbackItems' => $feedbackItems,
+            'feedbackCompanies' => $feedbackCompanies,
+            'alerts' => $alerts,
         ])->layout('layouts.crm', ['title' => 'Dashboard']);
     }
 

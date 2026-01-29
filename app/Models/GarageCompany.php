@@ -30,6 +30,8 @@ class GarageCompany extends Model
         'tags',
         'demo_aangevraagd_op',
         'demo_gepland_op',
+        'demo_duur_dagen',
+        'demo_eind_op',
         'proefperiode_start',
         'actief_vanaf',
         'opgezegd_op',
@@ -47,6 +49,8 @@ class GarageCompany extends Model
             'bron' => GarageCompanySource::class,
             'demo_aangevraagd_op' => 'datetime',
             'demo_gepland_op' => 'datetime',
+            'demo_duur_dagen' => 'integer',
+            'demo_eind_op' => 'datetime',
             'proefperiode_start' => 'datetime',
             'actief_vanaf' => 'datetime',
             'opgezegd_op' => 'datetime',
@@ -97,6 +101,11 @@ class GarageCompany extends Model
     public function activities(): HasMany
     {
         return $this->hasMany(Activity::class)->latest();
+    }
+
+    public function feedback(): HasMany
+    {
+        return $this->hasMany(CustomerFeedback::class);
     }
 
     public function activeMrrExcl(): Attribute
