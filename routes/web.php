@@ -16,6 +16,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/garagebedrijven/{garageCompany}', \App\Livewire\Crm\GarageCompanies\Show::class)->name('crm.garage_companies.show');
 
     Route::get('/rapportages', \App\Livewire\Crm\Reports\Index::class)->name('crm.reports.index');
+    Route::get('/taken', \App\Livewire\Crm\Tasks\Index::class)->name('crm.tasks.index');
 
     Route::get('/gebruikers', \App\Livewire\Crm\Users\Index::class)
         ->middleware('admin')

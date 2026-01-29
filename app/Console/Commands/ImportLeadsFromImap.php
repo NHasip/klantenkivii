@@ -133,8 +133,8 @@ class ImportLeadsFromImap extends Command
             $key = match ($key) {
                 'bedrijfsnaam', 'bedrijf' => 'bedrijfsnaam',
                 'contactnaam', 'naam' => 'contactnaam',
-                'email', 'e-mail' => 'email',
-                'telefoon', 'phone' => 'telefoon',
+                'email', 'e-mail', 'e-mailadres' => 'email',
+                'telefoon', 'telefoonnummer', 'phone' => 'telefoon',
                 'plaats', 'city' => 'plaats',
                 'bericht', 'message' => 'bericht',
                 default => null,
@@ -148,4 +148,3 @@ class ImportLeadsFromImap extends Command
         return $map;
     }
 }
-
