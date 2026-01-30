@@ -8,6 +8,7 @@
     <link rel="icon" type="image/png" href="{{ asset('brand/favicon.png') }}">
     <link rel="apple-touch-icon" href="{{ asset('brand/favicon.png') }}">
 
+    {{-- Inertia root view (React) --}}
     @vite(['resources/css/app.css', 'resources/js/app.jsx'])
     @inertiaHead
     @livewireStyles
