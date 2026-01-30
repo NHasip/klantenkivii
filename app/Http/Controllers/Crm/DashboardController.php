@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Crm;
 
+use App\Enums\ActivityType;
 use App\Enums\TaskStatus;
+use App\Models\Activity;
 use App\Models\GarageCompany;
 use App\Models\GarageCompanyModule;
 use App\Models\Task;
@@ -71,6 +73,65 @@ class DashboardController
             ->whereBetween('deadline', [$now, $now->addDays(7)->endOfDay()])
             ->count();
 
+        $taskItems = Task::query()
+            ->with(['project:id,naam'])
+            ->where('status', '!=', TaskStatus::Afgerond)
+            ->orderByRaw('case when deadline is null then 1 else 0 end, deadline asc')
+            ->limit(12)
+            ->get(['id', 'task_project_id', 'titel', 'status', 'prioriteit', 'deadline'])
+            ->map(fn (Task $task) => [
+                'id' => $task->id,
+                'titel' => $task->titel,
+                'status' => $task->status?->value,
+                'prioriteit' => $task->prioriteit?->value,
+                'deadline' => $task->deadline?->toIso8601String(),
+                'project' => $task->project ? [
+                    'id' => $task->project->id,
+                    'naam' => $task->project->naam,
+                ] : null,
+            ])
+            ->values();
+
+        $appointments = Activity::query()
+            ->with('garageCompany:id,bedrijfsnaam')
+            ->where('type', ActivityType::Afspraak)
+            ->whereNull('done_at')
+            ->whereNotNull('due_at')
+            ->orderBy('due_at')
+            ->limit(50)
+            ->get(['id', 'garage_company_id', 'titel', 'due_at'])
+            ->map(fn (Activity $activity) => [
+                'id' => $activity->id,
+                'titel' => $activity->titel,
+                'due_at' => $activity->due_at?->toIso8601String(),
+                'garage_company' => $activity->garageCompany ? [
+                    'id' => $activity->garageCompany->id,
+                    'bedrijfsnaam' => $activity->garageCompany->bedrijfsnaam,
+                    'url' => route('crm.garage_companies.show', ['garageCompany' => $activity->garageCompany->id]),
+                ] : null,
+            ])
+            ->values();
+
+        $appointmentsByCompany = $appointments
+            ->filter(fn (array $row) => is_array($row['garage_company'] ?? null))
+            ->groupBy(fn (array $row) => (string) $row['garage_company']['id'])
+            ->map(function ($items) {
+                /** @var \Illuminate\Support\Collection<int, array{id:int,titel:string,due_at:?string,garage_company:array{id:int,bedrijfsnaam:string,url:string}}> $items */
+                $first = $items->first();
+
+                return [
+                    'garage_company' => $first['garage_company'],
+                    'aantal' => $items->count(),
+                    'eerstvolgende' => [
+                        'titel' => $first['titel'],
+                        'due_at' => $first['due_at'],
+                    ],
+                ];
+            })
+            ->sortByDesc(fn (array $row) => $row['aantal'])
+            ->take(12)
+            ->values();
+
         return Inertia::render('Crm/Dashboard', [
             'kpis' => [
                 'companies_total' => $companiesTotal,
@@ -86,6 +147,13 @@ class DashboardController
                 'tasks_overdue' => $tasksOverdue,
                 'tasks_due_7' => $tasksDue7,
             ],
+            'lists' => [
+                'tasks' => $taskItems,
+                'appointments' => [
+                    'items' => $appointments->take(12)->values(),
+                    'by_company' => $appointmentsByCompany,
+                ],
+            ],
             'urls' => [
                 'dashboard_old' => route('dashboard.old'),
                 'tasks' => route('crm.tasks.index'),
@@ -98,4 +166,3 @@ class DashboardController
         ]);
     }
 }
-
