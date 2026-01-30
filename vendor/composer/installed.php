@@ -3,7 +3,7 @@
         'name' => 'laravel/laravel',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => 'd11c5ff5ec294b895d15ef7c52c2c639e1d24f48',
+        'reference' => '447aad3ca567286b04af1fa040eed1b01979965f',
         'type' => 'project',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -349,6 +349,15 @@
                 0 => 'v11.47.0',
             ),
         ),
+        'inertiajs/inertia-laravel' => array(
+            'pretty_version' => 'v2.0.0',
+            'version' => '2.0.0.0',
+            'reference' => '0259e37f802bc39c814c42ba92c04ada17921f70',
+            'type' => 'library',
+            'install_path' => __DIR__ . '/../inertiajs/inertia-laravel',
+            'aliases' => array(),
+            'dev_requirement' => false,
+        ),
         'laravel/fortify' => array(
             'pretty_version' => 'v1.33.0',
             'version' => '1.33.0.0',
@@ -379,7 +388,7 @@
         'laravel/laravel' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => 'd11c5ff5ec294b895d15ef7c52c2c639e1d24f48',
+            'reference' => '447aad3ca567286b04af1fa040eed1b01979965f',
             'type' => 'project',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),

@@ -6,6 +6,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "inertiajs/inertia-laravel": "2.0",
         "laravel/framework": "^11.0",
         "laravel/jetstream": "^5.2",
         "laravel/sanctum": "^4.0",
@@ -59,6 +60,9 @@
         }
     },
     "config": {
+        "platform": {
+            "php": "8.4.17"
+        },
         "optimize-autoloader": true,
         "preferred-install": "dist",
         "sort-packages": true,

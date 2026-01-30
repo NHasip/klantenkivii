@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Crm\DashboardController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -9,7 +10,8 @@ Route::get('/', function () {
 });
 
 Route::middleware(['auth', 'active'])->group(function () {
-    Route::get('/dashboard', \App\Livewire\Crm\Dashboard::class)->name('dashboard');
+    Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::get('/dashboard-old', \App\Livewire\Crm\Dashboard::class)->name('dashboard.old');
 
     Route::get('/garagebedrijven', \App\Livewire\Crm\GarageCompanies\Index::class)->name('crm.garage_companies.index');
     Route::get('/garagebedrijven/nieuw', \App\Livewire\Crm\GarageCompanies\Create::class)->name('crm.garage_companies.create');

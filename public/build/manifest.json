@@ -1,13 +1,35 @@
 {
   "resources/css/app.css": {
-    "file": "assets/app-DgAg2tIg.css",
+    "file": "assets/app-DQPzekgD.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
+  "resources/js/Pages/Crm/Dashboard.jsx": {
+    "file": "assets/Dashboard-YyMtxAXR.js",
+    "name": "Dashboard",
+    "src": "resources/js/Pages/Crm/Dashboard.jsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.jsx",
+      "resources/js/app.js"
+    ]
+  },
   "resources/js/app.js": {
-    "file": "assets/app-CAiCLEjY.js",
+    "file": "assets/app-Da9Q4cYH.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true
+  },
+  "resources/js/app.jsx": {
+    "file": "assets/app-DT083YZw.js",
+    "name": "app",
+    "src": "resources/js/app.jsx",
+    "isEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ],
+    "dynamicImports": [
+      "resources/js/Pages/Crm/Dashboard.jsx"
+    ]
   }
 }
