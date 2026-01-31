@@ -30,6 +30,7 @@
                             <a href="{{ route('dashboard') }}" class="rounded-md px-3 py-2 text-sm font-medium hover:bg-zinc-100">Dashboard</a>
                             <a href="{{ route('dashboard.old') }}" class="rounded-md px-3 py-2 text-sm font-medium text-zinc-500 hover:bg-zinc-100">Dashboard (old)</a>
                             <a href="{{ route('crm.tasks.index') }}" class="rounded-md px-3 py-2 text-sm font-medium hover:bg-zinc-100">Taken</a>
+                            <a href="{{ route('crm.tasks.old') }}" class="rounded-md px-3 py-2 text-sm font-medium text-zinc-500 hover:bg-zinc-100">Taken (old)</a>
                             <a href="{{ route('crm.garage_companies.index') }}" class="rounded-md px-3 py-2 text-sm font-medium hover:bg-zinc-100">Klanten</a>
                             <a href="{{ route('crm.reports.index') }}" class="rounded-md px-3 py-2 text-sm font-medium hover:bg-zinc-100">Rapportages</a>
                             @if(auth()->user()?->isAdmin())
@@ -71,6 +72,7 @@
                         <a href="{{ route('dashboard') }}" class="block rounded-md px-3 py-2 text-sm font-medium hover:bg-zinc-100">Dashboard</a>
                         <a href="{{ route('dashboard.old') }}" class="block rounded-md px-3 py-2 text-sm font-medium text-zinc-500 hover:bg-zinc-100">Dashboard (old)</a>
                         <a href="{{ route('crm.tasks.index') }}" class="block rounded-md px-3 py-2 text-sm font-medium hover:bg-zinc-100">Taken</a>
+                        <a href="{{ route('crm.tasks.old') }}" class="block rounded-md px-3 py-2 text-sm font-medium text-zinc-500 hover:bg-zinc-100">Taken (old)</a>
                         <a href="{{ route('crm.garage_companies.index') }}" class="block rounded-md px-3 py-2 text-sm font-medium hover:bg-zinc-100">Klanten</a>
                         <a href="{{ route('crm.reports.index') }}" class="block rounded-md px-3 py-2 text-sm font-medium hover:bg-zinc-100">Rapportages</a>
                         @if(auth()->user()?->isAdmin())
