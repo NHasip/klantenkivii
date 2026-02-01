@@ -15,6 +15,7 @@ use App\Notifications\TaskMentioned;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -47,6 +48,7 @@ class TasksController
             'attachments',
             'comments.author:id,name',
         ]);
+        $task->loadCount(['comments', 'attachments']);
 
         return response()->json([
             'task' => $this->taskDetails($task),
@@ -95,6 +97,11 @@ class TasksController
             'attachments.*' => ['file', 'max:10240'],
         ]);
 
+        $sortOrder = $this->nextSortOrder(
+            taskProjectId: $data['task_project_id'] ?? null,
+            status: $data['status'],
+        );
+
         $task = Task::create([
             'task_project_id' => $data['task_project_id'] ?? null,
             'titel' => $data['titel'],
@@ -104,6 +111,7 @@ class TasksController
             'deadline' => $data['deadline'] ?? null,
             'labels' => $data['labels'] ?? null,
             'created_by' => $request->user()->id,
+            'sort_order' => $sortOrder,
         ]);
 
         if (! empty($data['assignees'])) {
@@ -125,6 +133,7 @@ class TasksController
         }
 
         $task->load(['project:id,naam,kleur', 'assignees:id,name']);
+        $task->loadCount(['comments', 'attachments']);
 
         return response()->json([
             'task' => $this->taskSummary($task),
@@ -140,6 +149,7 @@ class TasksController
         $task->status = TaskStatus::from($data['status']);
         $task->afgerond_op = $task->status === TaskStatus::Afgerond ? now() : null;
         $task->save();
+        $task->loadCount(['comments', 'attachments']);
 
         return response()->json([
             'task' => $this->taskSummary($task->load(['project:id,naam,kleur', 'assignees:id,name'])),
@@ -149,10 +159,29 @@ class TasksController
     public function updateTask(Request $request, Task $task): JsonResponse
     {
         $data = $request->validate([
+            'titel' => ['nullable', 'string', 'max:255'],
+            'omschrijving' => ['nullable', 'string'],
+            'labels' => ['nullable', 'string', 'max:1000'],
             'prioriteit' => ['nullable', Rule::enum(TaskPriority::class)],
             'task_project_id' => ['nullable', 'integer', 'exists:task_projects,id'],
             'deadline' => ['nullable', 'date'],
+            'status' => ['nullable', Rule::enum(TaskStatus::class)],
+            'assignees' => ['nullable', 'array'],
+            'assignees.*' => ['integer', 'exists:users,id'],
+            'sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
+
+        if (array_key_exists('titel', $data) && $data['titel'] !== null) {
+            $task->titel = $data['titel'];
+        }
+
+        if (array_key_exists('omschrijving', $data)) {
+            $task->omschrijving = $data['omschrijving'] ?: null;
+        }
+
+        if (array_key_exists('labels', $data)) {
+            $task->labels = $data['labels'] ?: null;
+        }
 
         if (array_key_exists('prioriteit', $data) && $data['prioriteit'] !== null) {
             $task->prioriteit = TaskPriority::from($data['prioriteit']);
@@ -166,10 +195,91 @@ class TasksController
             $task->deadline = $data['deadline'] ?: null;
         }
 
+        if (array_key_exists('status', $data) && $data['status'] !== null) {
+            $task->status = TaskStatus::from($data['status']);
+            $task->afgerond_op = $task->status === TaskStatus::Afgerond ? now() : null;
+        }
+
+        if (array_key_exists('sort_order', $data) && $data['sort_order'] !== null) {
+            $task->sort_order = (int) $data['sort_order'];
+        }
+
         $task->save();
+
+        if (array_key_exists('assignees', $data) && is_array($data['assignees'])) {
+            $existing = $task->assignees()->pluck('users.id')->all();
+            $task->assignees()->sync($data['assignees']);
+            $newIds = array_values(array_diff($data['assignees'], $existing));
+            if (count($newIds) > 0) {
+                $assignees = User::query()->whereIn('id', $newIds)->get();
+                Notification::send($assignees, new TaskAssigned($task));
+            }
+        }
+
+        $task->loadCount(['comments', 'attachments']);
 
         return response()->json([
             'task' => $this->taskSummary($task->load(['project:id,naam,kleur', 'assignees:id,name'])),
+        ]);
+    }
+
+    public function reorder(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'changes' => ['required', 'array', 'min:1'],
+            'changes.*.id' => ['required', 'integer', 'exists:tasks,id'],
+            'changes.*.task_project_id' => ['nullable', 'integer', 'exists:task_projects,id'],
+            'changes.*.status' => ['nullable', Rule::enum(TaskStatus::class)],
+            'changes.*.sort_order' => ['required', 'integer', 'min:0'],
+        ]);
+
+        DB::transaction(function () use ($data) {
+            foreach ($data['changes'] as $row) {
+                $task = Task::find($row['id']);
+                if (! $task) {
+                    continue;
+                }
+
+                $task->task_project_id = $row['task_project_id'] ?? null;
+                if (! empty($row['status'])) {
+                    $task->status = TaskStatus::from($row['status']);
+                    $task->afgerond_op = $task->status === TaskStatus::Afgerond ? now() : null;
+                }
+                $task->sort_order = (int) $row['sort_order'];
+                $task->save();
+            }
+        });
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function storeAttachment(Request $request, Task $task): JsonResponse
+    {
+        $data = $request->validate([
+            'file' => ['required', 'file', 'max:10240'],
+        ]);
+
+        /** @var \Illuminate\Http\UploadedFile $file */
+        $file = $data['file'];
+        $path = $file->store("tasks/{$task->id}", 'public');
+
+        $attachment = TaskAttachment::create([
+            'task_id' => $task->id,
+            'user_id' => $request->user()->id,
+            'original_name' => $file->getClientOriginalName(),
+            'path' => $path,
+            'size' => $file->getSize() ?? 0,
+            'mime' => $file->getMimeType(),
+        ]);
+
+        return response()->json([
+            'attachment' => [
+                'id' => $attachment->id,
+                'original_name' => $attachment->original_name,
+                'size' => $attachment->size,
+                'mime' => $attachment->mime,
+                'url' => asset('storage/'.$attachment->path),
+            ],
         ]);
     }
 
@@ -252,6 +362,7 @@ class TasksController
             'status' => $request->query('status'),
             'priority' => $request->query('priority'),
             'search' => $request->query('search', ''),
+            'sort' => $request->query('sort', 'deadline'),
         ];
     }
 
@@ -260,8 +371,11 @@ class TasksController
      */
     private function filteredTasks(Request $request): Collection
     {
+        $sort = (string) $request->query('sort', 'deadline');
+
         $query = Task::query()
             ->with(['project:id,naam,kleur', 'assignees:id,name'])
+            ->withCount(['comments', 'attachments'])
             ->when($request->query('project'), fn ($q, $project) => $q->where('task_project_id', $project))
             ->when($request->query('assignee'), fn ($q, $assignee) => $q->whereHas('assignees', fn ($sub) => $sub->where('users.id', $assignee)))
             ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
@@ -274,8 +388,11 @@ class TasksController
                         ->orWhere('labels', 'like', $term);
                 });
             })
-            ->orderByRaw('case when deadline is null then 1 else 0 end, deadline asc')
-            ->orderBy('sort_order');
+            ->when($sort === 'nieuwste', fn ($q) => $q->orderByDesc('created_at'))
+            ->when($sort === 'prioriteit', fn ($q) => $q->orderByRaw("FIELD(prioriteit,'kritiek','hoog','normaal','laag')"))
+            ->when($sort === 'deadline', fn ($q) => $q->orderByRaw('case when deadline is null then 1 else 0 end, deadline asc'))
+            ->orderBy('sort_order')
+            ->orderBy('id');
 
         return $query->get();
     }
@@ -332,6 +449,9 @@ class TasksController
             'prioriteit' => $task->prioriteit?->value,
             'deadline' => $task->deadline?->toIso8601String(),
             'labels' => $task->labels,
+            'task_project_id' => $task->task_project_id,
+            'sort_order' => (int) $task->sort_order,
+            'created_at' => $task->created_at?->toIso8601String(),
             'project' => $task->project ? [
                 'id' => $task->project->id,
                 'naam' => $task->project->naam,
@@ -341,6 +461,10 @@ class TasksController
                 'id' => $user->id,
                 'name' => $user->name,
             ])->values(),
+            'counts' => [
+                'comments' => (int) ($task->comments_count ?? 0),
+                'attachments' => (int) ($task->attachments_count ?? 0),
+            ],
         ];
     }
 
@@ -373,5 +497,15 @@ class TasksController
                 ])
                 ->values(),
         ];
+    }
+
+    private function nextSortOrder(?int $taskProjectId, string $status): int
+    {
+        $max = Task::query()
+            ->where('status', $status)
+            ->where('task_project_id', $taskProjectId)
+            ->max('sort_order');
+
+        return ((int) $max) + 10;
     }
 }
