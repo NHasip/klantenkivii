@@ -42,7 +42,7 @@ export default function Tasks({ initial, filters, urls }) {
     const [statusOptions, setStatusOptions] = useState(initial?.statusOptions ?? []);
     const [priorityOptions, setPriorityOptions] = useState(initial?.priorityOptions ?? []);
 
-    const [view, setView] = useState('list');
+    const [view, setView] = useState('board');
     const [filterProject, setFilterProject] = useState(filters?.project ?? '');
     const [filterAssignee, setFilterAssignee] = useState(filters?.assignee ?? '');
     const [filterStatus, setFilterStatus] = useState(filters?.status ?? '');
@@ -320,6 +320,60 @@ export default function Tasks({ initial, filters, urls }) {
                             <button type="button" className="text-xs font-semibold" onClick={() => setNotice(null)}>
                                 Sluiten
                             </button>
+                        </div>
+                    </div>
+                ) : null}
+
+                {view === 'list' ? (
+                    <div className="rounded-xl border border-zinc-200 bg-white">
+                        <div className="grid grid-cols-12 gap-2 border-b border-zinc-100 px-4 py-3 text-xs font-semibold text-zinc-500">
+                            <div className="col-span-4">Taak</div>
+                            <div className="col-span-2">Project</div>
+                            <div className="col-span-2">Assignees</div>
+                            <div className="col-span-2">Status</div>
+                            <div className="col-span-2">Deadline</div>
+                        </div>
+                        <div className="divide-y divide-zinc-100">
+                            {tasks.length === 0 ? (
+                                <div className="px-4 py-6 text-sm text-zinc-500">Geen taken gevonden.</div>
+                            ) : (
+                                tasks.map((task) => (
+                                    <div key={task.id} className="grid grid-cols-12 gap-2 px-4 py-3 text-sm hover:bg-zinc-50">
+                                        <div className="col-span-4">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleSelectTask(task.id)}
+                                                className="text-left font-semibold text-zinc-900 hover:text-zinc-700"
+                                            >
+                                                {task.titel}
+                                            </button>
+                                            {task.labels ? <div className="mt-1 text-xs text-zinc-500">{task.labels}</div> : null}
+                                        </div>
+                                        <div className="col-span-2 text-sm text-zinc-600">{task.project?.naam ?? '-'}</div>
+                                        <div className="col-span-2 flex flex-wrap gap-1">
+                                            {task.assignees && task.assignees.length > 0 ? (
+                                                task.assignees.map((assignee) => <AssigneeBadge key={assignee.id} name={assignee.name} />)
+                                            ) : (
+                                                <span className="text-xs text-zinc-400">--</span>
+                                            )}
+                                        </div>
+                                        <div className="col-span-2">
+                                            <select
+                                                className="w-full rounded-md border-zinc-200 text-xs"
+                                                value={task.status}
+                                                onChange={(event) => handleStatusChange(task.id, event.target.value)}
+                                            >
+                                                {statusOptions.map((status) => (
+                                                    <option key={status} value={status}>
+                                                        {statusLabel(status)}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="col-span-2 text-xs text-zinc-500">{task.deadline ? formatDateTime(task.deadline) : 'Geen'}</div>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
                 ) : null}

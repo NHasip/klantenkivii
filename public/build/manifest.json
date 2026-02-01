@@ -5,7 +5,7 @@
     "isEntry": true
   },
   "resources/js/Pages/Crm/Dashboard.jsx": {
-    "file": "assets/Dashboard-BN1or1gp.js",
+    "file": "assets/Dashboard-DGBnuhWT.js",
     "name": "Dashboard",
     "src": "resources/js/Pages/Crm/Dashboard.jsx",
     "isDynamicEntry": true,
@@ -15,7 +15,7 @@
     ]
   },
   "resources/js/Pages/Crm/Tasks.jsx": {
-    "file": "assets/Tasks-fRStN_P7.js",
+    "file": "assets/Tasks-DyQmqmLe.js",
     "name": "Tasks",
     "src": "resources/js/Pages/Crm/Tasks.jsx",
     "isDynamicEntry": true,
@@ -31,7 +31,7 @@
     "isEntry": true
   },
   "resources/js/app.jsx": {
-    "file": "assets/app-TP49IIGm.js",
+    "file": "assets/app-DRtgPiAO.js",
     "name": "app",
     "src": "resources/js/app.jsx",
     "isEntry": true,
