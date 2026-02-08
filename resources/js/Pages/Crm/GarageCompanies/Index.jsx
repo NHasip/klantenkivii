@@ -1,5 +1,6 @@
 ﻿import React from 'react';
 import { Head, Link, router, useForm } from '@inertiajs/react';
+import { useConfirm } from '../../../components/ConfirmProvider';
 
 function formatEuro(value) {
     try {
@@ -52,6 +53,7 @@ function Pagination({ links }) {
 }
 
 export default function Index({ companies, filters, statusOptions, sourceOptions, urls }) {
+    const confirm = useConfirm();
     const { data, setData } = useForm({
         search: filters.search || '',
         status: filters.status || 'alle',
@@ -60,8 +62,15 @@ export default function Index({ companies, filters, statusOptions, sourceOptions
         perPage: filters.perPage || companies.per_page || 15,
     });
 
-    const deleteCompany = (company) => {
-        if (!confirm(`Weet je zeker dat je "${company.bedrijfsnaam}" wilt verwijderen?`)) return;
+    const deleteCompany = async (company) => {
+        const ok = await confirm({
+            title: 'Klant verwijderen',
+            message: `Weet je zeker dat je "${company.bedrijfsnaam}" wilt verwijderen?`,
+            confirmText: 'Verwijder',
+            cancelText: 'Annuleren',
+            tone: 'danger',
+        });
+        if (!ok) return;
         router.delete(company.delete_url, { preserveScroll: true });
     };
 

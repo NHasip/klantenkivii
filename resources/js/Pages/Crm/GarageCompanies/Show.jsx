@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Head, Link, router, useForm } from '@inertiajs/react';
+import { useConfirm } from '../../../components/ConfirmProvider';
 
 function formatEuro(value) {
     try {
@@ -102,9 +103,17 @@ export default function Show({
     urls,
 }) {
     const activeTab = tab || 'overzicht';
+    const confirm = useConfirm();
 
-    const deleteCompany = () => {
-        if (!confirm(`Weet je zeker dat je "${garageCompany.bedrijfsnaam}" wilt verwijderen?`)) return;
+    const deleteCompany = async () => {
+        const ok = await confirm({
+            title: 'Klant verwijderen',
+            message: `Weet je zeker dat je "${garageCompany.bedrijfsnaam}" wilt verwijderen?`,
+            confirmText: 'Verwijder',
+            cancelText: 'Annuleren',
+            tone: 'danger',
+        });
+        if (!ok) return;
         router.delete(urls.delete_company);
     };
 
@@ -144,10 +153,16 @@ export default function Show({
         }
     };
 
-    const submitOverview = (event) => {
+    const submitOverview = async (event) => {
         event.preventDefault();
         if (['opgezegd', 'verloren'].includes(overviewForm.data.status)) {
-            const ok = confirm('Weet je het zeker? Dit wordt gelogd in de timeline.');
+            const ok = await confirm({
+                title: 'Status wijzigen',
+                message: 'Weet je het zeker? Dit wordt gelogd in de timeline.',
+                confirmText: 'Doorgaan',
+                cancelText: 'Annuleren',
+                tone: 'danger',
+            });
             if (!ok) return;
         }
         overviewForm.patch(urls.update_overview, { preserveScroll: true });
@@ -212,8 +227,15 @@ export default function Show({
         }
     };
 
-    const deletePerson = (personId) => {
-        if (!confirm('Verwijderen?')) return;
+    const deletePerson = async (personId) => {
+        const ok = await confirm({
+            title: 'Contactpersoon verwijderen',
+            message: 'Weet je zeker dat je deze contactpersoon wilt verwijderen?',
+            confirmText: 'Verwijder',
+            cancelText: 'Annuleren',
+            tone: 'danger',
+        });
+        if (!ok) return;
         const url = urls.delete_person.replace('__PERSON__', personId);
         router.delete(url, { preserveScroll: true });
     };
@@ -308,8 +330,15 @@ export default function Show({
         }
     };
 
-    const deleteSeat = (seatId) => {
-        if (!confirm('Verwijderen?')) return;
+    const deleteSeat = async (seatId) => {
+        const ok = await confirm({
+            title: 'Gebruiker verwijderen',
+            message: 'Weet je zeker dat je deze gebruiker wilt verwijderen?',
+            confirmText: 'Verwijder',
+            cancelText: 'Annuleren',
+            tone: 'danger',
+        });
+        if (!ok) return;
         router.delete(urls.delete_seat.replace('__SEAT__', seatId), { preserveScroll: true });
     };
 
@@ -501,13 +530,26 @@ export default function Show({
         failed: 'bg-rose-50 text-rose-700',
     }[welcomeStatus] || 'bg-zinc-100 text-zinc-700';
 
-    const sendWelcome = () => {
+    const sendWelcome = async () => {
         if (!welcomeEmail) return;
         if (!smtpConfigured) {
-            alert('SMTP instellingen ontbreken. Voeg deze toe via profiel > systeem-instellingen.');
+            await confirm({
+                title: 'SMTP ontbreekt',
+                message: 'SMTP instellingen ontbreken. Voeg deze toe via profiel > systeem-instellingen.',
+                confirmText: 'Sluiten',
+                showCancel: false,
+                tone: 'primary',
+            });
             return;
         }
-        if (!confirm('Welkomstmail versturen?')) return;
+        const ok = await confirm({
+            title: 'Welkomstmail versturen',
+            message: 'Weet je zeker dat je de welkomstmail wilt versturen?',
+            confirmText: 'Verstuur',
+            cancelText: 'Annuleren',
+            tone: 'success',
+        });
+        if (!ok) return;
         welcomeForm.post(urls.update_welcome_email, {
             preserveScroll: true,
             onSuccess: () => {

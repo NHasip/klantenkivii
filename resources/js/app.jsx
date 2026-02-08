@@ -2,6 +2,7 @@ import './bootstrap';
 
 import { createInertiaApp } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
+import { ConfirmProvider } from './components/ConfirmProvider';
 
 const pages = import.meta.glob('./Pages/**/*.jsx');
 
@@ -15,6 +16,10 @@ createInertiaApp({
         return module.default;
     },
     setup({ el, App, props }) {
-        createRoot(el).render(<App {...props} />);
+        createRoot(el).render(
+            <ConfirmProvider>
+                <App {...props} />
+            </ConfirmProvider>
+        );
     },
 });
