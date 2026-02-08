@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 
 function formatEuro(value) {
@@ -10,7 +10,7 @@ function formatEuro(value) {
 }
 
 function formatDateTime(isoString) {
-    if (!isoString) return '—';
+    if (!isoString) return '�';
     try {
         return new Intl.DateTimeFormat('nl-NL', {
             year: 'numeric',
@@ -25,7 +25,7 @@ function formatDateTime(isoString) {
 }
 
 function formatDate(isoString) {
-    if (!isoString) return '—';
+    if (!isoString) return '�';
     try {
         return new Intl.DateTimeFormat('nl-NL', {
             year: 'numeric',
@@ -466,8 +466,26 @@ export default function Show({
         router.patch(urls.mark_task_done.replace('__ACTIVITY__', activityId), {}, { preserveScroll: true });
     };
 
+    const welcomeForm = useForm({
+        subject: welcomeEmail?.subject || '',
+        body_html: welcomeEmail?.body_html || '',
+        body_text: welcomeEmail?.body_text || '',
+    });
+
+    useEffect(() => {
+        welcomeForm.setData({
+            subject: welcomeEmail?.subject || '',
+            body_html: welcomeEmail?.body_html || '',
+            body_text: welcomeEmail?.body_text || '',
+        });
+    }, [welcomeEmail?.id]);
+
     const refreshWelcome = () => {
         router.post(urls.refresh_welcome_email, {}, { preserveScroll: true });
+    };
+
+    const saveWelcome = () => {
+        welcomeForm.post(urls.update_welcome_email, { preserveScroll: true });
     };
 
     const sendWelcome = () => {
@@ -476,7 +494,12 @@ export default function Show({
             return;
         }
         if (!confirm('Welkomstmail versturen?')) return;
-        router.post(urls.send_welcome_email, {}, { preserveScroll: true });
+        welcomeForm.post(urls.update_welcome_email, {
+            preserveScroll: true,
+            onSuccess: () => {
+                router.post(urls.send_welcome_email, {}, { preserveScroll: true });
+            },
+        });
     };
 
     return (
@@ -814,6 +837,13 @@ export default function Show({
                                 </button>
                                 <button
                                     type="button"
+                                    className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm font-semibold hover:bg-zinc-50"
+                                    onClick={saveWelcome}
+                                >
+                                    Concept opslaan
+                                </button>
+                                <button
+                                    type="button"
                                     className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700"
                                     onClick={sendWelcome}
                                 >
@@ -834,20 +864,52 @@ export default function Show({
                             </div>
                             <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 lg:col-span-2">
                                 <div className="text-xs font-medium text-zinc-500">Onderwerp</div>
-                                <div className="mt-1 text-sm font-semibold">{welcomeEmail?.subject || '—'}</div>
-                                <div className="mt-2 text-xs text-zinc-500">Naar: {welcomeEmail?.to_email || '—'}</div>
+                                <div className="mt-1 text-sm font-semibold">{welcomeForm.data.subject || '-'}</div>
+                                <div className="mt-2 text-xs text-zinc-500">Naar: {welcomeEmail?.to_email || '-'}</div>
+                            </div>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                            <div className="lg:col-span-2">
+                                <label className="block text-xs font-medium text-zinc-600">Onderwerp</label>
+                                <input
+                                    className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                    value={welcomeForm.data.subject}
+                                    onChange={(e) => welcomeForm.setData('subject', e.target.value)}
+                                />
+                                {welcomeForm.errors.subject && (
+                                    <div className="mt-1 text-xs text-rose-600">{welcomeForm.errors.subject}</div>
+                                )}
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-zinc-600">HTML template</label>
+                                <textarea
+                                    className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                    rows={8}
+                                    value={welcomeForm.data.body_html}
+                                    onChange={(e) => welcomeForm.setData('body_html', e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-zinc-600">Tekst template</label>
+                                <textarea
+                                    className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                    rows={8}
+                                    value={welcomeForm.data.body_text}
+                                    onChange={(e) => welcomeForm.setData('body_text', e.target.value)}
+                                />
                             </div>
                         </div>
 
                         <div className="mt-4 rounded-lg border border-zinc-200 bg-white p-4">
                             <div className="text-xs font-semibold text-zinc-500">Preview</div>
-                            {welcomeEmail?.body_html ? (
+                            {welcomeForm.data.body_html ? (
                                 <div
                                     className="prose prose-sm mt-3 max-w-none text-zinc-700"
-                                    dangerouslySetInnerHTML={{ __html: welcomeEmail.body_html }}
+                                    dangerouslySetInnerHTML={{ __html: welcomeForm.data.body_html }}
                                 />
-                            ) : welcomeEmail?.body_text ? (
-                                <pre className="mt-3 whitespace-pre-wrap text-sm text-zinc-700">{welcomeEmail.body_text}</pre>
+                            ) : welcomeForm.data.body_text ? (
+                                <pre className="mt-3 whitespace-pre-wrap text-sm text-zinc-700">{welcomeForm.data.body_text}</pre>
                             ) : (
                                 <div className="mt-3 text-sm text-zinc-600">
                                     Geen preview beschikbaar. Vul eerst login gegevens en vernieuw het concept.
@@ -1242,7 +1304,7 @@ export default function Show({
                                             </span>
                                         </td>
                                         <td className="px-4 py-3 text-sm text-zinc-600">
-                                            {mandate.ontvangen_op ? formatDateTime(mandate.ontvangen_op) : '—'}
+                                            {mandate.ontvangen_op ? formatDateTime(mandate.ontvangen_op) : '�'}
                                         </td>
                                         <td className="px-4 py-3 text-right text-sm">
                                             <button
@@ -1518,7 +1580,7 @@ export default function Show({
                     </div>
 
                     <div className="rounded-xl border border-zinc-200 bg-white p-4 text-sm text-zinc-600">
-                        Totaal: {formatEuro(moduleTotalsLive.totaalExcl)} excl. btw · BTW {formatEuro(moduleTotalsLive.btw)} ·{' '}
+                        Totaal: {formatEuro(moduleTotalsLive.totaalExcl)} excl. btw � BTW {formatEuro(moduleTotalsLive.btw)} �{' '}
                         {formatEuro(moduleTotalsLive.totaalIncl)} incl. btw
                     </div>
 
@@ -1586,7 +1648,7 @@ export default function Show({
                                                 />
                                                 {btwError && <div className="mt-1 text-xs text-rose-600">{btwError}</div>}
                                             </td>
-                                            <td className="px-4 py-3 text-sm text-zinc-700">{row.actief ? formatEuro(subtotal) : '—'}</td>
+                                            <td className="px-4 py-3 text-sm text-zinc-700">{row.actief ? formatEuro(subtotal) : '�'}</td>
                                         </tr>
                                     );
                                 })}
@@ -1789,7 +1851,7 @@ export default function Show({
                                         <div>
                                             <div className="text-sm font-semibold">{activity.titel}</div>
                                             <div className="mt-1 text-xs text-zinc-500">
-                                                {activity.type ? activity.type.replace('_', ' ') : 'Activiteit'} ·{' '}
+                                                {activity.type ? activity.type.replace('_', ' ') : 'Activiteit'} �{' '}
                                                 {formatDateTime(activity.created_at)}
                                             </div>
                                         </div>
@@ -1799,7 +1861,7 @@ export default function Show({
                                     {(activity.due_at || activity.done_at) && (
                                         <div className="mt-3 text-xs text-zinc-500">
                                             {activity.due_at && `Gepland: ${formatDateTime(activity.due_at)}`}
-                                            {activity.done_at && ` · Afgerond: ${formatDateTime(activity.done_at)}`}
+                                            {activity.done_at && ` � Afgerond: ${formatDateTime(activity.done_at)}`}
                                         </div>
                                     )}
                                 </div>
@@ -1976,3 +2038,4 @@ export default function Show({
         </div>
     );
 }
+

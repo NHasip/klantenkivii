@@ -530,6 +530,7 @@ class GarageCompaniesController
                 'add_task' => route('crm.garage_companies.tasks.add', ['garageCompany' => $garageCompany->id]),
                 'mark_task_done' => route('crm.garage_companies.tasks.done', ['garageCompany' => $garageCompany->id, 'activity' => '__ACTIVITY__']),
                 'refresh_welcome_email' => route('crm.garage_companies.welcome.refresh', ['garageCompany' => $garageCompany->id]),
+                'update_welcome_email' => route('crm.garage_companies.welcome.update', ['garageCompany' => $garageCompany->id]),
                 'send_welcome_email' => route('crm.garage_companies.welcome.send', ['garageCompany' => $garageCompany->id]),
             ],
         ]);
@@ -1074,6 +1075,24 @@ class GarageCompaniesController
         return back()->with('status', 'Welkomstmail concept ververst.');
     }
 
+    public function updateWelcomeEmail(Request $request, GarageCompany $garageCompany): RedirectResponse
+    {
+        $data = $request->validate([
+            'subject' => ['required', 'string', 'max:255'],
+            'body_html' => ['nullable', 'string'],
+            'body_text' => ['nullable', 'string'],
+        ]);
+
+        $draft = $this->ensureWelcomeDraft($garageCompany);
+        $draft->update([
+            'subject' => $data['subject'],
+            'body_html' => $data['body_html'] ?? '',
+            'body_text' => $data['body_text'] ?? '',
+        ]);
+
+        return back()->with('status', 'Welkomstmail concept opgeslagen.');
+    }
+
     public function sendWelcomeEmail(GarageCompany $garageCompany): RedirectResponse
     {
         $draft = $this->ensureWelcomeDraft($garageCompany);
@@ -1145,14 +1164,15 @@ class GarageCompaniesController
 
     private function ensureWelcomeDraft(GarageCompany $garageCompany): OutboundEmail
     {
-        $existing = OutboundEmail::query()
+        $draft = OutboundEmail::query()
             ->where('garage_company_id', $garageCompany->id)
             ->where('type', 'welcome_customer')
+            ->where('status', 'draft')
             ->orderByDesc('id')
             ->first();
 
-        if ($existing) {
-            return $existing;
+        if ($draft) {
+            return $draft;
         }
 
         return $this->refreshWelcomeDraft($garageCompany, true);
