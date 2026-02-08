@@ -1,7 +1,7 @@
 {
-  "_bootstrap-Da9Q4cYH.js": {
-    "file": "assets/bootstrap-Da9Q4cYH.js",
-    "name": "bootstrap"
+  "_module.esm-CDoHWUqT.js": {
+    "file": "assets/module.esm-CDoHWUqT.js",
+    "name": "module.esm"
   },
   "resources/css/app.css": {
     "file": "assets/app-Sqt9By1U.css",
@@ -9,71 +9,71 @@
     "isEntry": true
   },
   "resources/js/Pages/Crm/Dashboard.jsx": {
-    "file": "assets/Dashboard-D411eWbl.js",
+    "file": "assets/Dashboard-mRoRprUP.js",
     "name": "Dashboard",
     "src": "resources/js/Pages/Crm/Dashboard.jsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
-      "_bootstrap-Da9Q4cYH.js"
+      "_module.esm-CDoHWUqT.js"
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/Create.jsx": {
-    "file": "assets/Create-JZHQsA8e.js",
+    "file": "assets/Create-C-xfZyIH.js",
     "name": "Create",
     "src": "resources/js/Pages/Crm/GarageCompanies/Create.jsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
-      "_bootstrap-Da9Q4cYH.js"
+      "_module.esm-CDoHWUqT.js"
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/Index.jsx": {
-    "file": "assets/Index-Bz6MYq1P.js",
+    "file": "assets/Index-BNESmb7V.js",
     "name": "Index",
     "src": "resources/js/Pages/Crm/GarageCompanies/Index.jsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
-      "_bootstrap-Da9Q4cYH.js"
+      "_module.esm-CDoHWUqT.js"
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/Show.jsx": {
-    "file": "assets/Show-CJpFQaBL.js",
+    "file": "assets/Show-FU4vt4wX.js",
     "name": "Show",
     "src": "resources/js/Pages/Crm/GarageCompanies/Show.jsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
-      "_bootstrap-Da9Q4cYH.js"
+      "_module.esm-CDoHWUqT.js"
     ]
   },
   "resources/js/Pages/Crm/Tasks.jsx": {
-    "file": "assets/Tasks-wpechfjh.js",
+    "file": "assets/Tasks-CBR4n0xd.js",
     "name": "Tasks",
     "src": "resources/js/Pages/Crm/Tasks.jsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
-      "_bootstrap-Da9Q4cYH.js"
+      "_module.esm-CDoHWUqT.js"
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-dCNHPBwD.js",
+    "file": "assets/app-uMIf17jI.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
     "imports": [
-      "_bootstrap-Da9Q4cYH.js"
+      "_module.esm-CDoHWUqT.js"
     ]
   },
   "resources/js/app.jsx": {
-    "file": "assets/app-Cc9zflV_.js",
+    "file": "assets/app-BUm4k-9Z.js",
     "name": "app",
     "src": "resources/js/app.jsx",
     "isEntry": true,
     "imports": [
-      "_bootstrap-Da9Q4cYH.js"
+      "_module.esm-CDoHWUqT.js"
     ],
     "dynamicImports": [
       "resources/js/Pages/Crm/Dashboard.jsx",
