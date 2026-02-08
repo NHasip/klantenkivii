@@ -8,19 +8,25 @@ use App\Enums\GarageCompanyStatus;
 use App\Enums\ReminderChannel;
 use App\Enums\ReminderStatus;
 use App\Enums\SepaMandateStatus;
+use App\Mail\TemplateMail;
 use App\Models\Activity;
 use App\Models\CustomerPerson;
+use App\Models\EmailTemplate;
 use App\Models\GarageCompany;
 use App\Models\GarageCompanyModule;
 use App\Models\KiviiSeat;
 use App\Models\Module;
+use App\Models\OutboundEmail;
 use App\Models\Reminder;
 use App\Models\SepaMandate;
+use App\Models\SmtpSetting;
 use App\Models\User;
+use App\Services\EmailTemplateRenderer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -146,6 +152,9 @@ class GarageCompaniesController
             'login_password' => ['nullable', 'string', 'min:8'],
         ]);
 
+        $data['login_email'] = $data['login_email'] ?: null;
+        $data['login_password'] = $data['login_password'] ?: null;
+
         $moduleRows = $request->input('moduleRows', []);
         $rules = [];
         $messages = [];
@@ -197,6 +206,8 @@ class GarageCompaniesController
                 'land' => $data['land'],
                 'hoofd_email' => $data['email'],
                 'hoofd_telefoon' => $data['telefoonnummer'],
+                'login_email' => $data['login_email'] ?? null,
+                'login_password' => $data['login_password'] ?? null,
                 'status' => $data['status'],
                 'bron' => $data['bron'],
                 'tags' => $data['tags'] ?? null,
@@ -305,6 +316,8 @@ class GarageCompaniesController
             return $company;
         });
 
+        $this->ensureWelcomeDraft($company);
+
         return redirect()
             ->route('crm.garage_companies.show', ['garageCompany' => $company->id])
             ->with('status', 'Klant aangemaakt.');
@@ -323,6 +336,9 @@ class GarageCompaniesController
         $garageCompany->load(['primaryPerson', 'mandates', 'modules.module', 'seats']);
 
         $this->ensureAssignmentsExist($garageCompany->id);
+
+        $welcomeEmail = $this->ensureWelcomeDraft($garageCompany);
+        $smtpConfigured = SmtpSetting::query()->first()?->isComplete() ?? false;
 
         $moduleRows = $this->moduleRows($garageCompany->id);
         $moduleTotals = $this->moduleTotals($moduleRows);
@@ -444,6 +460,8 @@ class GarageCompaniesController
                 'website' => $garageCompany->website,
                 'hoofd_email' => $garageCompany->hoofd_email,
                 'hoofd_telefoon' => $garageCompany->hoofd_telefoon,
+                'login_email' => $garageCompany->login_email,
+                'login_password' => $garageCompany->login_password,
                 'status' => $garageCompany->status->value,
                 'bron' => $garageCompany->bron->value,
                 'tags' => $garageCompany->tags,
@@ -467,6 +485,16 @@ class GarageCompaniesController
                     'telefoon' => $garageCompany->primaryPerson->telefoon,
                 ] : null,
             ],
+            'welcomeEmail' => [
+                'id' => $welcomeEmail->id,
+                'to_email' => $welcomeEmail->to_email,
+                'subject' => $welcomeEmail->subject,
+                'body_html' => $welcomeEmail->body_html,
+                'body_text' => $welcomeEmail->body_text,
+                'status' => $welcomeEmail->status,
+                'sent_at' => optional($welcomeEmail->sent_at)->toIso8601String(),
+            ],
+            'smtpConfigured' => $smtpConfigured,
             'tab' => $tab,
             'statusOptions' => collect(GarageCompanyStatus::cases())->map(fn ($s) => $s->value)->values(),
             'sourceOptions' => collect(GarageCompanySource::cases())->map(fn ($s) => $s->value)->values(),
@@ -501,6 +529,8 @@ class GarageCompaniesController
                 'add_note' => route('crm.garage_companies.timeline.add', ['garageCompany' => $garageCompany->id]),
                 'add_task' => route('crm.garage_companies.tasks.add', ['garageCompany' => $garageCompany->id]),
                 'mark_task_done' => route('crm.garage_companies.tasks.done', ['garageCompany' => $garageCompany->id, 'activity' => '__ACTIVITY__']),
+                'refresh_welcome_email' => route('crm.garage_companies.welcome.refresh', ['garageCompany' => $garageCompany->id]),
+                'send_welcome_email' => route('crm.garage_companies.welcome.send', ['garageCompany' => $garageCompany->id]),
             ],
         ]);
     }
@@ -530,12 +560,38 @@ class GarageCompaniesController
             'opzegreden' => ['nullable', 'string'],
             'verloren_op' => ['nullable', 'date'],
             'verloren_reden' => ['nullable', 'string'],
+            'login_email' => [
+                'nullable',
+                'email',
+                'max:255',
+                Rule::unique('users', 'email')->ignore($garageCompany->eigenaar_user_id),
+            ],
+            'login_password' => ['nullable', 'string', 'min:8'],
         ]);
 
+        $data['login_email'] = $data['login_email'] ?: null;
+        $data['login_password'] = $data['login_password'] ?: null;
+
         $oldStatus = $garageCompany->status->value;
+        $oldLoginEmail = $garageCompany->login_email;
+        $oldLoginPassword = $garageCompany->login_password;
+        $oldHoofdEmail = $garageCompany->hoofd_email;
+        $oldBedrijfsnaam = $garageCompany->bedrijfsnaam;
 
         $garageCompany->fill($data);
         $garageCompany->save();
+
+        if (! empty($data['login_email']) && $garageCompany->eigenaar_user_id) {
+            User::query()
+                ->whereKey($garageCompany->eigenaar_user_id)
+                ->update(['email' => $data['login_email']]);
+        }
+
+        if (! empty($data['login_password']) && $garageCompany->eigenaar_user_id) {
+            User::query()
+                ->whereKey($garageCompany->eigenaar_user_id)
+                ->update(['password' => $data['login_password']]);
+        }
 
         if ($oldStatus !== $garageCompany->status->value) {
             Activity::create([
@@ -545,6 +601,15 @@ class GarageCompaniesController
                 'inhoud' => null,
                 'created_by' => auth()->id(),
             ]);
+        }
+
+        if (
+            $oldLoginEmail !== $garageCompany->login_email
+            || $oldLoginPassword !== $garageCompany->login_password
+            || $oldHoofdEmail !== $garageCompany->hoofd_email
+            || $oldBedrijfsnaam !== $garageCompany->bedrijfsnaam
+        ) {
+            $this->refreshWelcomeDraft($garageCompany, true);
         }
 
         return back()->with('status', 'Opgeslagen.');
@@ -1002,6 +1067,58 @@ class GarageCompaniesController
         return back()->with('status', 'Afgehandeld.');
     }
 
+    public function refreshWelcomeEmail(GarageCompany $garageCompany): RedirectResponse
+    {
+        $this->refreshWelcomeDraft($garageCompany, false);
+
+        return back()->with('status', 'Welkomstmail concept ververst.');
+    }
+
+    public function sendWelcomeEmail(GarageCompany $garageCompany): RedirectResponse
+    {
+        $draft = $this->ensureWelcomeDraft($garageCompany);
+        $smtp = SmtpSetting::query()->first();
+
+        if (! $smtp || ! $smtp->isComplete()) {
+            return back()->with('status', 'SMTP instellingen ontbreken. Voeg ze toe via profiel > systeem-instellingen.');
+        }
+
+        try {
+            $this->applySmtpSettings($smtp);
+
+            Mail::to($draft->to_email)->send(new TemplateMail(
+                $draft->subject,
+                $draft->body_html,
+                $draft->body_text,
+                $smtp->from_address,
+                $smtp->from_name
+            ));
+
+            $draft->update([
+                'status' => 'sent',
+                'sent_at' => now(),
+                'last_error' => null,
+            ]);
+
+            Activity::create([
+                'garage_company_id' => $garageCompany->id,
+                'type' => ActivityType::Systeem,
+                'titel' => 'Welkomstmail verstuurd',
+                'inhoud' => "Verstuurd naar {$draft->to_email}",
+                'created_by' => auth()->id(),
+            ]);
+
+            return back()->with('status', 'Welkomstmail verstuurd.');
+        } catch (\Throwable $e) {
+            $draft->update([
+                'status' => 'failed',
+                'last_error' => $e->getMessage(),
+            ]);
+
+            return back()->with('status', 'Versturen mislukt: '.$e->getMessage());
+        }
+    }
+
 
     /**
      * @return array{0:string,1:string}
@@ -1024,6 +1141,103 @@ class GarageCompaniesController
     private function generateMandaatId(int $companyId): string
     {
         return 'KIVII-'.$companyId.'-'.Str::upper(Str::random(10));
+    }
+
+    private function ensureWelcomeDraft(GarageCompany $garageCompany): OutboundEmail
+    {
+        $existing = OutboundEmail::query()
+            ->where('garage_company_id', $garageCompany->id)
+            ->where('type', 'welcome_customer')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($existing) {
+            return $existing;
+        }
+
+        return $this->refreshWelcomeDraft($garageCompany, true);
+    }
+
+    private function refreshWelcomeDraft(GarageCompany $garageCompany, bool $silent): OutboundEmail
+    {
+        $template = EmailTemplate::query()
+            ->where('key', 'welcome_customer')
+            ->firstOrFail();
+
+        $data = $this->welcomeTemplateData($garageCompany);
+        $rendered = EmailTemplateRenderer::render($template, $data);
+
+        $draft = OutboundEmail::query()
+            ->where('garage_company_id', $garageCompany->id)
+            ->where('type', 'welcome_customer')
+            ->where('status', 'draft')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($draft) {
+            $draft->update([
+                'template_id' => $template->id,
+                'to_email' => $garageCompany->hoofd_email,
+                'subject' => $rendered['subject'],
+                'body_html' => $rendered['html'],
+                'body_text' => $rendered['text'],
+            ]);
+        } else {
+            $draft = OutboundEmail::create([
+                'garage_company_id' => $garageCompany->id,
+                'template_id' => $template->id,
+                'type' => 'welcome_customer',
+                'to_email' => $garageCompany->hoofd_email,
+                'subject' => $rendered['subject'],
+                'body_html' => $rendered['html'],
+                'body_text' => $rendered['text'],
+                'status' => 'draft',
+                'created_by' => auth()->id(),
+            ]);
+        }
+
+        if (! $silent) {
+            Activity::create([
+                'garage_company_id' => $garageCompany->id,
+                'type' => ActivityType::Systeem,
+                'titel' => 'Welkomstmail concept vernieuwd',
+                'inhoud' => null,
+                'created_by' => auth()->id(),
+            ]);
+        }
+
+        return $draft;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function welcomeTemplateData(GarageCompany $garageCompany): array
+    {
+        $primary = $garageCompany->primaryPerson;
+        $naam = $primary ? trim("{$primary->voornaam} {$primary->achternaam}") : $garageCompany->bedrijfsnaam;
+
+        return [
+            'naam' => $naam ?: $garageCompany->bedrijfsnaam,
+            'bedrijfsnaam' => $garageCompany->bedrijfsnaam,
+            'loginnaam' => $garageCompany->login_email ?: '—',
+            'wachtwoord' => $garageCompany->login_password ?: '—',
+            'weblink' => 'https://web.kivii.nl/',
+        ];
+    }
+
+    private function applySmtpSettings(SmtpSetting $smtp): void
+    {
+        config([
+            'mail.default' => 'smtp',
+            'mail.mailers.smtp.host' => $smtp->host,
+            'mail.mailers.smtp.port' => $smtp->port,
+            'mail.mailers.smtp.username' => $smtp->username,
+            'mail.mailers.smtp.password' => $smtp->password,
+            'mail.mailers.smtp.encryption' => $smtp->encryption ?: null,
+            'mail.from.address' => $smtp->from_address,
+            'mail.from.name' => $smtp->from_name ?: config('app.name'),
+        ]);
     }
 
     private function ensureAssignmentsExist(int $garageCompanyId): void

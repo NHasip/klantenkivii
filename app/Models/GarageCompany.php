@@ -25,6 +25,8 @@ class GarageCompany extends Model
         'website',
         'hoofd_email',
         'hoofd_telefoon',
+        'login_email',
+        'login_password',
         'status',
         'bron',
         'tags',
@@ -55,6 +57,7 @@ class GarageCompany extends Model
             'actief_vanaf' => 'datetime',
             'opgezegd_op' => 'datetime',
             'verloren_op' => 'datetime',
+            'login_password' => 'encrypted',
         ];
     }
 

@@ -97,6 +97,8 @@ export default function Show({
     reminderChannels,
     hasActiveMandate,
     statusErrors,
+    welcomeEmail,
+    smtpConfigured,
     urls,
 }) {
     const activeTab = tab || 'overzicht';
@@ -112,6 +114,8 @@ export default function Show({
         website: garageCompany.website || '',
         hoofd_email: garageCompany.hoofd_email || '',
         hoofd_telefoon: garageCompany.hoofd_telefoon || '',
+        login_email: garageCompany.login_email || '',
+        login_password: garageCompany.login_password || '',
         status: garageCompany.status || statusOptions?.[0],
         bron: garageCompany.bron || sourceOptions?.[0],
         tags: garageCompany.tags || '',
@@ -462,6 +466,19 @@ export default function Show({
         router.patch(urls.mark_task_done.replace('__ACTIVITY__', activityId), {}, { preserveScroll: true });
     };
 
+    const refreshWelcome = () => {
+        router.post(urls.refresh_welcome_email, {}, { preserveScroll: true });
+    };
+
+    const sendWelcome = () => {
+        if (!smtpConfigured) {
+            alert('SMTP instellingen ontbreken. Voeg deze toe via profiel > systeem-instellingen.');
+            return;
+        }
+        if (!confirm('Welkomstmail versturen?')) return;
+        router.post(urls.send_welcome_email, {}, { preserveScroll: true });
+    };
+
     return (
         <div className="space-y-6">
             <Head title={garageCompany.bedrijfsnaam} />
@@ -611,6 +628,31 @@ export default function Show({
                                 )}
                             </div>
 
+                            <div>
+                                <label className="block text-xs font-medium text-zinc-600">Login e-mail</label>
+                                <input
+                                    type="email"
+                                    className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                    value={overviewForm.data.login_email}
+                                    onChange={(e) => overviewForm.setData('login_email', e.target.value)}
+                                />
+                                {overviewForm.errors.login_email && (
+                                    <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.login_email}</div>
+                                )}
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-zinc-600">Login wachtwoord</label>
+                                <input
+                                    type="password"
+                                    className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                    value={overviewForm.data.login_password}
+                                    onChange={(e) => overviewForm.setData('login_password', e.target.value)}
+                                />
+                                {overviewForm.errors.login_password && (
+                                    <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.login_password}</div>
+                                )}
+                            </div>
+
                             <div className="sm:col-span-2">
                                 <label className="block text-xs font-medium text-zinc-600">Adres</label>
                                 <input
@@ -753,6 +795,71 @@ export default function Show({
                             </button>
                         </div>
                     </form>
+
+                    <div className="rounded-xl border border-zinc-200 bg-white p-5">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <div className="text-sm font-semibold">Welkomstmail</div>
+                                <div className="mt-1 text-xs text-zinc-500">
+                                    Concept op basis van template. Controleer en verstuur handmatig.
+                                </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm font-semibold hover:bg-zinc-50"
+                                    onClick={refreshWelcome}
+                                >
+                                    Concept vernieuwen
+                                </button>
+                                <button
+                                    type="button"
+                                    className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700"
+                                    onClick={sendWelcome}
+                                >
+                                    Verstuur welkomstmail
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+                            <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                                <div className="text-xs font-medium text-zinc-500">Status</div>
+                                <div className="mt-1 text-sm font-semibold">{welcomeEmail?.status || 'concept'}</div>
+                                {welcomeEmail?.sent_at && (
+                                    <div className="mt-1 text-xs text-zinc-500">
+                                        Verstuurd op {formatDateTime(welcomeEmail.sent_at)}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 lg:col-span-2">
+                                <div className="text-xs font-medium text-zinc-500">Onderwerp</div>
+                                <div className="mt-1 text-sm font-semibold">{welcomeEmail?.subject || '—'}</div>
+                                <div className="mt-2 text-xs text-zinc-500">Naar: {welcomeEmail?.to_email || '—'}</div>
+                            </div>
+                        </div>
+
+                        <div className="mt-4 rounded-lg border border-zinc-200 bg-white p-4">
+                            <div className="text-xs font-semibold text-zinc-500">Preview</div>
+                            {welcomeEmail?.body_html ? (
+                                <div
+                                    className="prose prose-sm mt-3 max-w-none text-zinc-700"
+                                    dangerouslySetInnerHTML={{ __html: welcomeEmail.body_html }}
+                                />
+                            ) : welcomeEmail?.body_text ? (
+                                <pre className="mt-3 whitespace-pre-wrap text-sm text-zinc-700">{welcomeEmail.body_text}</pre>
+                            ) : (
+                                <div className="mt-3 text-sm text-zinc-600">
+                                    Geen preview beschikbaar. Vul eerst login gegevens en vernieuw het concept.
+                                </div>
+                            )}
+                        </div>
+                        {!smtpConfigured && (
+                            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">
+                                SMTP instellingen ontbreken. Voeg deze toe via profiel &gt; systeem-instellingen.
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
 

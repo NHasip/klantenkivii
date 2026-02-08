@@ -35,6 +35,8 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::post('/garagebedrijven/{garageCompany}/timeline', [GarageCompaniesController::class, 'addTimelineNote'])->name('crm.garage_companies.timeline.add');
     Route::post('/garagebedrijven/{garageCompany}/taken', [GarageCompaniesController::class, 'addTaskAppointment'])->name('crm.garage_companies.tasks.add');
     Route::patch('/garagebedrijven/{garageCompany}/taken/{activity}', [GarageCompaniesController::class, 'markTaskDone'])->name('crm.garage_companies.tasks.done');
+    Route::post('/garagebedrijven/{garageCompany}/welcome-email/refresh', [GarageCompaniesController::class, 'refreshWelcomeEmail'])->name('crm.garage_companies.welcome.refresh');
+    Route::post('/garagebedrijven/{garageCompany}/welcome-email/send', [GarageCompaniesController::class, 'sendWelcomeEmail'])->name('crm.garage_companies.welcome.send');
 
     Route::get('/garagebedrijven-old', \App\Livewire\Crm\GarageCompanies\Index::class)->name('crm.garage_companies.old');
     Route::get('/garagebedrijven-old/nieuw', \App\Livewire\Crm\GarageCompanies\Create::class)->name('crm.garage_companies.old.create');

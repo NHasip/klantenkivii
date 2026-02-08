@@ -29,6 +29,10 @@
                 <x-section-border />
             @endif
 
+            @if (auth()->user()?->isAdmin())
+                @livewire('profile.admin-system-settings')
+            @endif
+
             <div class="mt-10 sm:mt-0">
                 @livewire('profile.logout-other-browser-sessions-form')
             </div>
