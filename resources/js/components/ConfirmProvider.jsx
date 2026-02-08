@@ -37,26 +37,37 @@ function ConfirmDialog({
 
     const confirmClass =
         tone === 'danger'
-            ? 'bg-rose-600 hover:bg-rose-700'
+            ? 'bg-rose-600 hover:bg-rose-700 focus-visible:ring-rose-400'
             : tone === 'success'
-              ? 'bg-emerald-600 hover:bg-emerald-700'
-              : 'bg-zinc-900 hover:bg-zinc-800';
+              ? 'bg-emerald-600 hover:bg-emerald-700 focus-visible:ring-emerald-400'
+              : 'bg-zinc-900 hover:bg-zinc-800 focus-visible:ring-zinc-500';
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/30 px-4 py-8 backdrop-blur-sm"
             onClick={(event) => {
                 if (event.target === event.currentTarget) onCancel();
             }}
         >
-            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
-                <div className="text-base font-semibold text-zinc-900">{title}</div>
-                {message && <p className="mt-2 text-sm text-zinc-600">{message}</p>}
-                <div className="mt-5 flex items-center justify-end gap-2">
+            <div
+                className="w-full max-w-sm rounded-2xl border border-zinc-200/60 bg-white/95 shadow-[0_24px_60px_-30px_rgba(15,23,42,0.7)] ring-1 ring-black/5"
+                role="dialog"
+                aria-modal="true"
+                aria-label={title}
+            >
+                <div className="px-5 pt-4">
+                    <div className="text-[13px] font-semibold text-zinc-900">{title}</div>
+                    {message && (
+                        <p className="mt-1 text-xs leading-relaxed text-zinc-600">
+                            {message}
+                        </p>
+                    )}
+                </div>
+                <div className="mt-4 flex items-center justify-end gap-2 border-t border-zinc-100 px-4 py-3">
                     {showCancel && (
                         <button
                             type="button"
-                            className="rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50"
+                            className="rounded-full border border-zinc-200 px-3 py-1.5 text-[11px] font-semibold text-zinc-700 transition hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300 focus-visible:ring-offset-2"
                             onClick={onCancel}
                         >
                             {cancelText}
@@ -64,7 +75,7 @@ function ConfirmDialog({
                     )}
                     <button
                         type="button"
-                        className={`rounded-md px-3 py-2 text-sm font-semibold text-white ${confirmClass}`}
+                        className={`rounded-full px-3.5 py-1.5 text-[11px] font-semibold text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${confirmClass}`}
                         onClick={onConfirm}
                     >
                         {confirmText}
