@@ -1,72 +1,79 @@
 {
+  "_bootstrap-Da9Q4cYH.js": {
+    "file": "assets/bootstrap-Da9Q4cYH.js",
+    "name": "bootstrap"
+  },
   "resources/css/app.css": {
     "file": "assets/app-Sqt9By1U.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
   "resources/js/Pages/Crm/Dashboard.jsx": {
-    "file": "assets/Dashboard-Dhos7qqt.js",
+    "file": "assets/Dashboard-D411eWbl.js",
     "name": "Dashboard",
     "src": "resources/js/Pages/Crm/Dashboard.jsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
-      "resources/js/app.js"
+      "_bootstrap-Da9Q4cYH.js"
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/Create.jsx": {
-    "file": "assets/Create-qJoy4IwP.js",
+    "file": "assets/Create-JZHQsA8e.js",
     "name": "Create",
     "src": "resources/js/Pages/Crm/GarageCompanies/Create.jsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
-      "resources/js/app.js"
+      "_bootstrap-Da9Q4cYH.js"
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/Index.jsx": {
-    "file": "assets/Index-nAFABdeq.js",
+    "file": "assets/Index-Bz6MYq1P.js",
     "name": "Index",
     "src": "resources/js/Pages/Crm/GarageCompanies/Index.jsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
-      "resources/js/app.js"
+      "_bootstrap-Da9Q4cYH.js"
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/Show.jsx": {
-    "file": "assets/Show-D2Ta20Dt.js",
+    "file": "assets/Show-CJpFQaBL.js",
     "name": "Show",
     "src": "resources/js/Pages/Crm/GarageCompanies/Show.jsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
-      "resources/js/app.js"
+      "_bootstrap-Da9Q4cYH.js"
     ]
   },
   "resources/js/Pages/Crm/Tasks.jsx": {
-    "file": "assets/Tasks-ClrNUkJ6.js",
+    "file": "assets/Tasks-wpechfjh.js",
     "name": "Tasks",
     "src": "resources/js/Pages/Crm/Tasks.jsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
-      "resources/js/app.js"
+      "_bootstrap-Da9Q4cYH.js"
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-Da9Q4cYH.js",
+    "file": "assets/app-dCNHPBwD.js",
     "name": "app",
     "src": "resources/js/app.js",
-    "isEntry": true
+    "isEntry": true,
+    "imports": [
+      "_bootstrap-Da9Q4cYH.js"
+    ]
   },
   "resources/js/app.jsx": {
-    "file": "assets/app-BREDRco8.js",
+    "file": "assets/app-Cc9zflV_.js",
     "name": "app",
     "src": "resources/js/app.jsx",
     "isEntry": true,
     "imports": [
-      "resources/js/app.js"
+      "_bootstrap-Da9Q4cYH.js"
     ],
     "dynamicImports": [
       "resources/js/Pages/Crm/Dashboard.jsx",
