@@ -274,6 +274,7 @@ export default function Create({ statusOptions, sourceOptions, moduleRows, defau
                         <div>
                             <label className="block text-xs font-medium text-zinc-600">Plaats van tekenen</label>
                             <input
+                                autoComplete="off"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={data.plaats_van_tekenen}
                                 onChange={(e) => setData('plaats_van_tekenen', e.target.value)}
