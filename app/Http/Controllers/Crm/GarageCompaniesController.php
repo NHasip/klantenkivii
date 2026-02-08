@@ -27,6 +27,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -208,7 +209,7 @@ class GarageCompaniesController
         $company = DB::transaction(function () use ($data, $moduleRows) {
             [$voornaam, $achternaam] = $this->splitFullName($data['voor_en_achternaam']);
 
-            $company = GarageCompany::create([
+            $companyData = [
                 'bedrijfsnaam' => $data['bedrijfsnaam'],
                 'adres_straat_nummer' => $data['straatnaam_en_nummer'],
                 'postcode' => $data['postcode'],
@@ -217,8 +218,6 @@ class GarageCompaniesController
                 'kvk_nummer' => $data['kvk_nummer'] ?? null,
                 'hoofd_email' => $data['email'],
                 'hoofd_telefoon' => $data['telefoonnummer'],
-                'login_email' => $data['login_email'] ?? null,
-                'login_password' => $data['login_password'] ?? null,
                 'status' => $data['status'],
                 'bron' => $data['bron'],
                 'tags' => $data['tags'] ?? null,
@@ -227,7 +226,17 @@ class GarageCompaniesController
                 'opgezegd_op' => $data['opgezegd_op'] ?? null,
                 'opzegreden' => $data['opzegreden'] ?? null,
                 'created_by' => auth()->id(),
-            ]);
+            ];
+
+            if (Schema::hasColumn('garage_companies', 'login_email')) {
+                $companyData['login_email'] = $data['login_email'] ?? null;
+            }
+
+            if (Schema::hasColumn('garage_companies', 'login_password')) {
+                $companyData['login_password'] = $data['login_password'] ?? null;
+            }
+
+            $company = GarageCompany::create($companyData);
 
             CustomerPerson::create([
                 'garage_company_id' => $company->id,
