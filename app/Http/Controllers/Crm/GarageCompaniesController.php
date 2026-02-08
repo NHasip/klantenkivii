@@ -475,6 +475,27 @@ class GarageCompaniesController
                 'due_at' => optional($activity->due_at)->toIso8601String(),
             ]);
 
+        $emailTemplates = collect();
+        if (Schema::hasTable('email_templates')) {
+            $templateData = $this->welcomeTemplateData($garageCompany);
+            $emailTemplates = EmailTemplate::query()
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get()
+                ->map(function (EmailTemplate $template) use ($templateData) {
+                    $rendered = EmailTemplateRenderer::render($template, $templateData);
+
+                    return [
+                        'id' => $template->id,
+                        'key' => $template->key,
+                        'name' => $template->name,
+                        'subject' => $rendered['subject'],
+                        'body_html' => $rendered['html'],
+                        'preview' => Str::limit(trim(strip_tags($rendered['html'] ?? '')), 140),
+                    ];
+                });
+        }
+
         return Inertia::render('Crm/GarageCompanies/Show', [
             'garageCompany' => [
                 'id' => $garageCompany->id,
@@ -515,6 +536,7 @@ class GarageCompaniesController
             ],
             'welcomeEmail' => $welcomeEmail ? [
                 'id' => $welcomeEmail->id,
+                'template_id' => $welcomeEmail->template_id,
                 'to_email' => $welcomeEmail->to_email,
                 'subject' => $welcomeEmail->subject,
                 'body_html' => $welcomeEmail->body_html,
@@ -522,6 +544,7 @@ class GarageCompaniesController
                 'status' => $welcomeEmail->status,
                 'sent_at' => optional($welcomeEmail->sent_at)->toIso8601String(),
             ] : null,
+            'emailTemplates' => $emailTemplates,
             'smtpConfigured' => $smtpConfigured,
             'tab' => $tab,
             'statusOptions' => collect(GarageCompanyStatus::cases())->map(fn ($s) => $s->value)->values(),
@@ -1119,7 +1142,7 @@ class GarageCompaniesController
         $data = $request->validate([
             'subject' => ['required', 'string', 'max:255'],
             'body_html' => ['nullable', 'string'],
-            'body_text' => ['nullable', 'string'],
+            'template_id' => ['nullable', 'integer'],
         ]);
 
         $draft = $this->ensureWelcomeDraft($garageCompany);
@@ -1127,9 +1150,10 @@ class GarageCompaniesController
             return back()->with('status', 'Welkomstmail is niet beschikbaar (migraties ontbreken).');
         }
         $draft->update([
+            'template_id' => $data['template_id'] ?? $draft->template_id,
             'subject' => $data['subject'],
             'body_html' => $data['body_html'] ?? '',
-            'body_text' => $data['body_text'] ?? '',
+            'body_text' => $this->htmlToText($data['body_html'] ?? ''),
         ]);
 
         return back()->with('status', 'Welkomstmail concept opgeslagen.');
@@ -1209,6 +1233,17 @@ class GarageCompaniesController
     private function generateMandaatId(int $companyId): string
     {
         return 'KIVII-'.$companyId.'-'.Str::upper(Str::random(10));
+    }
+
+    private function htmlToText(string $html): string
+    {
+        $text = preg_replace('/<br\\s*\\/?>/i', "\n", $html) ?? $html;
+        $text = preg_replace('/<\\/p>\\s*<p>/i', "\n\n", $text) ?? $text;
+        $text = strip_tags($text);
+        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = preg_replace("/\\n{3,}/", "\n\n", $text) ?? $text;
+
+        return trim($text);
     }
 
     private function ensureWelcomeDraft(GarageCompany $garageCompany): ?OutboundEmail

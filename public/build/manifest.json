@@ -1,15 +1,22 @@
 {
+  "_index-CpUb11mV.js": {
+    "file": "assets/index-CpUb11mV.js",
+    "name": "index",
+    "imports": [
+      "resources/js/app.jsx"
+    ]
+  },
   "_module.esm-CDoHWUqT.js": {
     "file": "assets/module.esm-CDoHWUqT.js",
     "name": "module.esm"
   },
   "resources/css/app.css": {
-    "file": "assets/app-Bei2WWEc.css",
+    "file": "assets/app-BFqgSABn.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
   "resources/js/Pages/Crm/Dashboard.jsx": {
-    "file": "assets/Dashboard-DFAHKkeq.js",
+    "file": "assets/Dashboard-XbK5t8KA.js",
     "name": "Dashboard",
     "src": "resources/js/Pages/Crm/Dashboard.jsx",
     "isDynamicEntry": true,
@@ -18,8 +25,19 @@
       "_module.esm-CDoHWUqT.js"
     ]
   },
+  "resources/js/Pages/Crm/EmailTemplates/Index.jsx": {
+    "file": "assets/Index-D-MHzzuK.js",
+    "name": "Index",
+    "src": "resources/js/Pages/Crm/EmailTemplates/Index.jsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.jsx",
+      "_index-CpUb11mV.js",
+      "_module.esm-CDoHWUqT.js"
+    ]
+  },
   "resources/js/Pages/Crm/GarageCompanies/Create.jsx": {
-    "file": "assets/Create-tjMgUp9c.js",
+    "file": "assets/Create-CYtrLaIE.js",
     "name": "Create",
     "src": "resources/js/Pages/Crm/GarageCompanies/Create.jsx",
     "isDynamicEntry": true,
@@ -29,7 +47,7 @@
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/Index.jsx": {
-    "file": "assets/Index-DNjQHAR6.js",
+    "file": "assets/Index-WE02MI8N.js",
     "name": "Index",
     "src": "resources/js/Pages/Crm/GarageCompanies/Index.jsx",
     "isDynamicEntry": true,
@@ -39,17 +57,18 @@
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/Show.jsx": {
-    "file": "assets/Show-BD0iGQvp.js",
+    "file": "assets/Show-CMNp40jZ.js",
     "name": "Show",
     "src": "resources/js/Pages/Crm/GarageCompanies/Show.jsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
+      "_index-CpUb11mV.js",
       "_module.esm-CDoHWUqT.js"
     ]
   },
   "resources/js/Pages/Crm/Tasks.jsx": {
-    "file": "assets/Tasks-XXPcZwcN.js",
+    "file": "assets/Tasks-C8HMoEaJ.js",
     "name": "Tasks",
     "src": "resources/js/Pages/Crm/Tasks.jsx",
     "isDynamicEntry": true,
@@ -68,7 +87,7 @@
     ]
   },
   "resources/js/app.jsx": {
-    "file": "assets/app-Clptx6nZ.js",
+    "file": "assets/app-BJbxzx8l.js",
     "name": "app",
     "src": "resources/js/app.jsx",
     "isEntry": true,
@@ -77,6 +96,7 @@
     ],
     "dynamicImports": [
       "resources/js/Pages/Crm/Dashboard.jsx",
+      "resources/js/Pages/Crm/EmailTemplates/Index.jsx",
       "resources/js/Pages/Crm/GarageCompanies/Create.jsx",
       "resources/js/Pages/Crm/GarageCompanies/Index.jsx",
       "resources/js/Pages/Crm/GarageCompanies/Show.jsx",

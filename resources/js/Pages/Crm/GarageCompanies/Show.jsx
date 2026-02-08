@@ -121,6 +121,7 @@ export default function Show({
     hasActiveMandate,
     statusErrors,
     welcomeEmail,
+    emailTemplates,
     smtpConfigured,
     urls,
 }) {
@@ -525,16 +526,29 @@ export default function Show({
     const welcomeForm = useForm({
         subject: welcomeEmail?.subject || '',
         body_html: welcomeEmail?.body_html || '',
-        body_text: welcomeEmail?.body_text || '',
+        template_id: welcomeEmail?.template_id || null,
     });
 
     useEffect(() => {
         welcomeForm.setData({
             subject: welcomeEmail?.subject || '',
             body_html: welcomeEmail?.body_html || '',
-            body_text: welcomeEmail?.body_text || '',
+            template_id: welcomeEmail?.template_id || null,
         });
     }, [welcomeEmail?.id]);
+
+    useEffect(() => {
+        if (welcomeEmail?.template_id) {
+            setSelectedTemplateId(welcomeEmail.template_id);
+        }
+    }, [welcomeEmail?.template_id]);
+
+    const templates = emailTemplates ?? [];
+    const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+    const [selectedTemplateId, setSelectedTemplateId] = useState(welcomeEmail?.template_id ?? null);
+    const [pendingSend, setPendingSend] = useState(false);
+
+    const selectedTemplate = templates.find((item) => item.id === selectedTemplateId) || null;
 
     const welcomeEditor = useEditor({
         extensions: [
@@ -580,7 +594,7 @@ export default function Show({
         failed: 'bg-rose-50 text-rose-700',
     }[welcomeStatus] || 'bg-zinc-100 text-zinc-700';
 
-    const sendWelcome = async () => {
+    const confirmSendWelcome = async () => {
         if (!welcomeEmail) return;
         if (!smtpConfigured) {
             await confirm({
@@ -606,6 +620,30 @@ export default function Show({
                 router.post(urls.send_welcome_email, {}, { preserveScroll: true });
             },
         });
+    };
+
+    const applyTemplate = (template, { close = true, send = false } = {}) => {
+        if (!template) return;
+        welcomeForm.setData('subject', template.subject);
+        welcomeForm.setData('body_html', template.body_html);
+        welcomeForm.setData('template_id', template.id);
+        if (welcomeEditor) {
+            welcomeEditor.commands.setContent(template.body_html || '<p></p>', false);
+        }
+        setSelectedTemplateId(template.id);
+        if (close) setTemplatePickerOpen(false);
+        if (send) confirmSendWelcome();
+    };
+
+    const openTemplatePicker = (sendAfter = false) => {
+        if (!templates.length) {
+            if (sendAfter) {
+                confirmSendWelcome();
+            }
+            return;
+        }
+        setPendingSend(sendAfter);
+        setTemplatePickerOpen(true);
     };
 
     return (
@@ -952,6 +990,14 @@ export default function Show({
                                 <button
                                     type="button"
                                     className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm font-semibold hover:bg-zinc-50"
+                                    onClick={() => openTemplatePicker(false)}
+                                    disabled={!welcomeEmail || !templates.length}
+                                >
+                                    Template kiezen
+                                </button>
+                                <button
+                                    type="button"
+                                    className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm font-semibold hover:bg-zinc-50"
                                     onClick={saveWelcome}
                                     disabled={!welcomeEmail}
                                 >
@@ -960,7 +1006,7 @@ export default function Show({
                                 <button
                                     type="button"
                                     className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
-                                    onClick={sendWelcome}
+                                    onClick={() => openTemplatePicker(true)}
                                     disabled={!welcomeEmail}
                                 >
                                     Verstuur welkomstmail
@@ -1029,114 +1075,181 @@ export default function Show({
                                         )}
                                     </div>
 
-                                      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                                          <div className="rounded-xl border border-zinc-200 bg-white p-4">
-                                              <div className="text-xs font-semibold text-zinc-500">HTML template</div>
-                                              <div className="mt-2 rounded-lg border border-zinc-200">
-                                                  <div className="flex flex-wrap items-center gap-1 border-b border-zinc-100 bg-zinc-50 px-2 py-2">
-                                                      <ToolbarButton
-                                                          title="Vet"
-                                                          active={welcomeEditor?.isActive('bold')}
-                                                          disabled={!welcomeEditor}
-                                                          onClick={() => welcomeEditor?.chain().focus().toggleBold().run()}
-                                                      >
-                                                          Vet
-                                                      </ToolbarButton>
-                                                      <ToolbarButton
-                                                          title="Cursief"
-                                                          active={welcomeEditor?.isActive('italic')}
-                                                          disabled={!welcomeEditor}
-                                                          onClick={() => welcomeEditor?.chain().focus().toggleItalic().run()}
-                                                      >
-                                                          Cursief
-                                                      </ToolbarButton>
-                                                      <ToolbarButton
-                                                          title="Opsomming"
-                                                          active={welcomeEditor?.isActive('bulletList')}
-                                                          disabled={!welcomeEditor}
-                                                          onClick={() => welcomeEditor?.chain().focus().toggleBulletList().run()}
-                                                      >
-                                                          Lijst
-                                                      </ToolbarButton>
-                                                      <ToolbarButton
-                                                          title="Genummerde lijst"
-                                                          active={welcomeEditor?.isActive('orderedList')}
-                                                          disabled={!welcomeEditor}
-                                                          onClick={() => welcomeEditor?.chain().focus().toggleOrderedList().run()}
-                                                      >
-                                                          Nummering
-                                                      </ToolbarButton>
-                                                      <ToolbarButton
-                                                          title="Link"
-                                                          active={welcomeEditor?.isActive('link')}
-                                                          disabled={!welcomeEditor}
-                                                          onClick={() => {
-                                                              if (!welcomeEditor) return;
-                                                              const previousUrl = welcomeEditor.getAttributes('link').href || '';
-                                                              const url = window.prompt('Link URL', previousUrl);
-                                                              if (url === null) return;
-                                                              if (url === '') {
-                                                                  welcomeEditor.chain().focus().unsetLink().run();
-                                                                  return;
-                                                              }
-                                                              welcomeEditor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
-                                                          }}
-                                                      >
-                                                          Link
-                                                      </ToolbarButton>
-                                                      <ToolbarButton
-                                                          title="Opmaak wissen"
-                                                          disabled={!welcomeEditor}
-                                                          onClick={() => welcomeEditor?.chain().focus().clearNodes().unsetAllMarks().run()}
-                                                      >
-                                                          Wissen
-                                                      </ToolbarButton>
-                                                      <ToolbarButton
-                                                          title="Ongedaan maken"
-                                                          disabled={!welcomeEditor}
-                                                          onClick={() => welcomeEditor?.chain().focus().undo().run()}
-                                                      >
-                                                          Undo
-                                                      </ToolbarButton>
-                                                      <ToolbarButton
-                                                          title="Opnieuw"
-                                                          disabled={!welcomeEditor}
-                                                          onClick={() => welcomeEditor?.chain().focus().redo().run()}
-                                                      >
-                                                          Redo
-                                                      </ToolbarButton>
-                                                  </div>
-                                                  <EditorContent editor={welcomeEditor} className="tiptap px-3 py-2 text-sm" />
-                                              </div>
-                                              <div className="mt-2 text-xs text-zinc-500">
-                                                  {`Gebruik variabelen zoals {{ naam }}, {{ loginnaam }}, {{ wachtwoord }}, {{ weblink }}.`}
-                                              </div>
-                                          </div>
-                                          <div className="rounded-xl border border-zinc-200 bg-white p-4">
-                                              <div className="text-xs font-semibold text-zinc-500">Tekst template</div>
-                                            <textarea
-                                                className="mt-2 w-full rounded-md border-zinc-300 text-sm"
-                                                rows={10}
-                                                value={welcomeForm.data.body_text}
-                                                onChange={(e) => welcomeForm.setData('body_text', e.target.value)}
-                                            />
+                                    <div className="rounded-xl border border-zinc-200 bg-white p-4">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div className="text-xs font-semibold text-zinc-500">Welkomstmail</div>
+                                            {selectedTemplate && (
+                                                <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11px] font-semibold text-zinc-700">
+                                                    Template: {selectedTemplate.name}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="mt-2 rounded-lg border border-zinc-200">
+                                            <div className="flex flex-wrap items-center gap-1 border-b border-zinc-100 bg-zinc-50 px-2 py-2">
+                                                <ToolbarButton
+                                                    title="Vet"
+                                                    active={welcomeEditor?.isActive('bold')}
+                                                    disabled={!welcomeEditor}
+                                                    onClick={() => welcomeEditor?.chain().focus().toggleBold().run()}
+                                                >
+                                                    Vet
+                                                </ToolbarButton>
+                                                <ToolbarButton
+                                                    title="Cursief"
+                                                    active={welcomeEditor?.isActive('italic')}
+                                                    disabled={!welcomeEditor}
+                                                    onClick={() => welcomeEditor?.chain().focus().toggleItalic().run()}
+                                                >
+                                                    Cursief
+                                                </ToolbarButton>
+                                                <ToolbarButton
+                                                    title="Opsomming"
+                                                    active={welcomeEditor?.isActive('bulletList')}
+                                                    disabled={!welcomeEditor}
+                                                    onClick={() => welcomeEditor?.chain().focus().toggleBulletList().run()}
+                                                >
+                                                    Lijst
+                                                </ToolbarButton>
+                                                <ToolbarButton
+                                                    title="Genummerde lijst"
+                                                    active={welcomeEditor?.isActive('orderedList')}
+                                                    disabled={!welcomeEditor}
+                                                    onClick={() => welcomeEditor?.chain().focus().toggleOrderedList().run()}
+                                                >
+                                                    Nummering
+                                                </ToolbarButton>
+                                                <ToolbarButton
+                                                    title="Link"
+                                                    active={welcomeEditor?.isActive('link')}
+                                                    disabled={!welcomeEditor}
+                                                    onClick={() => {
+                                                        if (!welcomeEditor) return;
+                                                        const previousUrl = welcomeEditor.getAttributes('link').href || '';
+                                                        const url = window.prompt('Link URL', previousUrl);
+                                                        if (url === null) return;
+                                                        if (url === '') {
+                                                            welcomeEditor.chain().focus().unsetLink().run();
+                                                            return;
+                                                        }
+                                                        welcomeEditor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+                                                    }}
+                                                >
+                                                    Link
+                                                </ToolbarButton>
+                                                <ToolbarButton
+                                                    title="Opmaak wissen"
+                                                    disabled={!welcomeEditor}
+                                                    onClick={() => welcomeEditor?.chain().focus().clearNodes().unsetAllMarks().run()}
+                                                >
+                                                    Wissen
+                                                </ToolbarButton>
+                                                <ToolbarButton
+                                                    title="Ongedaan maken"
+                                                    disabled={!welcomeEditor}
+                                                    onClick={() => welcomeEditor?.chain().focus().undo().run()}
+                                                >
+                                                    Undo
+                                                </ToolbarButton>
+                                                <ToolbarButton
+                                                    title="Opnieuw"
+                                                    disabled={!welcomeEditor}
+                                                    onClick={() => welcomeEditor?.chain().focus().redo().run()}
+                                                >
+                                                    Redo
+                                                </ToolbarButton>
+                                            </div>
+                                            <EditorContent editor={welcomeEditor} className="tiptap px-3 py-2 text-sm" />
+                                        </div>
+                                        <div className="mt-2 text-xs text-zinc-500">
+                                            {`Gebruik variabelen zoals {{ naam }}, {{ loginnaam }}, {{ wachtwoord }}, {{ weblink }}.`}
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                        )}
 
-                                    <div className="rounded-xl border border-zinc-200 bg-white p-4">
-                                        <div className="text-xs font-semibold text-zinc-500">Preview</div>
-                                        {welcomeForm.data.body_html ? (
-                                            <div
-                                                className="prose prose-sm mt-3 max-w-none text-zinc-700"
-                                                dangerouslySetInnerHTML={{ __html: welcomeForm.data.body_html }}
-                                            />
-                                        ) : welcomeForm.data.body_text ? (
-                                            <pre className="mt-3 whitespace-pre-wrap text-sm text-zinc-700">{welcomeForm.data.body_text}</pre>
-                                        ) : (
-                                            <div className="mt-3 text-sm text-zinc-600">
-                                                Geen preview beschikbaar. Vul eerst login gegevens en vernieuw het concept.
+                        {templatePickerOpen && (
+                            <div
+                                className="fixed inset-0 z-40 flex items-center justify-center bg-zinc-950/30 px-4 py-8 backdrop-blur-sm"
+                                onClick={(event) => {
+                                    if (event.target === event.currentTarget) {
+                                        setTemplatePickerOpen(false);
+                                        setPendingSend(false);
+                                    }
+                                }}
+                            >
+                                <div className="w-full max-w-lg rounded-2xl border border-zinc-200/70 bg-white/95 shadow-2xl">
+                                    <div className="border-b border-zinc-100 px-5 py-4">
+                                        <div className="text-sm font-semibold text-zinc-900">Kies een e-mail template</div>
+                                        <div className="mt-1 text-xs text-zinc-500">
+                                            Selecteer een template om het concept te vullen. Je kunt daarna nog aanpassen.
+                                        </div>
+                                    </div>
+                                    <div className="max-h-64 space-y-2 overflow-y-auto px-5 py-4">
+                                        {templates.map((template) => (
+                                            <button
+                                                key={template.id}
+                                                type="button"
+                                                onClick={() => setSelectedTemplateId(template.id)}
+                                                className={cx(
+                                                    'w-full rounded-xl border px-4 py-3 text-left transition',
+                                                    selectedTemplateId === template.id
+                                                        ? 'border-zinc-900 bg-zinc-900 text-white'
+                                                        : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
+                                                )}
+                                            >
+                                                <div className="text-sm font-semibold">{template.name}</div>
+                                                <div className={cx('mt-1 text-xs', selectedTemplateId === template.id ? 'text-zinc-200' : 'text-zinc-500')}>
+                                                    {template.subject || 'Geen onderwerp'}
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="border-t border-zinc-100 px-5 py-4">
+                                        {selectedTemplate ? (
+                                            <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700">
+                                                <div className="font-semibold">{selectedTemplate.subject || 'Geen onderwerp'}</div>
+                                                <div className="mt-1 text-zinc-500">{selectedTemplate.preview || 'Geen voorbeeld'}</div>
                                             </div>
+                                        ) : (
+                                            <div className="text-xs text-zinc-500">Kies een template om een voorbeeld te zien.</div>
                                         )}
+                                        <div className="mt-4 flex flex-wrap justify-end gap-2">
+                                            <button
+                                                type="button"
+                                                className="rounded-full border border-zinc-200 px-3 py-1.5 text-[11px] font-semibold text-zinc-700 hover:bg-zinc-50"
+                                                onClick={() => {
+                                                    setTemplatePickerOpen(false);
+                                                    setPendingSend(false);
+                                                }}
+                                            >
+                                                Annuleren
+                                            </button>
+                                            {pendingSend && (
+                                                <button
+                                                    type="button"
+                                                    className="rounded-full border border-zinc-200 px-3 py-1.5 text-[11px] font-semibold text-zinc-700 hover:bg-zinc-50"
+                                                    onClick={() => {
+                                                        setTemplatePickerOpen(false);
+                                                        setPendingSend(false);
+                                                        confirmSendWelcome();
+                                                    }}
+                                                >
+                                                    Verstuur huidige
+                                                </button>
+                                            )}
+                                            <button
+                                                type="button"
+                                                className="rounded-full bg-zinc-900 px-3.5 py-1.5 text-[11px] font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+                                                disabled={!selectedTemplate}
+                                                onClick={() => {
+                                                    applyTemplate(selectedTemplate, { close: true, send: pendingSend });
+                                                    setPendingSend(false);
+                                                }}
+                                            >
+                                                {pendingSend ? 'Gebruik & verstuur' : 'Gebruik template'}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Crm\DashboardController;
+use App\Http\Controllers\Crm\EmailTemplatesController;
 use App\Http\Controllers\Crm\GarageCompaniesController;
 use App\Http\Controllers\Crm\TasksController;
 use Illuminate\Support\Facades\Route;
@@ -65,4 +66,17 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/modules', \App\Livewire\Crm\Modules\Index::class)
         ->middleware('admin')
         ->name('crm.modules.index');
+
+    Route::get('/email-templates', [EmailTemplatesController::class, 'index'])
+        ->middleware('admin')
+        ->name('crm.email_templates.index');
+    Route::post('/email-templates', [EmailTemplatesController::class, 'store'])
+        ->middleware('admin')
+        ->name('crm.email_templates.store');
+    Route::patch('/email-templates/{emailTemplate}', [EmailTemplatesController::class, 'update'])
+        ->middleware('admin')
+        ->name('crm.email_templates.update');
+    Route::delete('/email-templates/{emailTemplate}', [EmailTemplatesController::class, 'destroy'])
+        ->middleware('admin')
+        ->name('crm.email_templates.delete');
 });

@@ -55,6 +55,9 @@
                                 </div>
                                 <div class="border-t border-zinc-200">
                                     <a href="/user/profile" class="block px-4 py-2 text-sm hover:bg-zinc-50">Profiel &amp; 2FA</a>
+                                    @if(auth()->user()?->isAdmin())
+                                        <a href="{{ route('crm.email_templates.index') }}" class="block px-4 py-2 text-sm hover:bg-zinc-50">E-mail templates</a>
+                                    @endif
                                     <form method="POST" action="/logout">
                                         @csrf
                                         <button type="submit" class="block w-full px-4 py-2 text-left text-sm hover:bg-zinc-50">Uitloggen</button>
