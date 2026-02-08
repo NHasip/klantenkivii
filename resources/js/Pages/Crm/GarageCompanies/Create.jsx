@@ -244,12 +244,7 @@ export default function Create({ statusOptions, sourceOptions, moduleRows, defau
                             <input
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={data.plaats}
-                                onChange={(e) => {
-                                    setData('plaats', e.target.value);
-                                    if (!data.plaats_van_tekenen) {
-                                        setData('plaats_van_tekenen', e.target.value);
-                                    }
-                                }}
+                                onChange={(e) => setData('plaats', e.target.value)}
                             />
                             {errors.plaats && <div className="mt-1 text-xs text-rose-600">{errors.plaats}</div>}
                         </div>
