@@ -55,7 +55,6 @@ export default function Index({ companies, filters, statusOptions, sourceOptions
     const { data, setData } = useForm({
         search: filters.search || '',
         status: filters.status || 'alle',
-        bron: filters.bron || 'alle',
         tag: filters.tag || '',
         sort: filters.sort || 'updated_desc',
         perPage: filters.perPage || companies.per_page || 15,
@@ -92,8 +91,8 @@ export default function Index({ companies, filters, statusOptions, sourceOptions
             </div>
 
             <form onSubmit={submit} className="rounded-xl border border-zinc-200 bg-white p-4">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-6">
-                    <div className="md:col-span-2">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div>
                         <label className="block text-xs font-medium text-zinc-600">Zoek</label>
                         <input
                             className="mt-1 w-full rounded-md border-zinc-300 text-sm"
@@ -111,21 +110,6 @@ export default function Index({ companies, filters, statusOptions, sourceOptions
                         >
                             <option value="alle">Alle</option>
                             {statusOptions.map((s) => (
-                                <option key={s} value={s}>
-                                    {s}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-zinc-600">Bron</label>
-                        <select
-                            className="mt-1 w-full rounded-md border-zinc-300 text-sm"
-                            value={data.bron}
-                            onChange={(e) => setData('bron', e.target.value)}
-                        >
-                            <option value="alle">Alle</option>
-                            {sourceOptions.map((s) => (
                                 <option key={s} value={s}>
                                     {s}
                                 </option>
@@ -153,13 +137,10 @@ export default function Index({ companies, filters, statusOptions, sourceOptions
                             <option value="omzet_desc">Omzet (hoog-laag)</option>
                         </select>
                     </div>
-                </div>
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                    <div className="text-xs text-zinc-500">Totaal: {companies.total} bedrijven</div>
-                    <div className="flex items-center gap-2">
-                        <label className="text-xs text-zinc-500">Per pagina</label>
+                    <div>
+                        <label className="block text-xs font-medium text-zinc-600">Per pagina</label>
                         <select
-                            className="rounded-md border-zinc-300 text-sm"
+                            className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                             value={data.perPage}
                             onChange={(e) => setData('perPage', e.target.value)}
                         >
@@ -169,6 +150,9 @@ export default function Index({ companies, filters, statusOptions, sourceOptions
                                 </option>
                             ))}
                         </select>
+                    </div>
+                    <div className="flex items-end justify-between gap-3">
+                        <div className="text-xs text-zinc-500">Totaal: {companies.total} bedrijven</div>
                         <button
                             type="submit"
                             className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-800"

@@ -33,7 +33,6 @@ class GarageCompaniesController
         $filters = [
             'search' => (string) $request->query('search', ''),
             'status' => (string) $request->query('status', 'alle'),
-            'bron' => (string) $request->query('bron', 'alle'),
             'tag' => (string) $request->query('tag', ''),
             'sort' => (string) $request->query('sort', 'updated_desc'),
         ];
@@ -47,10 +46,6 @@ class GarageCompaniesController
 
         if ($filters['status'] !== 'alle') {
             $query->where('status', $filters['status']);
-        }
-
-        if ($filters['bron'] !== 'alle') {
-            $query->where('bron', $filters['bron']);
         }
 
         if (! empty($filters['tag'])) {
@@ -92,7 +87,6 @@ class GarageCompaniesController
             'companies' => $companies,
             'filters' => $filters,
             'statusOptions' => collect(GarageCompanyStatus::cases())->map(fn ($s) => $s->value)->values(),
-            'sourceOptions' => collect(GarageCompanySource::cases())->map(fn ($s) => $s->value)->values(),
             'urls' => [
                 'index' => route('crm.garage_companies.index'),
                 'create' => route('crm.garage_companies.create'),
@@ -1057,6 +1051,25 @@ class GarageCompaniesController
             'btw' => $btw,
             'totaalIncl' => $totaalExcl + $btw,
         ];
+    }
+
+    /**
+     * @return array<int, array{module_id:int,naam:string,aantal:int,actief:bool,prijs_maand_excl:float,btw_percentage:float}>
+     */
+    private function defaultModuleRows(): array
+    {
+        return Module::query()
+            ->orderBy('naam')
+            ->get()
+            ->map(fn (Module $module) => [
+                'module_id' => $module->id,
+                'naam' => $module->naam,
+                'aantal' => 1,
+                'actief' => false,
+                'prijs_maand_excl' => 0.0,
+                'btw_percentage' => 21.0,
+            ])
+            ->all();
     }
 
     /**
