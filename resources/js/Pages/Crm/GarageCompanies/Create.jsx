@@ -1,4 +1,4 @@
-﻿import React, { useMemo } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import { Head, Link, useForm } from '@inertiajs/react';
 
 function formatEuro(value) {
@@ -14,9 +14,38 @@ function numberValue(value) {
     return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function toLocalDateTimeInput(date) {
+    const pad = (value) => String(value).padStart(2, '0');
+    const year = date.getFullYear();
+    const month = pad(date.getMonth() + 1);
+    const day = pad(date.getDate());
+    const hour = pad(date.getHours());
+    const minute = pad(date.getMinutes());
+    return `${year}-${month}-${day}T${hour}:${minute}`;
+}
+
+function generatePassword(length = 12) {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
+    const values = new Uint32Array(length);
+    const result = [];
+    if (window.crypto && window.crypto.getRandomValues) {
+        window.crypto.getRandomValues(values);
+        for (let i = 0; i < length; i += 1) {
+            result.push(chars[values[i] % chars.length]);
+        }
+    } else {
+        for (let i = 0; i < length; i += 1) {
+            result.push(chars[Math.floor(Math.random() * chars.length)]);
+        }
+    }
+    return result.join('');
+}
+
 export default function Create({ statusOptions, sourceOptions, moduleRows, defaults, urls }) {
+    const [showPassword, setShowPassword] = useState(false);
     const { data, setData, post, processing, errors } = useForm({
         bedrijfsnaam: '',
+        kvk_nummer: '',
         land: defaults.land || 'Nederland',
         voor_en_achternaam: '',
         email: '',
@@ -31,7 +60,7 @@ export default function Create({ statusOptions, sourceOptions, moduleRows, defau
         status: statusOptions?.[0] || 'lead',
         bron: sourceOptions?.[0] || 'website_formulier',
         tags: '',
-        proefperiode_start: '',
+        proefperiode_start: defaults.proefperiode_start || toLocalDateTimeInput(new Date()),
         actief_vanaf: '',
         opgezegd_op: '',
         opzegreden: '',
@@ -128,6 +157,16 @@ export default function Create({ statusOptions, sourceOptions, moduleRows, defau
                             />
                             {errors.bedrijfsnaam && <div className="mt-1 text-xs text-rose-600">{errors.bedrijfsnaam}</div>}
                         </div>
+
+                        <div>
+                            <label className="block text-xs font-medium text-zinc-600">KVK nummer</label>
+                            <input
+                                className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                value={data.kvk_nummer}
+                                onChange={(e) => setData('kvk_nummer', e.target.value)}
+                            />
+                            {errors.kvk_nummer && <div className="mt-1 text-xs text-rose-600">{errors.kvk_nummer}</div>}
+                        </div>
                         <div>
                             <label className="block text-xs font-medium text-zinc-600">Land *</label>
                             <input
@@ -221,7 +260,7 @@ export default function Create({ statusOptions, sourceOptions, moduleRows, defau
                     <div className="text-sm font-semibold">Incasso (SEPA)</div>
                     <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">IBAN *</label>
+                            <label className="block text-xs font-medium text-zinc-600">IBAN</label>
                             <input
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={data.iban}
@@ -238,7 +277,7 @@ export default function Create({ statusOptions, sourceOptions, moduleRows, defau
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">Plaats van tekenen *</label>
+                            <label className="block text-xs font-medium text-zinc-600">Plaats van tekenen</label>
                             <input
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={data.plaats_van_tekenen}
@@ -249,7 +288,7 @@ export default function Create({ statusOptions, sourceOptions, moduleRows, defau
                             )}
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">Datum van tekenen *</label>
+                            <label className="block text-xs font-medium text-zinc-600">Datum van tekenen</label>
                             <input
                                 type="date"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
@@ -375,12 +414,31 @@ export default function Create({ statusOptions, sourceOptions, moduleRows, defau
                         </div>
                         <div>
                             <label className="block text-xs font-medium text-zinc-600">Wachtwoord</label>
-                            <input
-                                type="password"
-                                className="mt-1 w-full rounded-md border-zinc-300 text-sm"
-                                value={data.login_password}
-                                onChange={(e) => setData('login_password', e.target.value)}
-                            />
+                            <div className="mt-1 flex gap-2">
+                                <input
+                                    type={showPassword ? 'text' : 'password'}
+                                    className="w-full rounded-md border-zinc-300 text-sm"
+                                    value={data.login_password}
+                                    onChange={(e) => setData('login_password', e.target.value)}
+                                />
+                                <button
+                                    type="button"
+                                    className="rounded-md border border-zinc-200 px-3 text-xs font-semibold hover:bg-zinc-50"
+                                    onClick={() => setShowPassword((prev) => !prev)}
+                                >
+                                    {showPassword ? 'Verberg' : 'Toon'}
+                                </button>
+                                <button
+                                    type="button"
+                                    className="rounded-md border border-zinc-200 px-3 text-xs font-semibold hover:bg-zinc-50"
+                                    onClick={() => {
+                                        setData('login_password', generatePassword());
+                                        setShowPassword(true);
+                                    }}
+                                >
+                                    Genereer
+                                </button>
+                            </div>
                             {errors.login_password && (
                                 <div className="mt-1 text-xs text-rose-600">{errors.login_password}</div>
                             )}

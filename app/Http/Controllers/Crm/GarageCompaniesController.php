@@ -113,6 +113,7 @@ class GarageCompaniesController
             'defaults' => [
                 'land' => 'Nederland',
                 'datum_van_tekenen' => now()->toDateString(),
+                'proefperiode_start' => now()->format('Y-m-d\TH:i'),
             ],
             'urls' => [
                 'index' => route('crm.garage_companies.index'),
@@ -135,11 +136,12 @@ class GarageCompaniesController
             'straatnaam_en_nummer' => ['required', 'string', 'max:255'],
             'postcode' => ['required', 'string', 'max:20'],
             'plaats' => ['required', 'string', 'max:255'],
+            'kvk_nummer' => ['nullable', 'string', 'max:50'],
 
-            'iban' => ['required', 'string', 'max:34'],
+            'iban' => ['nullable', 'string', 'max:34'],
             'bic' => ['nullable', 'string', 'max:11'],
-            'plaats_van_tekenen' => ['required', 'string', 'max:255'],
-            'datum_van_tekenen' => ['required', 'date'],
+            'plaats_van_tekenen' => ['nullable', 'string', 'max:255'],
+            'datum_van_tekenen' => ['nullable', 'date'],
 
             'status' => ['required', Rule::enum(GarageCompanyStatus::class)],
             'bron' => ['required', Rule::enum(GarageCompanySource::class)],
@@ -195,6 +197,14 @@ class GarageCompaniesController
             return back()->withErrors(['login_email' => 'Vul zowel e-mail als wachtwoord in voor login.'])->withInput();
         }
 
+        if (! empty($data['iban'])) {
+            if (empty($data['plaats_van_tekenen']) || empty($data['datum_van_tekenen'])) {
+                return back()
+                    ->withErrors(['iban' => 'Vul plaats en datum van tekenen in voor het SEPA mandaat.'])
+                    ->withInput();
+            }
+        }
+
         $company = DB::transaction(function () use ($data, $moduleRows) {
             [$voornaam, $achternaam] = $this->splitFullName($data['voor_en_achternaam']);
 
@@ -204,6 +214,7 @@ class GarageCompaniesController
                 'postcode' => $data['postcode'],
                 'plaats' => $data['plaats'],
                 'land' => $data['land'],
+                'kvk_nummer' => $data['kvk_nummer'] ?? null,
                 'hoofd_email' => $data['email'],
                 'hoofd_telefoon' => $data['telefoonnummer'],
                 'login_email' => $data['login_email'] ?? null,
@@ -229,24 +240,27 @@ class GarageCompaniesController
                 'active' => true,
             ]);
 
-            SepaMandate::create([
-                'garage_company_id' => $company->id,
-                'bedrijfsnaam' => $company->bedrijfsnaam,
-                'voor_en_achternaam' => $data['voor_en_achternaam'],
-                'straatnaam_en_nummer' => $company->adres_straat_nummer ?? $data['straatnaam_en_nummer'],
-                'postcode' => $company->postcode ?? $data['postcode'],
-                'plaats' => $company->plaats,
-                'land' => $company->land,
-                'iban' => $data['iban'],
-                'bic' => $data['bic'] ?? null,
-                'email' => $data['email'],
-                'telefoonnummer' => $data['telefoonnummer'],
-                'plaats_van_tekenen' => $data['plaats_van_tekenen'],
-                'datum_van_tekenen' => $data['datum_van_tekenen'],
-                'mandaat_id' => $this->generateMandaatId($company->id),
-                'status' => SepaMandateStatus::Pending->value,
-                'ontvangen_op' => now(),
-            ]);
+            $sepaMandate = null;
+            if (! empty($data['iban'])) {
+                $sepaMandate = SepaMandate::create([
+                    'garage_company_id' => $company->id,
+                    'bedrijfsnaam' => $company->bedrijfsnaam,
+                    'voor_en_achternaam' => $data['voor_en_achternaam'],
+                    'straatnaam_en_nummer' => $company->adres_straat_nummer ?? $data['straatnaam_en_nummer'],
+                    'postcode' => $company->postcode ?? $data['postcode'],
+                    'plaats' => $company->plaats,
+                    'land' => $company->land,
+                    'iban' => $data['iban'],
+                    'bic' => $data['bic'] ?? null,
+                    'email' => $data['email'],
+                    'telefoonnummer' => $data['telefoonnummer'],
+                    'plaats_van_tekenen' => $data['plaats_van_tekenen'],
+                    'datum_van_tekenen' => $data['datum_van_tekenen'],
+                    'mandaat_id' => $this->generateMandaatId($company->id),
+                    'status' => SepaMandateStatus::Pending->value,
+                    'ontvangen_op' => now(),
+                ]);
+            }
 
             if (! empty($data['login_email']) && ! empty($data['login_password'])) {
                 $user = User::create([
@@ -297,13 +311,15 @@ class GarageCompaniesController
                 'created_by' => auth()->id(),
             ]);
 
-            Activity::create([
-                'garage_company_id' => $company->id,
-                'type' => ActivityType::Mandate,
-                'titel' => 'SEPA mandaat vastgelegd (pending)',
-                'inhoud' => "IBAN: {$data['iban']}",
-                'created_by' => auth()->id(),
-            ]);
+            if ($sepaMandate) {
+                Activity::create([
+                    'garage_company_id' => $company->id,
+                    'type' => ActivityType::Mandate,
+                    'titel' => 'SEPA mandaat vastgelegd (pending)',
+                    'inhoud' => "IBAN: {$data['iban']}",
+                    'created_by' => auth()->id(),
+                ]);
+            }
 
             Activity::create([
                 'garage_company_id' => $company->id,
