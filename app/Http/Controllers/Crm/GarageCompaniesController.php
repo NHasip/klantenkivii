@@ -16,6 +16,7 @@ use App\Models\KiviiSeat;
 use App\Models\Module;
 use App\Models\Reminder;
 use App\Models\SepaMandate;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -137,6 +138,12 @@ class GarageCompaniesController
             'status' => ['required', Rule::enum(GarageCompanyStatus::class)],
             'bron' => ['required', Rule::enum(GarageCompanySource::class)],
             'tags' => ['nullable', 'string'],
+            'proefperiode_start' => ['nullable', 'date'],
+            'actief_vanaf' => ['nullable', 'date'],
+            'opgezegd_op' => ['nullable', 'date'],
+            'opzegreden' => ['nullable', 'string', 'max:255'],
+            'login_email' => ['nullable', 'email', 'max:255', 'unique:users,email'],
+            'login_password' => ['nullable', 'string', 'min:8'],
         ]);
 
         $moduleRows = $request->input('moduleRows', []);
@@ -162,6 +169,23 @@ class GarageCompaniesController
             }
         }
 
+        if ($data['status'] === GarageCompanyStatus::Actief->value && empty($data['actief_vanaf'])) {
+            return back()->withErrors(['actief_vanaf' => 'Actief vanaf is verplicht bij status actief.'])->withInput();
+        }
+
+        if ($data['status'] === GarageCompanyStatus::Opgezegd->value) {
+            if (empty($data['opzegreden'])) {
+                return back()->withErrors(['opzegreden' => 'Opzegreden is verplicht bij status opgezegd.'])->withInput();
+            }
+            if (empty($data['opgezegd_op'])) {
+                return back()->withErrors(['opgezegd_op' => 'Opgezegd op is verplicht bij status opgezegd.'])->withInput();
+            }
+        }
+
+        if (! empty($data['login_email']) xor ! empty($data['login_password'])) {
+            return back()->withErrors(['login_email' => 'Vul zowel e-mail als wachtwoord in voor login.'])->withInput();
+        }
+
         $company = DB::transaction(function () use ($data, $moduleRows) {
             [$voornaam, $achternaam] = $this->splitFullName($data['voor_en_achternaam']);
 
@@ -176,6 +200,10 @@ class GarageCompaniesController
                 'status' => $data['status'],
                 'bron' => $data['bron'],
                 'tags' => $data['tags'] ?? null,
+                'proefperiode_start' => $data['proefperiode_start'] ?? null,
+                'actief_vanaf' => $data['actief_vanaf'] ?? null,
+                'opgezegd_op' => $data['opgezegd_op'] ?? null,
+                'opzegreden' => $data['opzegreden'] ?? null,
                 'created_by' => auth()->id(),
             ]);
 
@@ -208,6 +236,28 @@ class GarageCompaniesController
                 'status' => SepaMandateStatus::Pending->value,
                 'ontvangen_op' => now(),
             ]);
+
+            if (! empty($data['login_email']) && ! empty($data['login_password'])) {
+                $user = User::create([
+                    'name' => $data['voor_en_achternaam'],
+                    'email' => $data['login_email'],
+                    'password' => $data['login_password'],
+                    'role' => \App\Enums\UserRole::Medewerker->value,
+                    'phone' => $data['telefoonnummer'] ?? null,
+                    'active' => true,
+                ]);
+
+                $company->update(['eigenaar_user_id' => $user->id]);
+
+                KiviiSeat::create([
+                    'garage_company_id' => $company->id,
+                    'naam' => $data['voor_en_achternaam'],
+                    'email' => $data['login_email'],
+                    'rol_in_kivii' => 'eigenaar',
+                    'actief' => true,
+                    'aangemaakt_op' => now()->toDateString(),
+                ]);
+            }
 
             foreach ($moduleRows as $row) {
                 $values = [

@@ -31,6 +31,12 @@ export default function Create({ statusOptions, sourceOptions, moduleRows, defau
         status: statusOptions?.[0] || 'lead',
         bron: sourceOptions?.[0] || 'website_formulier',
         tags: '',
+        proefperiode_start: '',
+        actief_vanaf: '',
+        opgezegd_op: '',
+        opzegreden: '',
+        login_email: '',
+        login_password: '',
         moduleRows: moduleRows || [],
     });
 
@@ -273,7 +279,59 @@ export default function Create({ statusOptions, sourceOptions, moduleRows, defau
                                     </option>
                                 ))}
                             </select>
+                            {errors.status && <div className="mt-1 text-xs text-rose-600">{errors.status}</div>}
                         </div>
+                        <div>
+                            <label className="block text-xs font-medium text-zinc-600">Proefperiode start</label>
+                            <input
+                                type="datetime-local"
+                                className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                value={data.proefperiode_start}
+                                onChange={(e) => setData('proefperiode_start', e.target.value)}
+                            />
+                            {errors.proefperiode_start && (
+                                <div className="mt-1 text-xs text-rose-600">{errors.proefperiode_start}</div>
+                            )}
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-zinc-600">Actief vanaf</label>
+                            <input
+                                type="datetime-local"
+                                className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                value={data.actief_vanaf}
+                                onChange={(e) => setData('actief_vanaf', e.target.value)}
+                            />
+                            {errors.actief_vanaf && (
+                                <div className="mt-1 text-xs text-rose-600">{errors.actief_vanaf}</div>
+                            )}
+                        </div>
+                        {data.status === 'opgezegd' && (
+                            <>
+                                <div>
+                                    <label className="block text-xs font-medium text-zinc-600">Opgezegd op</label>
+                                    <input
+                                        type="datetime-local"
+                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        value={data.opgezegd_op}
+                                        onChange={(e) => setData('opgezegd_op', e.target.value)}
+                                    />
+                                    {errors.opgezegd_op && (
+                                        <div className="mt-1 text-xs text-rose-600">{errors.opgezegd_op}</div>
+                                    )}
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <label className="block text-xs font-medium text-zinc-600">Opzegreden</label>
+                                    <input
+                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        value={data.opzegreden}
+                                        onChange={(e) => setData('opzegreden', e.target.value)}
+                                    />
+                                    {errors.opzegreden && (
+                                        <div className="mt-1 text-xs text-rose-600">{errors.opzegreden}</div>
+                                    )}
+                                </div>
+                            </>
+                        )}
                         <div>
                             <label className="block text-xs font-medium text-zinc-600">Bron</label>
                             <select
@@ -296,6 +354,39 @@ export default function Create({ statusOptions, sourceOptions, moduleRows, defau
                                 value={data.tags}
                                 onChange={(e) => setData('tags', e.target.value)}
                             />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="rounded-xl border border-zinc-200 bg-white p-5">
+                    <div className="text-sm font-semibold">Login gegevens</div>
+                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                            <label className="block text-xs font-medium text-zinc-600">Login e-mail</label>
+                            <input
+                                type="email"
+                                className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                value={data.login_email}
+                                onChange={(e) => setData('login_email', e.target.value)}
+                            />
+                            {errors.login_email && (
+                                <div className="mt-1 text-xs text-rose-600">{errors.login_email}</div>
+                            )}
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-zinc-600">Wachtwoord</label>
+                            <input
+                                type="password"
+                                className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                value={data.login_password}
+                                onChange={(e) => setData('login_password', e.target.value)}
+                            />
+                            {errors.login_password && (
+                                <div className="mt-1 text-xs text-rose-600">{errors.login_password}</div>
+                            )}
+                        </div>
+                        <div className="sm:col-span-2 text-xs text-zinc-500">
+                            Laat leeg als je nog geen account wilt aanmaken. Vul beide velden in om een login te creëren.
                         </div>
                     </div>
                 </div>
