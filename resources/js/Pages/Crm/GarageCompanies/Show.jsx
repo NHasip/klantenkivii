@@ -977,6 +977,8 @@ export default function Show({
                             </div>
                         )}
                     </div>
+                </div>
+            )}
 
             {activeTab === 'klantpersonen' && (
                 <div className="space-y-6">
