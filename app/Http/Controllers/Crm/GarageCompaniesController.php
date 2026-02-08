@@ -1109,6 +1109,9 @@ class GarageCompaniesController
         ]);
 
         $draft = $this->ensureWelcomeDraft($garageCompany);
+        if (! $draft) {
+            return back()->with('status', 'Welkomstmail is niet beschikbaar (migraties ontbreken).');
+        }
         $draft->update([
             'subject' => $data['subject'],
             'body_html' => $data['body_html'] ?? '',
@@ -1121,6 +1124,9 @@ class GarageCompaniesController
     public function sendWelcomeEmail(GarageCompany $garageCompany): RedirectResponse
     {
         $draft = $this->ensureWelcomeDraft($garageCompany);
+        if (! $draft) {
+            return back()->with('status', 'Welkomstmail is niet beschikbaar (migraties ontbreken).');
+        }
         $smtp = SmtpSetting::query()->first();
 
         if (! $smtp || ! $smtp->isComplete()) {
@@ -1187,8 +1193,12 @@ class GarageCompaniesController
         return 'KIVII-'.$companyId.'-'.Str::upper(Str::random(10));
     }
 
-    private function ensureWelcomeDraft(GarageCompany $garageCompany): OutboundEmail
+    private function ensureWelcomeDraft(GarageCompany $garageCompany): ?OutboundEmail
     {
+        if (! Schema::hasTable('outbound_emails') || ! Schema::hasTable('email_templates')) {
+            return null;
+        }
+
         $draft = OutboundEmail::query()
             ->where('garage_company_id', $garageCompany->id)
             ->where('type', 'welcome_customer')
@@ -1203,11 +1213,19 @@ class GarageCompaniesController
         return $this->refreshWelcomeDraft($garageCompany, true);
     }
 
-    private function refreshWelcomeDraft(GarageCompany $garageCompany, bool $silent): OutboundEmail
+    private function refreshWelcomeDraft(GarageCompany $garageCompany, bool $silent): ?OutboundEmail
     {
+        if (! Schema::hasTable('outbound_emails') || ! Schema::hasTable('email_templates')) {
+            return null;
+        }
+
         $template = EmailTemplate::query()
             ->where('key', 'welcome_customer')
-            ->firstOrFail();
+            ->first();
+
+        if (! $template) {
+            return null;
+        }
 
         $data = $this->welcomeTemplateData($garageCompany);
         $rendered = EmailTemplateRenderer::render($template, $data);
