@@ -4,12 +4,12 @@
     "name": "module.esm"
   },
   "resources/css/app.css": {
-    "file": "assets/app-Sqt9By1U.css",
+    "file": "assets/app-Bei2WWEc.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
   "resources/js/Pages/Crm/Dashboard.jsx": {
-    "file": "assets/Dashboard-mRoRprUP.js",
+    "file": "assets/Dashboard-DFAHKkeq.js",
     "name": "Dashboard",
     "src": "resources/js/Pages/Crm/Dashboard.jsx",
     "isDynamicEntry": true,
@@ -19,7 +19,7 @@
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/Create.jsx": {
-    "file": "assets/Create-C-xfZyIH.js",
+    "file": "assets/Create-tjMgUp9c.js",
     "name": "Create",
     "src": "resources/js/Pages/Crm/GarageCompanies/Create.jsx",
     "isDynamicEntry": true,
@@ -29,7 +29,7 @@
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/Index.jsx": {
-    "file": "assets/Index-BNESmb7V.js",
+    "file": "assets/Index-DNjQHAR6.js",
     "name": "Index",
     "src": "resources/js/Pages/Crm/GarageCompanies/Index.jsx",
     "isDynamicEntry": true,
@@ -39,7 +39,7 @@
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/Show.jsx": {
-    "file": "assets/Show-FU4vt4wX.js",
+    "file": "assets/Show-BD0iGQvp.js",
     "name": "Show",
     "src": "resources/js/Pages/Crm/GarageCompanies/Show.jsx",
     "isDynamicEntry": true,
@@ -49,7 +49,7 @@
     ]
   },
   "resources/js/Pages/Crm/Tasks.jsx": {
-    "file": "assets/Tasks-CBR4n0xd.js",
+    "file": "assets/Tasks-XXPcZwcN.js",
     "name": "Tasks",
     "src": "resources/js/Pages/Crm/Tasks.jsx",
     "isDynamicEntry": true,
@@ -68,7 +68,7 @@
     ]
   },
   "resources/js/app.jsx": {
-    "file": "assets/app-BUm4k-9Z.js",
+    "file": "assets/app-Clptx6nZ.js",
     "name": "app",
     "src": "resources/js/app.jsx",
     "isEntry": true,

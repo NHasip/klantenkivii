@@ -1,4 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { EditorContent, useEditor } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import LinkExtension from '@tiptap/extension-link';
+import Placeholder from '@tiptap/extension-placeholder';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useConfirm } from '../../../components/ConfirmProvider';
 
@@ -45,6 +49,24 @@ function numberValue(value) {
 
 function cx(...parts) {
     return parts.filter(Boolean).join(' ');
+}
+
+function ToolbarButton({ active, disabled, onClick, children, title }) {
+    return (
+        <button
+            type="button"
+            title={title}
+            onClick={onClick}
+            disabled={disabled}
+            className={cx(
+                'rounded-md px-2 py-1 text-xs font-semibold transition',
+                active ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-zinc-100',
+                disabled && 'cursor-not-allowed opacity-40'
+            )}
+        >
+            {children}
+        </button>
+    );
 }
 
 function Pagination({ links }) {
@@ -514,6 +536,34 @@ export default function Show({
         });
     }, [welcomeEmail?.id]);
 
+    const welcomeEditor = useEditor({
+        extensions: [
+            StarterKit.configure({
+                heading: { levels: [2, 3] },
+            }),
+            LinkExtension.configure({
+                openOnClick: false,
+                autolink: true,
+                defaultProtocol: 'https',
+            }),
+            Placeholder.configure({
+                placeholder: 'Typ hier je welkomstmail...',
+            }),
+        ],
+        content: welcomeForm.data.body_html || '<p></p>',
+        onUpdate: ({ editor }) => {
+            welcomeForm.setData('body_html', editor.getHTML());
+        },
+    });
+
+    useEffect(() => {
+        if (!welcomeEditor) return;
+        const nextHtml = welcomeForm.data.body_html?.trim() ? welcomeForm.data.body_html : '<p></p>';
+        if (welcomeEditor.getHTML() !== nextHtml) {
+            welcomeEditor.commands.setContent(nextHtml, false);
+        }
+    }, [welcomeEditor, welcomeForm.data.body_html]);
+
     const refreshWelcome = () => {
         router.post(urls.refresh_welcome_email, {}, { preserveScroll: true });
     };
@@ -979,18 +1029,91 @@ export default function Show({
                                         )}
                                     </div>
 
-                                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                                        <div className="rounded-xl border border-zinc-200 bg-white p-4">
-                                            <div className="text-xs font-semibold text-zinc-500">HTML template</div>
-                                            <textarea
-                                                className="mt-2 w-full rounded-md border-zinc-300 text-sm"
-                                                rows={10}
-                                                value={welcomeForm.data.body_html}
-                                                onChange={(e) => welcomeForm.setData('body_html', e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="rounded-xl border border-zinc-200 bg-white p-4">
-                                            <div className="text-xs font-semibold text-zinc-500">Tekst template</div>
+                                      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                                          <div className="rounded-xl border border-zinc-200 bg-white p-4">
+                                              <div className="text-xs font-semibold text-zinc-500">HTML template</div>
+                                              <div className="mt-2 rounded-lg border border-zinc-200">
+                                                  <div className="flex flex-wrap items-center gap-1 border-b border-zinc-100 bg-zinc-50 px-2 py-2">
+                                                      <ToolbarButton
+                                                          title="Vet"
+                                                          active={welcomeEditor?.isActive('bold')}
+                                                          disabled={!welcomeEditor}
+                                                          onClick={() => welcomeEditor?.chain().focus().toggleBold().run()}
+                                                      >
+                                                          Vet
+                                                      </ToolbarButton>
+                                                      <ToolbarButton
+                                                          title="Cursief"
+                                                          active={welcomeEditor?.isActive('italic')}
+                                                          disabled={!welcomeEditor}
+                                                          onClick={() => welcomeEditor?.chain().focus().toggleItalic().run()}
+                                                      >
+                                                          Cursief
+                                                      </ToolbarButton>
+                                                      <ToolbarButton
+                                                          title="Opsomming"
+                                                          active={welcomeEditor?.isActive('bulletList')}
+                                                          disabled={!welcomeEditor}
+                                                          onClick={() => welcomeEditor?.chain().focus().toggleBulletList().run()}
+                                                      >
+                                                          Lijst
+                                                      </ToolbarButton>
+                                                      <ToolbarButton
+                                                          title="Genummerde lijst"
+                                                          active={welcomeEditor?.isActive('orderedList')}
+                                                          disabled={!welcomeEditor}
+                                                          onClick={() => welcomeEditor?.chain().focus().toggleOrderedList().run()}
+                                                      >
+                                                          Nummering
+                                                      </ToolbarButton>
+                                                      <ToolbarButton
+                                                          title="Link"
+                                                          active={welcomeEditor?.isActive('link')}
+                                                          disabled={!welcomeEditor}
+                                                          onClick={() => {
+                                                              if (!welcomeEditor) return;
+                                                              const previousUrl = welcomeEditor.getAttributes('link').href || '';
+                                                              const url = window.prompt('Link URL', previousUrl);
+                                                              if (url === null) return;
+                                                              if (url === '') {
+                                                                  welcomeEditor.chain().focus().unsetLink().run();
+                                                                  return;
+                                                              }
+                                                              welcomeEditor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+                                                          }}
+                                                      >
+                                                          Link
+                                                      </ToolbarButton>
+                                                      <ToolbarButton
+                                                          title="Opmaak wissen"
+                                                          disabled={!welcomeEditor}
+                                                          onClick={() => welcomeEditor?.chain().focus().clearNodes().unsetAllMarks().run()}
+                                                      >
+                                                          Wissen
+                                                      </ToolbarButton>
+                                                      <ToolbarButton
+                                                          title="Ongedaan maken"
+                                                          disabled={!welcomeEditor}
+                                                          onClick={() => welcomeEditor?.chain().focus().undo().run()}
+                                                      >
+                                                          Undo
+                                                      </ToolbarButton>
+                                                      <ToolbarButton
+                                                          title="Opnieuw"
+                                                          disabled={!welcomeEditor}
+                                                          onClick={() => welcomeEditor?.chain().focus().redo().run()}
+                                                      >
+                                                          Redo
+                                                      </ToolbarButton>
+                                                  </div>
+                                                  <EditorContent editor={welcomeEditor} className="tiptap px-3 py-2 text-sm" />
+                                              </div>
+                                              <div className="mt-2 text-xs text-zinc-500">
+                                                  {`Gebruik variabelen zoals {{ naam }}, {{ loginnaam }}, {{ wachtwoord }}, {{ weblink }}.`}
+                                              </div>
+                                          </div>
+                                          <div className="rounded-xl border border-zinc-200 bg-white p-4">
+                                              <div className="text-xs font-semibold text-zinc-500">Tekst template</div>
                                             <textarea
                                                 className="mt-2 w-full rounded-md border-zinc-300 text-sm"
                                                 rows={10}

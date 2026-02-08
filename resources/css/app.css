@@ -5,3 +5,27 @@
 [x-cloak] {
     display: none;
 }
+
+.tiptap {
+    min-height: 220px;
+    outline: none;
+}
+
+.tiptap p {
+    margin: 0 0 0.75rem;
+}
+
+.tiptap p:last-child {
+    margin-bottom: 0;
+}
+
+.tiptap ul,
+.tiptap ol {
+    padding-left: 1.25rem;
+    margin: 0 0 0.75rem;
+}
+
+.tiptap a {
+    color: #2563eb;
+    text-decoration: underline;
+}
