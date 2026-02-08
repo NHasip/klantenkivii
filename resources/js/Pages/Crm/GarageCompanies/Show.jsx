@@ -970,14 +970,13 @@ export default function Show({
                                     type="button"
                                     className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
                                     onClick={() => setDemoStatus('actief')}
-                                    disabled={!hasActiveMandate}
                                 >
                                     Actief
                                 </button>
                             </div>
                         </div>
                         {!hasActiveMandate && (
-                            <div className="mt-3 text-xs text-amber-800">Let op: Actief vereist een actief SEPA mandaat.</div>
+                            <div className="mt-3 text-xs text-amber-800">Let op: geen actief SEPA mandaat gekoppeld.</div>
                         )}
                     </div>
 

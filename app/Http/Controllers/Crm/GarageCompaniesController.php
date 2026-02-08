@@ -833,11 +833,6 @@ class GarageCompaniesController
             if (! $garageCompany->actief_vanaf) {
                 $garageCompany->actief_vanaf = now();
             }
-
-            $hasActiveMandate = $garageCompany->mandates->firstWhere('status', SepaMandateStatus::Actief) !== null;
-            if (! $hasActiveMandate) {
-                return back()->with('status', 'Actief vereist een SEPA mandaat met status actief.');
-            }
         }
 
         $garageCompany->status = GarageCompanyStatus::from($to);
@@ -1151,10 +1146,26 @@ class GarageCompaniesController
         }
 
         $flow = [
-            GarageCompanyStatus::Lead->value => [GarageCompanyStatus::DemoAangevraagd->value, GarageCompanyStatus::Verloren->value],
-            GarageCompanyStatus::DemoAangevraagd->value => [GarageCompanyStatus::DemoGepland->value, GarageCompanyStatus::Verloren->value],
-            GarageCompanyStatus::DemoGepland->value => [GarageCompanyStatus::Proefperiode->value, GarageCompanyStatus::Verloren->value],
-            GarageCompanyStatus::Proefperiode->value => [GarageCompanyStatus::Actief->value, GarageCompanyStatus::Opgezegd->value, GarageCompanyStatus::Verloren->value],
+            GarageCompanyStatus::Lead->value => [
+                GarageCompanyStatus::DemoAangevraagd->value,
+                GarageCompanyStatus::Actief->value,
+                GarageCompanyStatus::Verloren->value,
+            ],
+            GarageCompanyStatus::DemoAangevraagd->value => [
+                GarageCompanyStatus::DemoGepland->value,
+                GarageCompanyStatus::Actief->value,
+                GarageCompanyStatus::Verloren->value,
+            ],
+            GarageCompanyStatus::DemoGepland->value => [
+                GarageCompanyStatus::Proefperiode->value,
+                GarageCompanyStatus::Actief->value,
+                GarageCompanyStatus::Verloren->value,
+            ],
+            GarageCompanyStatus::Proefperiode->value => [
+                GarageCompanyStatus::Actief->value,
+                GarageCompanyStatus::Opgezegd->value,
+                GarageCompanyStatus::Verloren->value,
+            ],
             GarageCompanyStatus::Actief->value => [GarageCompanyStatus::Opgezegd->value, GarageCompanyStatus::Verloren->value],
             GarageCompanyStatus::Opgezegd->value => [],
             GarageCompanyStatus::Verloren->value => [],
