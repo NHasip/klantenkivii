@@ -491,7 +491,7 @@ export default function Show({
                 {TABS.map((item) => (
                     <Link
                         key={item.key}
-                        href={`${route('crm.garage_companies.show', garageCompany.id)}?tab=${item.key}`}
+                        href={`${urls.show}?tab=${item.key}`}
                         className={cx(
                             'rounded-md border px-3 py-2 text-sm font-semibold',
                             activeTab === item.key
@@ -526,7 +526,7 @@ export default function Show({
 
                     <div className="flex justify-end">
                         <Link
-                            href={`${route('crm.garage_companies.show', garageCompany.id)}?tab=modules`}
+                            href={`${urls.show}?tab=modules`}
                             className="rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
                         >
                             Modules & prijzen wijzigen

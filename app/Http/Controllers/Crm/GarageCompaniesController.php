@@ -85,6 +85,7 @@ class GarageCompaniesController
             'updated_at' => $company->updated_at?->toIso8601String(),
             'actieve_seats' => (int) ($company->actieve_seats ?? 0),
             'omzet_excl' => (float) ($company->omzet_excl ?? 0),
+            'show_url' => route('crm.garage_companies.show', ['garageCompany' => $company->id]),
         ]);
 
         return Inertia::render('Crm/GarageCompanies/Index', [
@@ -438,6 +439,7 @@ class GarageCompaniesController
             'statusErrors' => $this->statusErrors($garageCompany),
             'urls' => [
                 'index' => route('crm.garage_companies.index'),
+                'show' => route('crm.garage_companies.show', ['garageCompany' => $garageCompany->id]),
                 'old_show' => route('crm.garage_companies.old.show', ['garageCompany' => $garageCompany->id]),
                 'update_overview' => route('crm.garage_companies.update', ['garageCompany' => $garageCompany->id]),
                 'store_person' => route('crm.garage_companies.persons.store', ['garageCompany' => $garageCompany->id]),

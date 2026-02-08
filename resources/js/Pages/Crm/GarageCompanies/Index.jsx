@@ -213,7 +213,7 @@ export default function Index({ companies, filters, statusOptions, sourceOptions
                                 <td className="px-4 py-3 text-sm text-zinc-600">{formatDateTime(company.updated_at)}</td>
                                 <td className="px-4 py-3 text-right">
                                     <Link
-                                        href={route('crm.garage_companies.show', company.id)}
+                                        href={company.show_url}
                                         className="rounded-md border border-zinc-200 px-2 py-1 text-xs hover:bg-zinc-50"
                                     >
                                         Open
