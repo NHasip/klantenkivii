@@ -89,6 +89,7 @@ class GarageCompaniesController
             'actieve_seats' => (int) ($company->actieve_seats ?? 0),
             'omzet_excl' => (float) ($company->omzet_excl ?? 0),
             'show_url' => route('crm.garage_companies.show', ['garageCompany' => $company->id]),
+            'delete_url' => route('crm.garage_companies.destroy', ['garageCompany' => $company->id]),
         ]);
 
         return Inertia::render('Crm/GarageCompanies/Index', [
@@ -363,7 +364,9 @@ class GarageCompaniesController
         $this->ensureAssignmentsExist($garageCompany->id);
 
         $welcomeEmail = $this->ensureWelcomeDraft($garageCompany);
-        $smtpConfigured = SmtpSetting::query()->first()?->isComplete() ?? false;
+        $smtpConfigured = Schema::hasTable('smtp_settings')
+            ? (SmtpSetting::query()->first()?->isComplete() ?? false)
+            : false;
 
         $moduleRows = $this->moduleRows($garageCompany->id);
         $moduleTotals = $this->moduleTotals($moduleRows);
@@ -510,7 +513,7 @@ class GarageCompaniesController
                     'telefoon' => $garageCompany->primaryPerson->telefoon,
                 ] : null,
             ],
-            'welcomeEmail' => [
+            'welcomeEmail' => $welcomeEmail ? [
                 'id' => $welcomeEmail->id,
                 'to_email' => $welcomeEmail->to_email,
                 'subject' => $welcomeEmail->subject,
@@ -518,7 +521,7 @@ class GarageCompaniesController
                 'body_text' => $welcomeEmail->body_text,
                 'status' => $welcomeEmail->status,
                 'sent_at' => optional($welcomeEmail->sent_at)->toIso8601String(),
-            ],
+            ] : null,
             'smtpConfigured' => $smtpConfigured,
             'tab' => $tab,
             'statusOptions' => collect(GarageCompanyStatus::cases())->map(fn ($s) => $s->value)->values(),
@@ -538,6 +541,7 @@ class GarageCompaniesController
                 'index' => route('crm.garage_companies.index'),
                 'show' => route('crm.garage_companies.show', ['garageCompany' => $garageCompany->id]),
                 'old_show' => route('crm.garage_companies.old.show', ['garageCompany' => $garageCompany->id]),
+                'delete_company' => route('crm.garage_companies.destroy', ['garageCompany' => $garageCompany->id]),
                 'update_overview' => route('crm.garage_companies.update', ['garageCompany' => $garageCompany->id]),
                 'store_person' => route('crm.garage_companies.persons.store', ['garageCompany' => $garageCompany->id]),
                 'update_person' => route('crm.garage_companies.persons.update', ['garageCompany' => $garageCompany->id, 'person' => '__PERSON__']),
@@ -559,6 +563,16 @@ class GarageCompaniesController
                 'send_welcome_email' => route('crm.garage_companies.welcome.send', ['garageCompany' => $garageCompany->id]),
             ],
         ]);
+    }
+
+    public function destroy(GarageCompany $garageCompany): RedirectResponse
+    {
+        $naam = $garageCompany->bedrijfsnaam;
+        $garageCompany->delete();
+
+        return redirect()
+            ->route('crm.garage_companies.index')
+            ->with('status', "Klant verwijderd: {$naam}");
     }
 
 
@@ -1127,6 +1141,10 @@ class GarageCompaniesController
         if (! $draft) {
             return back()->with('status', 'Welkomstmail is niet beschikbaar (migraties ontbreken).');
         }
+        if (! Schema::hasTable('smtp_settings')) {
+            return back()->with('status', 'SMTP instellingen ontbreken. Voeg ze toe via profiel > systeem-instellingen.');
+        }
+
         $smtp = SmtpSetting::query()->first();
 
         if (! $smtp || ! $smtp->isComplete()) {

@@ -10,7 +10,7 @@ function formatEuro(value) {
 }
 
 function formatDateTime(isoString) {
-    if (!isoString) return '�';
+    if (!isoString) return '-';
     try {
         return new Intl.DateTimeFormat('nl-NL', {
             year: 'numeric',
@@ -25,7 +25,7 @@ function formatDateTime(isoString) {
 }
 
 function formatDate(isoString) {
-    if (!isoString) return '�';
+    if (!isoString) return '-';
     try {
         return new Intl.DateTimeFormat('nl-NL', {
             year: 'numeric',
@@ -102,6 +102,11 @@ export default function Show({
     urls,
 }) {
     const activeTab = tab || 'overzicht';
+
+    const deleteCompany = () => {
+        if (!confirm(`Weet je zeker dat je "${garageCompany.bedrijfsnaam}" wilt verwijderen?`)) return;
+        router.delete(urls.delete_company);
+    };
 
     const overviewForm = useForm({
         bedrijfsnaam: garageCompany.bedrijfsnaam || '',
@@ -488,7 +493,16 @@ export default function Show({
         welcomeForm.post(urls.update_welcome_email, { preserveScroll: true });
     };
 
+    const welcomeStatus = welcomeEmail?.status || 'concept';
+    const welcomeStatusClass = {
+        draft: 'bg-amber-50 text-amber-700',
+        concept: 'bg-amber-50 text-amber-700',
+        sent: 'bg-emerald-50 text-emerald-700',
+        failed: 'bg-rose-50 text-rose-700',
+    }[welcomeStatus] || 'bg-zinc-100 text-zinc-700';
+
     const sendWelcome = () => {
+        if (!welcomeEmail) return;
         if (!smtpConfigured) {
             alert('SMTP instellingen ontbreken. Voeg deze toe via profiel > systeem-instellingen.');
             return;
@@ -518,6 +532,13 @@ export default function Show({
                     >
                         Terug naar overzicht
                     </Link>
+                    <button
+                        type="button"
+                        onClick={deleteCompany}
+                        className="rounded-md border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
+                    >
+                        Verwijder klant
+                    </button>
                     <Link
                         href={urls.old_show}
                         className="rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-500 hover:bg-zinc-50"
@@ -819,12 +840,12 @@ export default function Show({
                         </div>
                     </form>
 
-                    <div className="rounded-xl border border-zinc-200 bg-white p-5">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+                        <div className="flex flex-wrap items-start justify-between gap-4">
                             <div>
                                 <div className="text-sm font-semibold">Welkomstmail</div>
                                 <div className="mt-1 text-xs text-zinc-500">
-                                    Concept op basis van template. Controleer en verstuur handmatig.
+                                    Concept op basis van template. Controleer, pas aan en verstuur handmatig.
                                 </div>
                             </div>
                             <div className="flex flex-wrap gap-2">
@@ -832,6 +853,7 @@ export default function Show({
                                     type="button"
                                     className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm font-semibold hover:bg-zinc-50"
                                     onClick={refreshWelcome}
+                                    disabled={!welcomeEmail}
                                 >
                                     Concept vernieuwen
                                 </button>
@@ -839,91 +861,122 @@ export default function Show({
                                     type="button"
                                     className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm font-semibold hover:bg-zinc-50"
                                     onClick={saveWelcome}
+                                    disabled={!welcomeEmail}
                                 >
                                     Concept opslaan
                                 </button>
                                 <button
                                     type="button"
-                                    className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700"
+                                    className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
                                     onClick={sendWelcome}
+                                    disabled={!welcomeEmail}
                                 >
                                     Verstuur welkomstmail
                                 </button>
                             </div>
                         </div>
 
-                        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-                            <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-                                <div className="text-xs font-medium text-zinc-500">Status</div>
-                                <div className="mt-1 text-sm font-semibold">{welcomeEmail?.status || 'concept'}</div>
-                                {welcomeEmail?.sent_at && (
-                                    <div className="mt-1 text-xs text-zinc-500">
-                                        Verstuurd op {formatDateTime(welcomeEmail.sent_at)}
+                        {!welcomeEmail && (
+                            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                                Welkomstmail is nog niet beschikbaar. Draai migraties en refresh deze pagina.
+                            </div>
+                        )}
+
+                        {welcomeEmail && (
+                            <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-12">
+                                <div className="space-y-4 lg:col-span-4">
+                                    <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+                                        <div className="text-xs font-medium text-zinc-500">Status</div>
+                                        <div className="mt-2">
+                                            <span
+                                                className={cx(
+                                                    'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold',
+                                                    welcomeStatusClass
+                                                )}
+                                            >
+                                                {welcomeStatus}
+                                            </span>
+                                        </div>
+                                        {welcomeEmail?.sent_at && (
+                                            <div className="mt-2 text-xs text-zinc-500">
+                                                Laatst verstuurd: {formatDateTime(welcomeEmail.sent_at)}
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                            </div>
-                            <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 lg:col-span-2">
-                                <div className="text-xs font-medium text-zinc-500">Onderwerp</div>
-                                <div className="mt-1 text-sm font-semibold">{welcomeForm.data.subject || '-'}</div>
-                                <div className="mt-2 text-xs text-zinc-500">Naar: {welcomeEmail?.to_email || '-'}</div>
-                            </div>
-                        </div>
 
-                        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                            <div className="lg:col-span-2">
-                                <label className="block text-xs font-medium text-zinc-600">Onderwerp</label>
-                                <input
-                                    className="mt-1 w-full rounded-md border-zinc-300 text-sm"
-                                    value={welcomeForm.data.subject}
-                                    onChange={(e) => welcomeForm.setData('subject', e.target.value)}
-                                />
-                                {welcomeForm.errors.subject && (
-                                    <div className="mt-1 text-xs text-rose-600">{welcomeForm.errors.subject}</div>
-                                )}
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-zinc-600">HTML template</label>
-                                <textarea
-                                    className="mt-1 w-full rounded-md border-zinc-300 text-sm"
-                                    rows={8}
-                                    value={welcomeForm.data.body_html}
-                                    onChange={(e) => welcomeForm.setData('body_html', e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-zinc-600">Tekst template</label>
-                                <textarea
-                                    className="mt-1 w-full rounded-md border-zinc-300 text-sm"
-                                    rows={8}
-                                    value={welcomeForm.data.body_text}
-                                    onChange={(e) => welcomeForm.setData('body_text', e.target.value)}
-                                />
-                            </div>
-                        </div>
+                                    <div className="rounded-xl border border-zinc-200 bg-white p-4">
+                                        <div className="text-xs font-semibold text-zinc-500">Ontvanger</div>
+                                        <div className="mt-2 text-sm font-semibold">{welcomeEmail?.to_email || '-'}</div>
+                                        <div className="mt-4 text-xs font-semibold text-zinc-500">Beschikbare velden</div>
+                                        <div className="mt-2 space-y-1 text-xs text-zinc-600">
+                                            {['{{ naam }}', '{{ bedrijfsnaam }}', '{{ loginnaam }}', '{{ wachtwoord }}', '{{ weblink }}'].map((token) => (
+                                                <div key={token} className="rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1 font-mono">
+                                                    {token}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
 
-                        <div className="mt-4 rounded-lg border border-zinc-200 bg-white p-4">
-                            <div className="text-xs font-semibold text-zinc-500">Preview</div>
-                            {welcomeForm.data.body_html ? (
-                                <div
-                                    className="prose prose-sm mt-3 max-w-none text-zinc-700"
-                                    dangerouslySetInnerHTML={{ __html: welcomeForm.data.body_html }}
-                                />
-                            ) : welcomeForm.data.body_text ? (
-                                <pre className="mt-3 whitespace-pre-wrap text-sm text-zinc-700">{welcomeForm.data.body_text}</pre>
-                            ) : (
-                                <div className="mt-3 text-sm text-zinc-600">
-                                    Geen preview beschikbaar. Vul eerst login gegevens en vernieuw het concept.
+                                    {!smtpConfigured && (
+                                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                                            SMTP instellingen ontbreken. Voeg deze toe via profiel &gt; systeem-instellingen.
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                        </div>
-                        {!smtpConfigured && (
-                            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">
-                                SMTP instellingen ontbreken. Voeg deze toe via profiel &gt; systeem-instellingen.
+
+                                <div className="space-y-4 lg:col-span-8">
+                                    <div className="rounded-xl border border-zinc-200 bg-white p-4">
+                                        <div className="text-xs font-semibold text-zinc-500">Onderwerp</div>
+                                        <input
+                                            className="mt-2 w-full rounded-md border-zinc-300 text-sm"
+                                            value={welcomeForm.data.subject}
+                                            onChange={(e) => welcomeForm.setData('subject', e.target.value)}
+                                        />
+                                        {welcomeForm.errors.subject && (
+                                            <div className="mt-1 text-xs text-rose-600">{welcomeForm.errors.subject}</div>
+                                        )}
+                                    </div>
+
+                                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                                        <div className="rounded-xl border border-zinc-200 bg-white p-4">
+                                            <div className="text-xs font-semibold text-zinc-500">HTML template</div>
+                                            <textarea
+                                                className="mt-2 w-full rounded-md border-zinc-300 text-sm"
+                                                rows={10}
+                                                value={welcomeForm.data.body_html}
+                                                onChange={(e) => welcomeForm.setData('body_html', e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="rounded-xl border border-zinc-200 bg-white p-4">
+                                            <div className="text-xs font-semibold text-zinc-500">Tekst template</div>
+                                            <textarea
+                                                className="mt-2 w-full rounded-md border-zinc-300 text-sm"
+                                                rows={10}
+                                                value={welcomeForm.data.body_text}
+                                                onChange={(e) => welcomeForm.setData('body_text', e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-xl border border-zinc-200 bg-white p-4">
+                                        <div className="text-xs font-semibold text-zinc-500">Preview</div>
+                                        {welcomeForm.data.body_html ? (
+                                            <div
+                                                className="prose prose-sm mt-3 max-w-none text-zinc-700"
+                                                dangerouslySetInnerHTML={{ __html: welcomeForm.data.body_html }}
+                                            />
+                                        ) : welcomeForm.data.body_text ? (
+                                            <pre className="mt-3 whitespace-pre-wrap text-sm text-zinc-700">{welcomeForm.data.body_text}</pre>
+                                        ) : (
+                                            <div className="mt-3 text-sm text-zinc-600">
+                                                Geen preview beschikbaar. Vul eerst login gegevens en vernieuw het concept.
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>
-                </div>
-            )}
 
             {activeTab === 'klantpersonen' && (
                 <div className="space-y-6">

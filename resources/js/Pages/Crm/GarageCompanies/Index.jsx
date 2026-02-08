@@ -60,6 +60,11 @@ export default function Index({ companies, filters, statusOptions, sourceOptions
         perPage: filters.perPage || companies.per_page || 15,
     });
 
+    const deleteCompany = (company) => {
+        if (!confirm(`Weet je zeker dat je "${company.bedrijfsnaam}" wilt verwijderen?`)) return;
+        router.delete(company.delete_url, { preserveScroll: true });
+    };
+
     const submit = (event) => {
         event.preventDefault();
         router.get(urls.index, data, { preserveState: true, replace: true });
@@ -196,12 +201,21 @@ export default function Index({ companies, filters, statusOptions, sourceOptions
                                 <td className="px-4 py-3 text-sm">{formatEuro(company.omzet_excl)}</td>
                                 <td className="px-4 py-3 text-sm text-zinc-600">{formatDateTime(company.updated_at)}</td>
                                 <td className="px-4 py-3 text-right">
-                                    <Link
-                                        href={company.show_url}
-                                        className="rounded-md border border-zinc-200 px-2 py-1 text-xs hover:bg-zinc-50"
-                                    >
-                                        Open
-                                    </Link>
+                                    <div className="flex items-center justify-end gap-2">
+                                        <Link
+                                            href={company.show_url}
+                                            className="rounded-md border border-zinc-200 px-2 py-1 text-xs hover:bg-zinc-50"
+                                        >
+                                            Open
+                                        </Link>
+                                        <button
+                                            type="button"
+                                            onClick={() => deleteCompany(company)}
+                                            className="rounded-md border border-rose-200 px-2 py-1 text-xs text-rose-600 hover:bg-rose-50"
+                                        >
+                                            Verwijder
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         ))}

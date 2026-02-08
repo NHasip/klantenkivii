@@ -19,6 +19,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/garagebedrijven/nieuw', [GarageCompaniesController::class, 'create'])->name('crm.garage_companies.create');
     Route::post('/garagebedrijven', [GarageCompaniesController::class, 'store'])->name('crm.garage_companies.store');
     Route::get('/garagebedrijven/{garageCompany}', [GarageCompaniesController::class, 'show'])->name('crm.garage_companies.show');
+    Route::delete('/garagebedrijven/{garageCompany}', [GarageCompaniesController::class, 'destroy'])->name('crm.garage_companies.destroy');
     Route::patch('/garagebedrijven/{garageCompany}', [GarageCompaniesController::class, 'updateOverview'])->name('crm.garage_companies.update');
     Route::post('/garagebedrijven/{garageCompany}/contactpersonen', [GarageCompaniesController::class, 'storePerson'])->name('crm.garage_companies.persons.store');
     Route::patch('/garagebedrijven/{garageCompany}/contactpersonen/{person}', [GarageCompaniesController::class, 'updatePerson'])->name('crm.garage_companies.persons.update');
