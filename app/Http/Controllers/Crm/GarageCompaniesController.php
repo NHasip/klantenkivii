@@ -476,9 +476,12 @@ class GarageCompaniesController
         $emailTemplates = collect();
         if (Schema::hasTable('email_templates')) {
             $templateData = $this->welcomeTemplateData($garageCompany);
-            $emailTemplates = EmailTemplate::query()
-                ->where('is_active', true)
-                ->orderBy('name')
+            $templateQuery = EmailTemplate::query()->orderBy('name');
+            if (Schema::hasColumn('email_templates', 'is_active')) {
+                $templateQuery->where('is_active', true);
+            }
+
+            $emailTemplates = $templateQuery
                 ->get()
                 ->map(function (EmailTemplate $template) use ($templateData) {
                     $rendered = EmailTemplateRenderer::render($template, $templateData);

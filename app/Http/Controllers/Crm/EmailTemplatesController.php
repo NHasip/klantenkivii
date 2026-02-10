@@ -33,6 +33,7 @@ class EmailTemplatesController
         }
 
         $this->ensureDefaults();
+        $hasActiveColumn = Schema::hasColumn('email_templates', 'is_active');
 
         $templates = EmailTemplate::query()
             ->orderBy('name')
@@ -43,7 +44,7 @@ class EmailTemplatesController
                 'name' => $template->name,
                 'subject' => $template->subject,
                 'body_html' => $template->body_html,
-                'is_active' => $template->is_active,
+                'is_active' => $hasActiveColumn ? (bool) $template->is_active : true,
                 'is_system' => in_array($template->key, self::SYSTEM_KEYS, true),
             ]);
 
@@ -64,20 +65,32 @@ class EmailTemplatesController
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'subject' => ['required', 'string', 'max:255'],
-            'body_html' => ['required', 'string'],
-            'is_active' => ['boolean'],
+            'body_html' => ['nullable', 'string'],
+            'is_active' => ['nullable', 'boolean'],
         ]);
 
         $key = $this->makeKey($data['name']);
+        $bodyHtml = $data['body_html'] ?? '';
+        $hasBodyText = Schema::hasColumn('email_templates', 'body_text');
+        $hasActiveColumn = Schema::hasColumn('email_templates', 'is_active');
 
-        EmailTemplate::create([
+        $payload = [
             'key' => $key,
             'name' => $data['name'],
             'subject' => $data['subject'],
-            'body_html' => $data['body_html'],
-            'body_text' => $this->htmlToText($data['body_html']),
-            'is_active' => (bool) ($data['is_active'] ?? true),
-        ]);
+        ];
+
+        if (Schema::hasColumn('email_templates', 'body_html')) {
+            $payload['body_html'] = $bodyHtml;
+        }
+        if ($hasBodyText) {
+            $payload['body_text'] = $this->htmlToText($bodyHtml);
+        }
+        if ($hasActiveColumn) {
+            $payload['is_active'] = (bool) ($data['is_active'] ?? true);
+        }
+
+        EmailTemplate::create($payload);
 
         return back()->with('status', 'Template toegevoegd.');
     }
@@ -87,17 +100,27 @@ class EmailTemplatesController
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'subject' => ['required', 'string', 'max:255'],
-            'body_html' => ['required', 'string'],
-            'is_active' => ['boolean'],
+            'body_html' => ['nullable', 'string'],
+            'is_active' => ['nullable', 'boolean'],
         ]);
 
-        $emailTemplate->update([
+        $bodyHtml = $data['body_html'] ?? '';
+        $payload = [
             'name' => $data['name'],
             'subject' => $data['subject'],
-            'body_html' => $data['body_html'],
-            'body_text' => $this->htmlToText($data['body_html']),
-            'is_active' => (bool) ($data['is_active'] ?? true),
-        ]);
+        ];
+
+        if (Schema::hasColumn('email_templates', 'body_html')) {
+            $payload['body_html'] = $bodyHtml;
+        }
+        if (Schema::hasColumn('email_templates', 'body_text')) {
+            $payload['body_text'] = $this->htmlToText($bodyHtml);
+        }
+        if (Schema::hasColumn('email_templates', 'is_active')) {
+            $payload['is_active'] = (bool) ($data['is_active'] ?? true);
+        }
+
+        $emailTemplate->update($payload);
 
         return back()->with('status', 'Template opgeslagen.');
     }
@@ -115,6 +138,9 @@ class EmailTemplatesController
 
     private function ensureDefaults(): void
     {
+        $hasBodyHtml = Schema::hasColumn('email_templates', 'body_html');
+        $hasBodyText = Schema::hasColumn('email_templates', 'body_text');
+        $hasActiveColumn = Schema::hasColumn('email_templates', 'is_active');
         $defaults = [
             'welcome_customer' => [
                 'name' => 'Welkomstmail',
@@ -134,15 +160,24 @@ class EmailTemplatesController
         ];
 
         foreach ($defaults as $key => $payload) {
+            $update = [
+                'name' => $payload['name'],
+                'subject' => $payload['subject'],
+            ];
+
+            if ($hasBodyHtml) {
+                $update['body_html'] = $payload['body_html'];
+            }
+            if ($hasBodyText) {
+                $update['body_text'] = $this->htmlToText($payload['body_html']);
+            }
+            if ($hasActiveColumn) {
+                $update['is_active'] = true;
+            }
+
             EmailTemplate::query()->updateOrCreate(
                 ['key' => $key],
-                [
-                    'name' => $payload['name'],
-                    'subject' => $payload['subject'],
-                    'body_html' => $payload['body_html'],
-                    'body_text' => $this->htmlToText($payload['body_html']),
-                    'is_active' => true,
-                ]
+                $update
             );
         }
     }
