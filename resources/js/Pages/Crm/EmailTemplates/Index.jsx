@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import LinkExtension from '@tiptap/extension-link';
@@ -83,12 +83,27 @@ export default function Index({ templates, variables, urls }) {
         }
     }, [editor, form.data.body_html]);
 
+    const submitTemplate = (method, url, options = {}) => {
+        const latestHtml = editor ? editor.getHTML() : form.data.body_html;
+        form.transform((data) => ({
+            ...data,
+            body_html: latestHtml,
+        })).submit(method, url, {
+            preserveScroll: true,
+            ...options,
+            onSuccess: (...args) => {
+                router.reload({ only: ['templates'], preserveScroll: true, preserveState: true });
+                options.onSuccess?.(...args);
+            },
+        });
+    };
+
     const saveTemplate = (event) => {
         event?.preventDefault?.();
         if (isNew) {
-            form.post(urls.store, { preserveScroll: true, onSuccess: () => setSelectedId('new') });
+            submitTemplate('post', urls.store, { onSuccess: () => setSelectedId('new') });
         } else if (selectedTemplate) {
-            form.patch(urls.update.replace('__TEMPLATE__', selectedTemplate.id), { preserveScroll: true });
+            submitTemplate('patch', urls.update.replace('__TEMPLATE__', selectedTemplate.id));
         }
     };
 
