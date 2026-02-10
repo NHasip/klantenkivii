@@ -58,6 +58,14 @@ function parseId(value) {
     return Number.isFinite(n) ? n : null;
 }
 
+function toLocalInputValue(isoString) {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    if (Number.isNaN(date.getTime())) return '';
+    const pad = (v) => String(v).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 function Button({ tone = 'primary', className = '', ...props }) {
     const base = 'inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-semibold transition';
     const tones = {
@@ -251,6 +259,21 @@ export default function Tasks({ initial, filters, urls }) {
     const [projectErrors, setProjectErrors] = useState({});
     const [projectSaving, setProjectSaving] = useState(false);
 
+    const [showTaskModal, setShowTaskModal] = useState(false);
+    const [taskForm, setTaskForm] = useState({
+        titel: '',
+        omschrijving: '',
+        task_project_id: '',
+        status: 'open',
+        prioriteit: 'normaal',
+        deadline: '',
+        labels: '',
+        assignees: [],
+    });
+    const [taskFiles, setTaskFiles] = useState([]);
+    const [taskErrors, setTaskErrors] = useState({});
+    const [taskSaving, setTaskSaving] = useState(false);
+
     const [selectedTaskId, setSelectedTaskId] = useState(null);
     const [selectedTask, setSelectedTask] = useState(null);
     const [detailLoading, setDetailLoading] = useState(false);
@@ -338,16 +361,16 @@ export default function Tasks({ initial, filters, urls }) {
             if (!selectedTask) return;
             setDetailSaving(true);
             try {
-                const response = await axios.patch(`/taken/tasks/${selectedTask.id}`, {
-                    titel: selectedTask.titel,
-                    omschrijving: selectedTask.omschrijving ?? null,
-                    labels: selectedTask.labels ?? null,
-                    prioriteit: selectedTask.prioriteit ?? 'normaal',
-                    task_project_id: selectedTask.task_project_id ?? null,
-                    deadline: selectedTask.deadline ? new Date(selectedTask.deadline).toISOString() : null,
-                    status: selectedTask.status ?? 'open',
-                    assignees: (selectedTask.assignees ?? []).map((a) => a.id),
-                });
+                    const response = await axios.patch(`/taken/tasks/${selectedTask.id}`, {
+                        titel: selectedTask.titel,
+                        omschrijving: selectedTask.omschrijving ?? null,
+                        labels: selectedTask.labels ?? null,
+                        prioriteit: selectedTask.prioriteit ?? 'normaal',
+                        task_project_id: selectedTask.task_project_id ?? null,
+                        deadline: selectedTask.deadline ?? null,
+                        status: selectedTask.status ?? 'open',
+                        assignees: (selectedTask.assignees ?? []).map((a) => a.id),
+                    });
                 const updated = response.data.task;
                 setTasks((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
                 setNotice({ tone: 'success', text: 'Taak opgeslagen.' });
@@ -627,6 +650,47 @@ export default function Tasks({ initial, filters, urls }) {
         [filterProject, group, view],
     );
 
+    const createTask = useCallback(
+        async (event) => {
+            event.preventDefault();
+            setTaskSaving(true);
+            setTaskErrors({});
+            try {
+                const form = new FormData();
+                form.append('titel', taskForm.titel);
+                if (taskForm.omschrijving) form.append('omschrijving', taskForm.omschrijving);
+                if (taskForm.task_project_id) form.append('task_project_id', taskForm.task_project_id);
+                form.append('status', taskForm.status);
+                form.append('prioriteit', taskForm.prioriteit);
+                if (taskForm.deadline) form.append('deadline', taskForm.deadline);
+                if (taskForm.labels) form.append('labels', taskForm.labels);
+                taskForm.assignees.forEach((id) => form.append('assignees[]', id));
+                taskFiles.forEach((file) => form.append('attachments[]', file));
+
+                await axios.post('/taken/tasks', form);
+                setTaskForm({
+                    titel: '',
+                    omschrijving: '',
+                    task_project_id: '',
+                    status: 'open',
+                    prioriteit: 'normaal',
+                    deadline: '',
+                    labels: '',
+                    assignees: [],
+                });
+                setTaskFiles([]);
+                setShowTaskModal(false);
+                setNotice({ tone: 'success', text: 'Taak toegevoegd.' });
+                fetchTasks();
+            } catch (error) {
+                setTaskErrors(error?.response?.data?.errors ?? {});
+            } finally {
+                setTaskSaving(false);
+            }
+        },
+        [taskForm, taskFiles, fetchTasks],
+    );
+
     const listRows = useMemo(() => {
         return [...tasks].sort((a, b) => (a.deadline ?? '').localeCompare(b.deadline ?? ''));
     }, [tasks]);
@@ -664,6 +728,7 @@ export default function Tasks({ initial, filters, urls }) {
                                 Team
                             </button>
                         </div>
+                        <Button onClick={() => setShowTaskModal(true)}>Nieuwe taak</Button>
                         <Button tone="secondary" onClick={() => setShowProjectModal(true)}>
                             Nieuw project
                         </Button>
@@ -944,6 +1009,139 @@ export default function Tasks({ initial, filters, urls }) {
                     </div>
                 </div>
             ) : null}
+            {showTaskModal ? (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4" role="dialog" aria-modal="true">
+                    <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
+                        <div className="flex items-start justify-between gap-4">
+                            <div>
+                                <div className="text-lg font-bold text-zinc-900">Nieuwe taak</div>
+                                <div className="mt-1 text-sm text-zinc-500">Maak snel een taak aan en koppel deze aan een project.</div>
+                            </div>
+                            <Button tone="ghost" type="button" onClick={() => setShowTaskModal(false)}>
+                                Sluiten
+                            </Button>
+                        </div>
+                        <form className="mt-6 space-y-4" onSubmit={createTask}>
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <div className="md:col-span-2">
+                                    <div className="text-xs font-semibold text-zinc-500">Titel</div>
+                                    <input
+                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        value={taskForm.titel}
+                                        onChange={(e) => setTaskForm((t) => ({ ...t, titel: e.target.value }))}
+                                    />
+                                    {taskErrors.titel ? <div className="mt-1 text-xs text-rose-600">{taskErrors.titel?.[0]}</div> : null}
+                                </div>
+                                <div className="md:col-span-2">
+                                    <div className="text-xs font-semibold text-zinc-500">Omschrijving</div>
+                                    <textarea
+                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        rows={3}
+                                        value={taskForm.omschrijving}
+                                        onChange={(e) => setTaskForm((t) => ({ ...t, omschrijving: e.target.value }))}
+                                    />
+                                </div>
+                                <div>
+                                    <div className="text-xs font-semibold text-zinc-500">Project</div>
+                                    <select
+                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        value={taskForm.task_project_id}
+                                        onChange={(e) => setTaskForm((t) => ({ ...t, task_project_id: e.target.value }))}
+                                    >
+                                        <option value="">Geen</option>
+                                        {projects.map((p) => (
+                                            <option key={p.id} value={p.id}>
+                                                {p.naam}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <div className="text-xs font-semibold text-zinc-500">Status</div>
+                                    <select
+                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        value={taskForm.status}
+                                        onChange={(e) => setTaskForm((t) => ({ ...t, status: e.target.value }))}
+                                    >
+                                        {statusOptions.map((s) => (
+                                            <option key={s} value={s}>
+                                                {statusLabel(s)}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <div className="text-xs font-semibold text-zinc-500">Prioriteit</div>
+                                    <select
+                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        value={taskForm.prioriteit}
+                                        onChange={(e) => setTaskForm((t) => ({ ...t, prioriteit: e.target.value }))}
+                                    >
+                                        {priorityOptions.map((p) => (
+                                            <option key={p} value={p}>
+                                                {priorityMeta(p).label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <div className="text-xs font-semibold text-zinc-500">Deadline</div>
+                                    <input
+                                        type="datetime-local"
+                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        value={taskForm.deadline}
+                                        onChange={(e) => setTaskForm((t) => ({ ...t, deadline: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <div className="text-xs font-semibold text-zinc-500">Labels</div>
+                                    <input
+                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        placeholder="bijv. lead, demo, urgent"
+                                        value={taskForm.labels}
+                                        onChange={(e) => setTaskForm((t) => ({ ...t, labels: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <div className="text-xs font-semibold text-zinc-500">Assignees</div>
+                                    <select
+                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        multiple
+                                        value={taskForm.assignees.map(String)}
+                                        onChange={(e) => {
+                                            const selected = Array.from(e.target.selectedOptions).map((o) => Number(o.value));
+                                            setTaskForm((t) => ({ ...t, assignees: selected }));
+                                        }}
+                                    >
+                                        {users.map((u) => (
+                                            <option key={u.id} value={u.id}>
+                                                {u.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="md:col-span-2">
+                                    <div className="text-xs font-semibold text-zinc-500">Bijlagen</div>
+                                    <input
+                                        type="file"
+                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        multiple
+                                        onChange={(e) => setTaskFiles(Array.from(e.target.files ?? []))}
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-end gap-2">
+                                <Button tone="secondary" type="button" onClick={() => setShowTaskModal(false)}>
+                                    Annuleren
+                                </Button>
+                                <Button type="submit" disabled={taskSaving}>
+                                    {taskSaving ? 'Opslaan...' : 'Taak toevoegen'}
+                                </Button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            ) : null}
             {selectedTaskId ? (
                 <div className="fixed inset-0 z-50 flex justify-end bg-zinc-900/40" role="dialog" aria-modal="true">
                     <div className="h-full w-full max-w-xl overflow-y-auto bg-white shadow-2xl">
@@ -1032,11 +1230,11 @@ export default function Tasks({ initial, filters, urls }) {
                                             <input
                                                 type="datetime-local"
                                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
-                                                value={selectedTask.deadline ? new Date(selectedTask.deadline).toISOString().slice(0, 16) : ''}
+                                                value={toLocalInputValue(selectedTask.deadline)}
                                                 onChange={(e) =>
                                                     setSelectedTask((t) => ({
                                                         ...t,
-                                                        deadline: e.target.value ? new Date(e.target.value).toISOString() : null,
+                                                        deadline: e.target.value || null,
                                                     }))
                                                 }
                                             />

@@ -42,9 +42,6 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::post('/garagebedrijven/{garageCompany}/welcome-email/update', [GarageCompaniesController::class, 'updateWelcomeEmail'])->name('crm.garage_companies.welcome.update');
     Route::post('/garagebedrijven/{garageCompany}/welcome-email/send', [GarageCompaniesController::class, 'sendWelcomeEmail'])->name('crm.garage_companies.welcome.send');
 
-    Route::get('/garagebedrijven-old', \App\Livewire\Crm\GarageCompanies\Index::class)->name('crm.garage_companies.old');
-    Route::get('/garagebedrijven-old/nieuw', \App\Livewire\Crm\GarageCompanies\Create::class)->name('crm.garage_companies.old.create');
-    Route::get('/garagebedrijven-old/{garageCompany}', \App\Livewire\Crm\GarageCompanies\Show::class)->name('crm.garage_companies.old.show');
 
     Route::get('/rapportages', \App\Livewire\Crm\Reports\Index::class)->name('crm.reports.index');
 
