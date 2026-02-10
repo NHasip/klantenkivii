@@ -90,12 +90,6 @@ export default function Index({ companies, filters, statusOptions, sourceOptions
                 </div>
                 <div className="flex items-center gap-2">
                     <Link
-                        href={urls.old_index}
-                        className="rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-500 hover:bg-zinc-50"
-                    >
-                        Klanten (old)
-                    </Link>
-                    <Link
                         href={urls.create}
                         className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
                     >

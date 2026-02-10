@@ -99,7 +99,6 @@ class GarageCompaniesController
             'urls' => [
                 'index' => route('crm.garage_companies.index'),
                 'create' => route('crm.garage_companies.create'),
-                'old_index' => route('crm.garage_companies.old'),
             ],
         ]);
     }
@@ -120,7 +119,6 @@ class GarageCompaniesController
             'urls' => [
                 'index' => route('crm.garage_companies.index'),
                 'store' => route('crm.garage_companies.store'),
-                'old_create' => route('crm.garage_companies.old.create'),
             ],
         ]);
     }
@@ -563,7 +561,6 @@ class GarageCompaniesController
             'urls' => [
                 'index' => route('crm.garage_companies.index'),
                 'show' => route('crm.garage_companies.show', ['garageCompany' => $garageCompany->id]),
-                'old_show' => route('crm.garage_companies.old.show', ['garageCompany' => $garageCompany->id]),
                 'delete_company' => route('crm.garage_companies.destroy', ['garageCompany' => $garageCompany->id]),
                 'update_overview' => route('crm.garage_companies.update', ['garageCompany' => $garageCompany->id]),
                 'store_person' => route('crm.garage_companies.persons.store', ['garageCompany' => $garageCompany->id]),

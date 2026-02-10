@@ -669,12 +669,6 @@ export default function Show({
                     >
                         Verwijder klant
                     </button>
-                    <Link
-                        href={urls.old_show}
-                        className="rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-500 hover:bg-zinc-50"
-                    >
-                        Klant (old)
-                    </Link>
                 </div>
             </div>
 
@@ -2371,4 +2365,3 @@ export default function Show({
         </div>
     );
 }
-

@@ -135,12 +135,6 @@ export default function Create({ statusOptions, sourceOptions, moduleRows, defau
                     >
                         Terug
                     </Link>
-                    <Link
-                        href={urls.old_create}
-                        className="rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-500 hover:bg-zinc-50"
-                    >
-                        Nieuw (old)
-                    </Link>
                 </div>
             </div>
 
