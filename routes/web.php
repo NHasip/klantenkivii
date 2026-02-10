@@ -4,6 +4,7 @@ use App\Http\Controllers\Crm\DashboardController;
 use App\Http\Controllers\Crm\EmailTemplatesController;
 use App\Http\Controllers\Crm\GarageCompaniesController;
 use App\Http\Controllers\Crm\TasksController;
+use App\Http\Controllers\Profile\SmtpSettingsController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -76,4 +77,8 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::delete('/email-templates/{emailTemplate}', [EmailTemplatesController::class, 'destroy'])
         ->middleware('admin')
         ->name('crm.email_templates.delete');
+
+    Route::post('/user/profile/smtp-settings', [SmtpSettingsController::class, 'store'])
+        ->middleware('admin')
+        ->name('profile.smtp.save');
 });

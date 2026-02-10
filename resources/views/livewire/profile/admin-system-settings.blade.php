@@ -2,7 +2,7 @@
     <x-section-border />
 
     <div class="mt-10 sm:mt-0">
-        <x-form-section submit="saveSmtp">
+        <x-form-section submit="saveSmtp" action="{{ route('profile.smtp.save') }}">
             <x-slot name="title">
                 {{ __('Systeem-instellingen (SMTP)') }}
             </x-slot>
@@ -14,31 +14,31 @@
             <x-slot name="form">
                 <div class="col-span-6 sm:col-span-4">
                     <x-label value="SMTP host" />
-                    <x-input type="text" class="mt-1 block w-full" wire:model.defer="smtp.host" placeholder="smtp.office365.com" />
+                    <x-input type="text" class="mt-1 block w-full" wire:model.defer="smtp.host" name="smtp[host]" placeholder="smtp.office365.com" />
                     <x-input-error for="smtp.host" class="mt-2" />
                 </div>
 
                 <div class="col-span-6 sm:col-span-2">
                     <x-label value="Poort" />
-                    <x-input type="number" class="mt-1 block w-full" wire:model.defer="smtp.port" />
+                    <x-input type="number" class="mt-1 block w-full" wire:model.defer="smtp.port" name="smtp[port]" />
                     <x-input-error for="smtp.port" class="mt-2" />
                 </div>
 
                 <div class="col-span-6 sm:col-span-4">
                     <x-label value="Gebruikersnaam" />
-                    <x-input type="text" class="mt-1 block w-full" wire:model.defer="smtp.username" />
+                    <x-input type="text" class="mt-1 block w-full" wire:model.defer="smtp.username" name="smtp[username]" />
                     <x-input-error for="smtp.username" class="mt-2" />
                 </div>
 
                 <div class="col-span-6 sm:col-span-4">
                     <x-label value="Wachtwoord" />
-                    <x-input type="password" class="mt-1 block w-full" wire:model.defer="smtp.password" />
+                    <x-input type="password" class="mt-1 block w-full" wire:model.defer="smtp.password" name="smtp[password]" />
                     <x-input-error for="smtp.password" class="mt-2" />
                 </div>
 
                 <div class="col-span-6 sm:col-span-2">
                     <x-label value="Encryptie" />
-                    <select class="mt-1 block w-full rounded-md border-gray-300 text-sm" wire:model.defer="smtp.encryption">
+                    <select class="mt-1 block w-full rounded-md border-gray-300 text-sm" wire:model.defer="smtp.encryption" name="smtp[encryption]">
                         <option value="">Geen</option>
                         <option value="tls">TLS</option>
                         <option value="ssl">SSL</option>
@@ -47,19 +47,19 @@
 
                 <div class="col-span-6 sm:col-span-4">
                     <x-label value="From e-mail" />
-                    <x-input type="email" class="mt-1 block w-full" wire:model.defer="smtp.from_address" />
+                    <x-input type="email" class="mt-1 block w-full" wire:model.defer="smtp.from_address" name="smtp[from_address]" />
                     <x-input-error for="smtp.from_address" class="mt-2" />
                 </div>
 
                 <div class="col-span-6 sm:col-span-4">
                     <x-label value="From naam" />
-                    <x-input type="text" class="mt-1 block w-full" wire:model.defer="smtp.from_name" />
+                    <x-input type="text" class="mt-1 block w-full" wire:model.defer="smtp.from_name" name="smtp[from_name]" />
                     <x-input-error for="smtp.from_name" class="mt-2" />
                 </div>
 
                 <div class="col-span-6 sm:col-span-4">
                     <x-label value="Test e-mail naar" />
-                    <x-input type="email" class="mt-1 block w-full" wire:model.defer="testEmail" />
+                    <x-input type="email" class="mt-1 block w-full" wire:model.defer="testEmail" name="testEmail" />
                     <x-input-error for="testEmail" class="mt-2" />
                 </div>
             </x-slot>
