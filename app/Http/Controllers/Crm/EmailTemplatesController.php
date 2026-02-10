@@ -160,24 +160,24 @@ class EmailTemplatesController
         ];
 
         foreach ($defaults as $key => $payload) {
-            $update = [
+            $create = [
                 'name' => $payload['name'],
                 'subject' => $payload['subject'],
             ];
 
             if ($hasBodyHtml) {
-                $update['body_html'] = $payload['body_html'];
+                $create['body_html'] = $payload['body_html'];
             }
             if ($hasBodyText) {
-                $update['body_text'] = $this->htmlToText($payload['body_html']);
+                $create['body_text'] = $this->htmlToText($payload['body_html']);
             }
             if ($hasActiveColumn) {
-                $update['is_active'] = true;
+                $create['is_active'] = true;
             }
 
-            EmailTemplate::query()->updateOrCreate(
+            EmailTemplate::query()->firstOrCreate(
                 ['key' => $key],
-                $update
+                $create
             );
         }
     }
