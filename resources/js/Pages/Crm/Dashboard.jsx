@@ -97,14 +97,7 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                        <a
-                            href={urls.dashboard_old}
-                            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
-                        >
-                            Dashboard (old)
-                        </a>
-                    </div>
+                    <div className="flex flex-wrap items-center gap-2" />
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -290,13 +283,7 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                                     <span>Dashboard</span>
                                     <Badge tone="emerald">nieuw</Badge>
                                 </div>
-                                <div className="flex items-center justify-between">
-                                    <span>Dashboard (old)</span>
-                                    <Badge tone="zinc">livewire</Badge>
-                                </div>
-                                <div className="pt-2 text-xs text-zinc-500">
-                                    Volgende stap: Klanten en Rapportages moderniseren met dezelfde aanpak.
-                                </div>
+                                <div className="pt-2 text-xs text-zinc-500">Volgende stap: Klanten en Rapportages moderniseren met dezelfde aanpak.</div>
                             </div>
                         </div>
                     </div>
@@ -305,4 +292,3 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
         </>
     );
 }
-

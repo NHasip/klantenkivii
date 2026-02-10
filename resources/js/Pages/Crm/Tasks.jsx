@@ -667,9 +667,6 @@ export default function Tasks({ initial, filters, urls }) {
                         <Button tone="secondary" onClick={() => setShowProjectModal(true)}>
                             Nieuw project
                         </Button>
-                        <a className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-50" href={urls?.tasks_old}>
-                            Taken (old)
-                        </a>
                     </div>
                 </div>
 

@@ -14,7 +14,6 @@ Route::get('/', function () {
 
 Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
-    Route::get('/dashboard-old', \App\Livewire\Crm\Dashboard::class)->name('dashboard.old');
 
     Route::get('/garagebedrijven', [GarageCompaniesController::class, 'index'])->name('crm.garage_companies.index');
     Route::get('/garagebedrijven/nieuw', [GarageCompaniesController::class, 'create'])->name('crm.garage_companies.create');
@@ -57,7 +56,6 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::post('/taken/tasks/{task}/attachments', [TasksController::class, 'storeAttachment'])->name('crm.tasks.attachments.store');
     Route::post('/taken/tasks/{task}/comments', [TasksController::class, 'storeComment'])->name('crm.tasks.comments.store');
     Route::get('/taken/{task}', [TasksController::class, 'show'])->name('crm.tasks.show');
-    Route::get('/taken-old', \App\Livewire\Crm\Tasks\Index::class)->name('crm.tasks.old');
 
     Route::get('/gebruikers', \App\Livewire\Crm\Users\Index::class)
         ->middleware('admin')

@@ -155,7 +155,6 @@ class DashboardController
                 ],
             ],
             'urls' => [
-                'dashboard_old' => route('dashboard.old'),
                 'tasks' => route('crm.tasks.index'),
                 'customers' => route('crm.garage_companies.index'),
                 'reports' => route('crm.reports.index'),

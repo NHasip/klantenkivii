@@ -29,9 +29,7 @@ class TasksController
         return Inertia::render('Crm/Tasks', [
             'initial' => $this->buildTasksPayload($request),
             'filters' => $this->filtersFromRequest($request),
-            'urls' => [
-                'tasks_old' => route('crm.tasks.old'),
-            ],
+            'urls' => [],
         ]);
     }
 
