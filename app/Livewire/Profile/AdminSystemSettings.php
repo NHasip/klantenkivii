@@ -7,6 +7,7 @@ use App\Models\EmailTemplate;
 use App\Models\SmtpSetting;
 use App\Services\EmailTemplateRenderer;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 use Livewire\Component;
 
 class AdminSystemSettings extends Component
@@ -78,18 +79,24 @@ class AdminSystemSettings extends Component
             'smtp.from_name' => ['nullable', 'string', 'max:255'],
         ]);
 
+        $payload = [
+            'host' => $data['smtp']['host'] ?? null,
+            'port' => $data['smtp']['port'] ?? null,
+            'username' => $data['smtp']['username'] ?? null,
+            'password' => $data['smtp']['password'] ?? null,
+            'encryption' => $data['smtp']['encryption'] ?? null,
+            'from_address' => $data['smtp']['from_address'] ?? null,
+            'from_name' => $data['smtp']['from_name'] ?? null,
+            'updated_by' => auth()->id(),
+        ];
+
+        if (! Schema::hasColumn('smtp_settings', 'updated_by')) {
+            unset($payload['updated_by']);
+        }
+
         $smtp = SmtpSetting::query()->updateOrCreate(
             ['id' => $this->smtpId],
-            [
-                'host' => $data['smtp']['host'] ?? null,
-                'port' => $data['smtp']['port'] ?? null,
-                'username' => $data['smtp']['username'] ?? null,
-                'password' => $data['smtp']['password'] ?? null,
-                'encryption' => $data['smtp']['encryption'] ?? null,
-                'from_address' => $data['smtp']['from_address'] ?? null,
-                'from_name' => $data['smtp']['from_name'] ?? null,
-                'updated_by' => auth()->id(),
-            ]
+            $payload
         );
 
         $this->smtpId = $smtp->id;
