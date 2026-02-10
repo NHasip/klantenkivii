@@ -260,10 +260,10 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                         <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
                             <div className="flex items-start justify-between gap-4">
                                 <div>
-                                    <div className="text-sm font-semibold">Wat is nieuw?</div>
-                                    <div className="mt-1 text-sm text-zinc-600">
-                                        Dit dashboard is de eerste pagina die we naar React migreren. De rest blijft voorlopig Livewire (old).
-                                    </div>
+                                <div className="text-sm font-semibold">Wat is nieuw?</div>
+                                <div className="mt-1 text-sm text-zinc-600">
+                                    Dit dashboard is vernieuwd in React. De oude pagina's zijn verwijderd.
+                                </div>
                                 </div>
                                 <Badge tone="emerald">React</Badge>
                             </div>

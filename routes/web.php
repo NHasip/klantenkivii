@@ -11,6 +11,8 @@ Route::get('/', function () {
         ? redirect()->route('dashboard')
         : redirect()->route('login');
 });
+Route::redirect('/dashboard-old', '/dashboard', 301);
+Route::redirect('/taken-old', '/taken', 301);
 
 Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
