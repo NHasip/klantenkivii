@@ -95,14 +95,16 @@ export default function Index({ templates, variables, urls }) {
             ...form.data,
             body_html: latestHtml,
         };
-        const submitMethod = method === 'post' ? form.post : method === 'patch' ? form.patch : form.post;
-        submitMethod(url, {
+        const submitMethod = method === 'patch' ? router.patch : router.post;
+        submitMethod(url, payload, {
             preserveScroll: true,
             ...options,
-            data: payload,
             onSuccess: (...args) => {
                 router.reload({ only: ['templates'], preserveScroll: true, preserveState: true });
                 options.onSuccess?.(...args);
+            },
+            onError: (errors) => {
+                form.setError(errors || {});
             },
         });
     };
@@ -130,13 +132,17 @@ export default function Index({ templates, variables, urls }) {
         });
         if (!ok) return;
         if (deleteUrl) {
-            form.post(deleteUrl.replace('__TEMPLATE__', selectedTemplate.id), {
-                preserveScroll: true,
-                onSuccess: () => setSelectedId('new'),
-            });
+            router.post(
+                deleteUrl.replace('__TEMPLATE__', selectedTemplate.id),
+                { is_active: form.data.is_active },
+                {
+                    preserveScroll: true,
+                    onSuccess: () => setSelectedId('new'),
+                }
+            );
             return;
         }
-        form.delete(urls.delete.replace('__TEMPLATE__', selectedTemplate.id), {
+        router.delete(urls.delete.replace('__TEMPLATE__', selectedTemplate.id), {
             preserveScroll: true,
             onSuccess: () => setSelectedId('new'),
         });

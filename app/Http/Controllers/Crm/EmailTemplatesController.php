@@ -127,13 +127,14 @@ class EmailTemplatesController
         return back()->with('status', 'Template opgeslagen.');
     }
 
-    public function destroy(EmailTemplate $emailTemplate): RedirectResponse
+    public function destroy(Request $request, EmailTemplate $emailTemplate): RedirectResponse
     {
         $isSystem = in_array($emailTemplate->key, self::SYSTEM_KEYS, true);
         $isActive = Schema::hasColumn('email_templates', 'is_active')
             ? (bool) $emailTemplate->is_active
             : true;
-        if ($isSystem && $isActive) {
+        $requestedInactive = $request->boolean('is_active') === false;
+        if ($isSystem && $isActive && ! $requestedInactive) {
             return back()->with('status', 'Standaard templates kun je niet verwijderen zolang ze actief zijn.');
         }
 
