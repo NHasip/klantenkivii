@@ -47,6 +47,9 @@ class EmailTemplatesController
                 'is_active' => $hasActiveColumn ? (bool) $template->is_active : true,
                 'is_system' => in_array($template->key, self::SYSTEM_KEYS, true),
             ]);
+        if ($hasActiveColumn) {
+            $templates = $templates->reject(fn ($template) => $template['is_system'] && ! $template['is_active'])->values();
+        }
 
         return Inertia::render('Crm/EmailTemplates/Index', [
             'templates' => $templates,
@@ -130,12 +133,17 @@ class EmailTemplatesController
     public function destroy(Request $request, EmailTemplate $emailTemplate): RedirectResponse
     {
         $isSystem = in_array($emailTemplate->key, self::SYSTEM_KEYS, true);
-        $isActive = Schema::hasColumn('email_templates', 'is_active')
-            ? (bool) $emailTemplate->is_active
-            : true;
+        $hasActive = Schema::hasColumn('email_templates', 'is_active');
+        $isActive = $hasActive ? (bool) $emailTemplate->is_active : true;
         $requestedInactive = $request->boolean('is_active') === false;
-        if ($isSystem && $isActive && ! $requestedInactive) {
-            return back()->with('status', 'Standaard templates kun je niet verwijderen zolang ze actief zijn.');
+        if ($isSystem) {
+            if ($isActive && ! $requestedInactive) {
+                return back()->with('status', 'Standaard templates kun je niet verwijderen zolang ze actief zijn.');
+            }
+            if ($hasActive) {
+                $emailTemplate->update(['is_active' => false]);
+            }
+            return back()->with('status', 'Template verborgen.');
         }
 
         $emailTemplate->delete();
