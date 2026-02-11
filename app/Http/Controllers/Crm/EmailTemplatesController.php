@@ -55,7 +55,9 @@ class EmailTemplatesController
                 'back' => route('dashboard'),
                 'store' => route('crm.email_templates.store'),
                 'update' => route('crm.email_templates.update', ['emailTemplate' => '__TEMPLATE__']),
+                'update_post' => route('crm.email_templates.update_post', ['emailTemplate' => '__TEMPLATE__']),
                 'delete' => route('crm.email_templates.delete', ['emailTemplate' => '__TEMPLATE__']),
+                'delete_post' => route('crm.email_templates.delete_post', ['emailTemplate' => '__TEMPLATE__']),
             ],
         ]);
     }

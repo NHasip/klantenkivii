@@ -74,9 +74,15 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::patch('/email-templates/{emailTemplate}', [EmailTemplatesController::class, 'update'])
         ->middleware('admin')
         ->name('crm.email_templates.update');
+    Route::post('/email-templates/{emailTemplate}/update', [EmailTemplatesController::class, 'update'])
+        ->middleware('admin')
+        ->name('crm.email_templates.update_post');
     Route::delete('/email-templates/{emailTemplate}', [EmailTemplatesController::class, 'destroy'])
         ->middleware('admin')
         ->name('crm.email_templates.delete');
+    Route::post('/email-templates/{emailTemplate}/delete', [EmailTemplatesController::class, 'destroy'])
+        ->middleware('admin')
+        ->name('crm.email_templates.delete_post');
 
     Route::post('/user/profile/smtp-settings', [SmtpSettingsController::class, 'store'])
         ->middleware('admin')

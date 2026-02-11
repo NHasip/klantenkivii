@@ -37,6 +37,9 @@ export default function Index({ templates, variables, urls }) {
         [templates, selectedId]
     );
     const isNew = selectedId === 'new';
+    const canDelete = !isNew && selectedTemplate && !selectedTemplate.is_system;
+    const updateUrl = urls.update_post || urls.update;
+    const deleteUrl = urls.delete_post || urls.delete;
 
     const form = useForm({
         name: '',
@@ -103,7 +106,7 @@ export default function Index({ templates, variables, urls }) {
         if (isNew) {
             submitTemplate('post', urls.store, { onSuccess: () => setSelectedId('new') });
         } else if (selectedTemplate) {
-            submitTemplate('patch', urls.update.replace('__TEMPLATE__', selectedTemplate.id));
+            submitTemplate(updateUrl ? 'post' : 'patch', updateUrl.replace('__TEMPLATE__', selectedTemplate.id));
         }
     };
 
@@ -117,10 +120,17 @@ export default function Index({ templates, variables, urls }) {
             tone: 'danger',
         });
         if (!ok) return;
-        form.delete(urls.delete.replace('__TEMPLATE__', selectedTemplate.id), {
-            preserveScroll: true,
-            onSuccess: () => setSelectedId('new'),
-        });
+        if (deleteUrl) {
+            form.post(deleteUrl.replace('__TEMPLATE__', selectedTemplate.id), {
+                preserveScroll: true,
+                onSuccess: () => setSelectedId('new'),
+            });
+        } else {
+            form.delete(urls.delete.replace('__TEMPLATE__', selectedTemplate.id), {
+                preserveScroll: true,
+                onSuccess: () => setSelectedId('new'),
+            });
+        }
     };
 
     return (
@@ -308,13 +318,14 @@ export default function Index({ templates, variables, urls }) {
 
                         <div className="flex flex-wrap items-center gap-2">
                             <button
-                                type="submit"
+                                type="button"
                                 className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-60"
                                 disabled={form.processing}
+                                onClick={saveTemplate}
                             >
                                 {form.processing ? 'Opslaan...' : 'Opslaan'}
                             </button>
-                            {!isNew && selectedTemplate && !selectedTemplate.is_system && (
+                            {canDelete && (
                                 <button
                                     type="button"
                                     className="rounded-md border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
@@ -322,6 +333,9 @@ export default function Index({ templates, variables, urls }) {
                                 >
                                     Verwijderen
                                 </button>
+                            )}
+                            {!canDelete && !isNew && selectedTemplate && selectedTemplate.is_system && (
+                                <div className="text-xs text-zinc-500">Standaard templates kun je niet verwijderen.</div>
                             )}
                         </div>
                     </form>
