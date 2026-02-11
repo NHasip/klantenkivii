@@ -25,7 +25,9 @@ class EmailTemplateRenderer
     {
         $output = $content;
         foreach ($data as $key => $value) {
-            $output = str_replace('{{'.$key.'}}', $value, $output);
+            $value = (string) $value;
+            $pattern = '/{{\\s*'.preg_quote($key, '/').'\\s*}}/u';
+            $output = preg_replace($pattern, $value, $output) ?? $output;
         }
 
         return $output;

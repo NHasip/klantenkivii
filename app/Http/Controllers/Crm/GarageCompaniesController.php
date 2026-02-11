@@ -1336,8 +1336,8 @@ class GarageCompaniesController
         return [
             'naam' => $naam ?: $garageCompany->bedrijfsnaam,
             'bedrijfsnaam' => $garageCompany->bedrijfsnaam,
-            'loginnaam' => $garageCompany->login_email ?: '—',
-            'wachtwoord' => $garageCompany->login_password ?: '—',
+            'loginnaam' => $garageCompany->login_email ?: '-',
+            'wachtwoord' => $garageCompany->login_password ?: '-',
             'weblink' => 'https://web.kivii.nl/',
         ];
     }
