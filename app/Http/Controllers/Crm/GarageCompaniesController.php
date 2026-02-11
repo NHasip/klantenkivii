@@ -601,8 +601,12 @@ class GarageCompaniesController
 
     public function updateOverview(Request $request, GarageCompany $garageCompany): RedirectResponse
     {
+        $garageCompany->load('primaryPerson');
+
         $data = $request->validate([
             'bedrijfsnaam' => ['required', 'string', 'max:255'],
+            'primary_voornaam' => ['required', 'string', 'max:255'],
+            'primary_achternaam' => ['required', 'string', 'max:255'],
             'kvk_nummer' => ['nullable', 'string', 'max:50'],
             'btw_nummer' => ['nullable', 'string', 'max:50'],
             'adres_straat_nummer' => ['nullable', 'string', 'max:255'],
@@ -640,9 +644,31 @@ class GarageCompaniesController
         $oldLoginPassword = $garageCompany->login_password;
         $oldHoofdEmail = $garageCompany->hoofd_email;
         $oldBedrijfsnaam = $garageCompany->bedrijfsnaam;
+        $oldPrimaryName = $garageCompany->primaryPerson
+            ? trim("{$garageCompany->primaryPerson->voornaam} {$garageCompany->primaryPerson->achternaam}")
+            : null;
 
         $garageCompany->fill($data);
         $garageCompany->save();
+
+        $primaryPayload = [
+            'voornaam' => $data['primary_voornaam'],
+            'achternaam' => $data['primary_achternaam'],
+            'email' => $data['hoofd_email'],
+            'telefoon' => $data['hoofd_telefoon'],
+        ];
+
+        if ($garageCompany->primaryPerson) {
+            $garageCompany->primaryPerson->update($primaryPayload);
+        } else {
+            CustomerPerson::create([
+                ...$primaryPayload,
+                'garage_company_id' => $garageCompany->id,
+                'rol' => 'eigenaar',
+                'is_primary' => true,
+                'active' => true,
+            ]);
+        }
 
         if (! empty($data['login_email']) && $garageCompany->eigenaar_user_id) {
             User::query()
@@ -671,6 +697,7 @@ class GarageCompaniesController
             || $oldLoginPassword !== $garageCompany->login_password
             || $oldHoofdEmail !== $garageCompany->hoofd_email
             || $oldBedrijfsnaam !== $garageCompany->bedrijfsnaam
+            || $oldPrimaryName !== trim("{$data['primary_voornaam']} {$data['primary_achternaam']}")
         ) {
             $this->refreshWelcomeDraft($garageCompany, true);
         }

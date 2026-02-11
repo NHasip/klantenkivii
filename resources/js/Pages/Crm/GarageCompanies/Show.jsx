@@ -142,6 +142,8 @@ export default function Show({
 
     const overviewForm = useForm({
         bedrijfsnaam: garageCompany.bedrijfsnaam || '',
+        primary_voornaam: garageCompany.primary_person?.voornaam || '',
+        primary_achternaam: garageCompany.primary_person?.achternaam || '',
         kvk_nummer: garageCompany.kvk_nummer || '',
         btw_nummer: garageCompany.btw_nummer || '',
         adres_straat_nummer: garageCompany.adres_straat_nummer || '',
@@ -740,6 +742,29 @@ export default function Show({
                                 />
                                 {overviewForm.errors.bedrijfsnaam && (
                                     <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.bedrijfsnaam}</div>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-medium text-zinc-600">Voornaam *</label>
+                                <input
+                                    className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                    value={overviewForm.data.primary_voornaam}
+                                    onChange={(e) => overviewForm.setData('primary_voornaam', e.target.value)}
+                                />
+                                {overviewForm.errors.primary_voornaam && (
+                                    <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.primary_voornaam}</div>
+                                )}
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-zinc-600">Achternaam *</label>
+                                <input
+                                    className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                    value={overviewForm.data.primary_achternaam}
+                                    onChange={(e) => overviewForm.setData('primary_achternaam', e.target.value)}
+                                />
+                                {overviewForm.errors.primary_achternaam && (
+                                    <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.primary_achternaam}</div>
                                 )}
                             </div>
 
