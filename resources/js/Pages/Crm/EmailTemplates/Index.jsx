@@ -88,12 +88,15 @@ export default function Index({ templates, variables, urls }) {
 
     const submitTemplate = (method, url, options = {}) => {
         const latestHtml = editor ? editor.getHTML() : form.data.body_html;
-        form.transform((data) => ({
-            ...data,
+        const payload = {
+            ...form.data,
             body_html: latestHtml,
-        })).submit(method, url, {
+        };
+        const submitMethod = method === 'post' ? form.post : method === 'patch' ? form.patch : form.post;
+        submitMethod(url, {
             preserveScroll: true,
             ...options,
+            data: payload,
             onSuccess: (...args) => {
                 router.reload({ only: ['templates'], preserveScroll: true, preserveState: true });
                 options.onSuccess?.(...args);
@@ -105,8 +108,11 @@ export default function Index({ templates, variables, urls }) {
         event?.preventDefault?.();
         if (isNew) {
             submitTemplate('post', urls.store, { onSuccess: () => setSelectedId('new') });
-        } else if (selectedTemplate) {
-            submitTemplate(updateUrl ? 'post' : 'patch', updateUrl.replace('__TEMPLATE__', selectedTemplate.id));
+            return;
+        }
+        if (selectedTemplate) {
+            const targetUrl = updateUrl.replace('__TEMPLATE__', selectedTemplate.id);
+            submitTemplate(updateUrl ? 'post' : 'patch', targetUrl);
         }
     };
 
@@ -125,12 +131,12 @@ export default function Index({ templates, variables, urls }) {
                 preserveScroll: true,
                 onSuccess: () => setSelectedId('new'),
             });
-        } else {
-            form.delete(urls.delete.replace('__TEMPLATE__', selectedTemplate.id), {
-                preserveScroll: true,
-                onSuccess: () => setSelectedId('new'),
-            });
+            return;
         }
+        form.delete(urls.delete.replace('__TEMPLATE__', selectedTemplate.id), {
+            preserveScroll: true,
+            onSuccess: () => setSelectedId('new'),
+        });
     };
 
     return (
@@ -325,11 +331,17 @@ export default function Index({ templates, variables, urls }) {
                             >
                                 {form.processing ? 'Opslaan...' : 'Opslaan'}
                             </button>
-                            {canDelete && (
+                            {!isNew && selectedTemplate && (
                                 <button
                                     type="button"
-                                    className="rounded-md border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
+                                    className={cx(
+                                        'rounded-md border px-3 py-2 text-sm font-semibold',
+                                        selectedTemplate.is_system
+                                            ? 'cursor-not-allowed border-zinc-200 text-zinc-400'
+                                            : 'border-rose-200 text-rose-600 hover:bg-rose-50'
+                                    )}
                                     onClick={deleteTemplate}
+                                    disabled={selectedTemplate.is_system}
                                 >
                                     Verwijderen
                                 </button>
