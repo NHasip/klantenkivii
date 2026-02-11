@@ -129,8 +129,12 @@ class EmailTemplatesController
 
     public function destroy(EmailTemplate $emailTemplate): RedirectResponse
     {
-        if (in_array($emailTemplate->key, self::SYSTEM_KEYS, true)) {
-            return back()->with('status', 'Standaard templates kun je niet verwijderen.');
+        $isSystem = in_array($emailTemplate->key, self::SYSTEM_KEYS, true);
+        $isActive = Schema::hasColumn('email_templates', 'is_active')
+            ? (bool) $emailTemplate->is_active
+            : true;
+        if ($isSystem && $isActive) {
+            return back()->with('status', 'Standaard templates kun je niet verwijderen zolang ze actief zijn.');
         }
 
         $emailTemplate->delete();

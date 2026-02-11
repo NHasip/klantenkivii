@@ -37,7 +37,10 @@ export default function Index({ templates, variables, urls }) {
         [templates, selectedId]
     );
     const isNew = selectedId === 'new';
-    const canDelete = !isNew && selectedTemplate && !selectedTemplate.is_system;
+    const canDelete =
+        !isNew &&
+        selectedTemplate &&
+        (!selectedTemplate.is_system || !selectedTemplate.is_active);
     const updateUrl = urls.update_post || urls.update;
     const deleteUrl = urls.delete_post || urls.delete;
 
@@ -117,7 +120,7 @@ export default function Index({ templates, variables, urls }) {
     };
 
     const deleteTemplate = async () => {
-        if (!selectedTemplate || selectedTemplate.is_system) return;
+        if (!selectedTemplate || (selectedTemplate.is_system && selectedTemplate.is_active)) return;
         const ok = await confirm({
             title: 'Template verwijderen',
             message: `Weet je zeker dat je "${selectedTemplate.name}" wilt verwijderen?`,
@@ -336,18 +339,18 @@ export default function Index({ templates, variables, urls }) {
                                     type="button"
                                     className={cx(
                                         'rounded-md border px-3 py-2 text-sm font-semibold',
-                                        selectedTemplate.is_system
+                                        selectedTemplate.is_system && selectedTemplate.is_active
                                             ? 'cursor-not-allowed border-zinc-200 text-zinc-400'
                                             : 'border-rose-200 text-rose-600 hover:bg-rose-50'
                                     )}
                                     onClick={deleteTemplate}
-                                    disabled={selectedTemplate.is_system}
+                                    disabled={selectedTemplate.is_system && selectedTemplate.is_active}
                                 >
                                     Verwijderen
                                 </button>
                             )}
-                            {!canDelete && !isNew && selectedTemplate && selectedTemplate.is_system && (
-                                <div className="text-xs text-zinc-500">Standaard templates kun je niet verwijderen.</div>
+                            {!canDelete && !isNew && selectedTemplate && selectedTemplate.is_system && selectedTemplate.is_active && (
+                                <div className="text-xs text-zinc-500">Standaard templates kun je niet verwijderen zolang ze actief zijn.</div>
                             )}
                         </div>
                     </form>
