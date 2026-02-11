@@ -528,6 +528,7 @@ export default function Show({
     const welcomeForm = useForm({
         subject: welcomeEmail?.subject || '',
         body_html: welcomeEmail?.body_html || '',
+        to_email: welcomeEmail?.to_email || '',
         template_id: welcomeEmail?.template_id || null,
     });
 
@@ -535,6 +536,7 @@ export default function Show({
         welcomeForm.setData({
             subject: welcomeEmail?.subject || '',
             body_html: welcomeEmail?.body_html || '',
+            to_email: welcomeEmail?.to_email || '',
             template_id: welcomeEmail?.template_id || null,
         });
     }, [welcomeEmail?.id]);
@@ -1063,7 +1065,16 @@ export default function Show({
 
                                     <div className="rounded-xl border border-zinc-200 bg-white p-4">
                                         <div className="text-xs font-semibold text-zinc-500">Ontvanger</div>
-                                        <div className="mt-2 text-sm font-semibold">{welcomeEmail?.to_email || '-'}</div>
+                                        <input
+                                            type="email"
+                                            className="mt-2 w-full rounded-md border-zinc-300 text-sm"
+                                            value={welcomeForm.data.to_email}
+                                            onChange={(e) => welcomeForm.setData('to_email', e.target.value)}
+                                            placeholder="klant@voorbeeld.nl"
+                                        />
+                                        {welcomeForm.errors.to_email && (
+                                            <div className="mt-1 text-xs text-rose-600">{welcomeForm.errors.to_email}</div>
+                                        )}
                                         <div className="mt-4 text-xs font-semibold text-zinc-500">Beschikbare velden</div>
                                         <div className="mt-2 space-y-1 text-xs text-zinc-600">
                                             {['{{ naam }}', '{{ bedrijfsnaam }}', '{{ loginnaam }}', '{{ wachtwoord }}', '{{ weblink }}'].map((token) => (

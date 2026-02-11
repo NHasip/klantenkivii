@@ -1167,6 +1167,7 @@ class GarageCompaniesController
     public function updateWelcomeEmail(Request $request, GarageCompany $garageCompany): RedirectResponse
     {
         $data = $request->validate([
+            'to_email' => ['nullable', 'email', 'max:255'],
             'subject' => ['required', 'string', 'max:255'],
             'body_html' => ['nullable', 'string'],
             'template_id' => ['nullable', 'integer'],
@@ -1178,6 +1179,7 @@ class GarageCompaniesController
         }
         $draft->update([
             'template_id' => $data['template_id'] ?? $draft->template_id,
+            'to_email' => $data['to_email'] ?? $draft->to_email,
             'subject' => $data['subject'],
             'body_html' => $data['body_html'] ?? '',
             'body_text' => $this->htmlToText($data['body_html'] ?? ''),
