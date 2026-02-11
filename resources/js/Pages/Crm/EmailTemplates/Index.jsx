@@ -48,7 +48,7 @@ export default function Index({ templates, variables, urls }) {
         name: '',
         subject: '',
         body_html: '',
-        is_active: true,
+        is_active: 1,
     });
 
     useEffect(() => {
@@ -57,14 +57,14 @@ export default function Index({ templates, variables, urls }) {
                 name: selectedTemplate.name || '',
                 subject: selectedTemplate.subject || '',
                 body_html: selectedTemplate.body_html || '',
-                is_active: !!selectedTemplate.is_active,
+                is_active: selectedTemplate.is_active ? 1 : 0,
             });
         } else if (isNew) {
             form.setData({
                 name: '',
                 subject: '',
                 body_html: '<p></p>',
-                is_active: true,
+                is_active: 1,
             });
         }
     }, [selectedTemplate?.id, isNew]);
@@ -116,6 +116,7 @@ export default function Index({ templates, variables, urls }) {
             return;
         }
         if (selectedTemplate) {
+            form.clearErrors();
             const targetUrl = updateUrl.replace('__TEMPLATE__', selectedTemplate.id);
             submitTemplate(updateUrl ? 'post' : 'patch', targetUrl);
         }
@@ -245,7 +246,7 @@ export default function Index({ templates, variables, urls }) {
                                     type="checkbox"
                                     className="rounded border-zinc-300"
                                     checked={!!form.data.is_active}
-                                    onChange={(e) => form.setData('is_active', e.target.checked)}
+                                    onChange={(e) => form.setData('is_active', e.target.checked ? 1 : 0)}
                                 />
                                 Actief
                             </label>
