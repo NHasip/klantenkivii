@@ -1,6 +1,6 @@
 {
-  "_index-POH0pUtn.js": {
-    "file": "assets/index-POH0pUtn.js",
+  "_index-BT6luacT.js": {
+    "file": "assets/index-BT6luacT.js",
     "name": "index",
     "imports": [
       "resources/js/app.jsx"
@@ -16,7 +16,7 @@
     "isEntry": true
   },
   "resources/js/Pages/Crm/Dashboard.jsx": {
-    "file": "assets/Dashboard-BnzlWouJ.js",
+    "file": "assets/Dashboard-DuCuJEJD.js",
     "name": "Dashboard",
     "src": "resources/js/Pages/Crm/Dashboard.jsx",
     "isDynamicEntry": true,
@@ -26,18 +26,18 @@
     ]
   },
   "resources/js/Pages/Crm/EmailTemplates/Index.jsx": {
-    "file": "assets/Index-Dvc6NtSK.js",
+    "file": "assets/Index-lDEJQyf7.js",
     "name": "Index",
     "src": "resources/js/Pages/Crm/EmailTemplates/Index.jsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
-      "_index-POH0pUtn.js",
+      "_index-BT6luacT.js",
       "_module.esm-CDoHWUqT.js"
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/Create.jsx": {
-    "file": "assets/Create-CsBoUCyz.js",
+    "file": "assets/Create-hmKItI1J.js",
     "name": "Create",
     "src": "resources/js/Pages/Crm/GarageCompanies/Create.jsx",
     "isDynamicEntry": true,
@@ -47,7 +47,7 @@
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/Index.jsx": {
-    "file": "assets/Index-DwLgcGGW.js",
+    "file": "assets/Index-DcHYUDr3.js",
     "name": "Index",
     "src": "resources/js/Pages/Crm/GarageCompanies/Index.jsx",
     "isDynamicEntry": true,
@@ -57,18 +57,18 @@
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/Show.jsx": {
-    "file": "assets/Show-ChD2iIPu.js",
+    "file": "assets/Show-ByJMg7zy.js",
     "name": "Show",
     "src": "resources/js/Pages/Crm/GarageCompanies/Show.jsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
-      "_index-POH0pUtn.js",
+      "_index-BT6luacT.js",
       "_module.esm-CDoHWUqT.js"
     ]
   },
   "resources/js/Pages/Crm/Tasks.jsx": {
-    "file": "assets/Tasks-q62tlHbs.js",
+    "file": "assets/Tasks-DGtKQQH4.js",
     "name": "Tasks",
     "src": "resources/js/Pages/Crm/Tasks.jsx",
     "isDynamicEntry": true,
@@ -87,7 +87,7 @@
     ]
   },
   "resources/js/app.jsx": {
-    "file": "assets/app-BAYY7dq2.js",
+    "file": "assets/app-DGSx-slH.js",
     "name": "app",
     "src": "resources/js/app.jsx",
     "isEntry": true,

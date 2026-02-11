@@ -95,8 +95,7 @@ export default function Index({ templates, variables, urls }) {
             ...form.data,
             body_html: latestHtml,
         };
-        const submitMethod = method === 'patch' ? router.patch : router.post;
-        submitMethod(url, payload, {
+        const requestOptions = {
             preserveScroll: true,
             ...options,
             onSuccess: (...args) => {
@@ -106,16 +105,16 @@ export default function Index({ templates, variables, urls }) {
             onError: (errors) => {
                 form.setError(errors || {});
             },
-        });
+        };
+        if (method === 'patch') {
+            router.patch(url, payload, requestOptions);
+        } else {
+            router.post(url, payload, requestOptions);
+        }
     };
 
     const saveTemplate = (event) => {
         event?.preventDefault?.();
-        console.log('[email-templates] save', {
-            selectedId,
-            isNew,
-            isActive: form.data.is_active,
-        });
         if (isNew) {
             submitTemplate('post', urls.store, { onSuccess: () => setSelectedId('new') });
             return;
