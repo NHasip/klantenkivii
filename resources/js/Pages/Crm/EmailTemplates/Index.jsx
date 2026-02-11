@@ -111,6 +111,11 @@ export default function Index({ templates, variables, urls }) {
 
     const saveTemplate = (event) => {
         event?.preventDefault?.();
+        console.log('[email-templates] save', {
+            selectedId,
+            isNew,
+            isActive: form.data.is_active,
+        });
         if (isNew) {
             submitTemplate('post', urls.store, { onSuccess: () => setSelectedId('new') });
             return;
