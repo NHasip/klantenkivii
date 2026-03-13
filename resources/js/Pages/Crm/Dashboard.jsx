@@ -36,11 +36,8 @@ function formatDateTime(isoString) {
 function Badge({ children, tone = 'zinc' }) {
     const toneClasses = {
         zinc: 'bg-zinc-100 text-zinc-700',
-        emerald: 'bg-emerald-100 text-emerald-800',
-        amber: 'bg-amber-100 text-amber-800',
-        rose: 'bg-rose-100 text-rose-800',
-        sky: 'bg-sky-100 text-sky-800',
         lime: 'bg-lime-100 text-lime-800',
+        dark: 'bg-zinc-900 text-white',
     }[tone];
 
     return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${toneClasses}`}>{children}</span>;
@@ -48,7 +45,7 @@ function Badge({ children, tone = 'zinc' }) {
 
 function Panel({ title, subtitle, action, children, className = '' }) {
     return (
-        <section className={`rounded-[28px] border border-zinc-200/80 bg-white/90 p-5 shadow-[0_20px_60px_-32px_rgba(15,23,42,0.35)] backdrop-blur ${className}`}>
+        <section className={`rounded-[28px] border border-zinc-200 bg-white p-5 shadow-[0_16px_50px_-34px_rgba(15,23,42,0.24)] ${className}`}>
             {(title || subtitle || action) && (
                 <div className="mb-4 flex items-start justify-between gap-4">
                     <div>
@@ -66,10 +63,7 @@ function Panel({ title, subtitle, action, children, className = '' }) {
 function MetricCard({ label, value, sub, tone = 'default' }) {
     const toneClasses = {
         default: 'border-zinc-200 bg-white',
-        good: 'border-emerald-200 bg-emerald-50',
-        warn: 'border-amber-200 bg-amber-50',
-        bad: 'border-rose-200 bg-rose-50',
-        brand: 'border-sky-200 bg-sky-50',
+        accent: 'border-lime-200 bg-lime-50',
         dark: 'border-zinc-900 bg-zinc-900 text-white',
     }[tone];
 
@@ -87,22 +81,22 @@ function MetricCard({ label, value, sub, tone = 'default' }) {
 
 function ActionLink({ href, title, subtitle, accent = 'zinc' }) {
     const accentClasses = {
-        zinc: 'from-zinc-900 to-zinc-800 text-white',
-        lime: 'from-lime-300 to-lime-400 text-zinc-950',
-        sky: 'from-sky-500 to-cyan-500 text-white',
+        zinc: 'border-zinc-200 bg-white text-zinc-900 hover:border-zinc-300 hover:bg-zinc-50',
+        lime: 'border-lime-300 bg-lime-300 text-zinc-950 hover:bg-lime-400',
+        dark: 'border-zinc-900 bg-zinc-900 text-white hover:bg-zinc-800',
     }[accent];
 
     return (
         <a
             href={href}
-            className={`group rounded-[24px] bg-gradient-to-br p-4 shadow-sm transition hover:translate-y-[-1px] ${accentClasses}`}
+            className={`group rounded-[24px] border p-4 shadow-sm transition hover:translate-y-[-1px] ${accentClasses}`}
         >
             <div className="flex items-start justify-between gap-3">
                 <div>
                     <div className="text-sm font-semibold">{title}</div>
-                    <div className="mt-1 text-xs leading-5 opacity-80">{subtitle}</div>
+                    <div className="mt-1 text-xs leading-5 opacity-75">{subtitle}</div>
                 </div>
-                <div className="text-sm opacity-70 transition group-hover:translate-x-0.5">Open</div>
+                <div className="text-sm opacity-60 transition group-hover:translate-x-0.5">Open</div>
             </div>
         </a>
     );
@@ -120,13 +114,13 @@ function TaskRow({ task }) {
     const overdue = task.deadline ? new Date(task.deadline) < new Date() : false;
 
     return (
-        <li className="rounded-[20px] border border-zinc-200 bg-white p-4 transition hover:border-zinc-300 hover:shadow-sm">
+        <li className={`rounded-[20px] border bg-white p-4 transition hover:border-zinc-300 hover:shadow-sm ${overdue ? 'border-zinc-900' : 'border-zinc-200'}`}>
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                         <div className="truncate text-sm font-semibold text-zinc-950">{task.titel}</div>
-                        {task.project?.naam ? <Badge tone="sky">{task.project.naam}</Badge> : null}
-                        {overdue ? <Badge tone="rose">Te laat</Badge> : null}
+                        {task.project?.naam ? <Badge tone="lime">{task.project.naam}</Badge> : null}
+                        {overdue ? <Badge tone="dark">Te laat</Badge> : null}
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-600">
                         <span>Deadline: {formatDateTime(task.deadline)}</span>
@@ -167,34 +161,32 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
     const taskItems = lists?.tasks ?? [];
     const appointmentItems = lists?.appointments?.items ?? [];
     const appointmentsByCompany = lists?.appointments?.by_company ?? [];
-    const tasksTone = kpis.tasks_overdue > 0 ? 'bad' : kpis.tasks_open > 0 ? 'warn' : 'good';
+    const tasksTone = kpis.tasks_overdue > 0 ? 'dark' : kpis.tasks_open > 0 ? 'accent' : 'default';
 
     return (
         <>
             <Head title="Dashboard" />
 
             <div className="space-y-6">
-                <section className="relative overflow-hidden rounded-[32px] border border-zinc-200 bg-[radial-gradient(circle_at_top_left,_rgba(163,230,53,0.18),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(14,165,233,0.16),_transparent_28%),linear-gradient(180deg,_#ffffff,_#f8fafc)] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.35)]">
-                    <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-lime-200/30 blur-3xl" />
-                    <div className="absolute bottom-0 left-0 h-32 w-32 rounded-full bg-sky-200/30 blur-3xl" />
-
-                    <div className="relative grid gap-6 xl:grid-cols-[1.4fr_0.9fr]">
+                <section className="overflow-hidden rounded-[32px] border border-zinc-200 bg-white shadow-[0_20px_70px_-36px_rgba(15,23,42,0.28)]">
+                    <div className="h-1.5 w-full bg-lime-300" />
+                    <div className="grid gap-6 p-6 xl:grid-cols-[1.35fr_0.85fr]">
                         <div>
-                            <div className="inline-flex items-center rounded-full border border-zinc-200 bg-white/80 px-3 py-1 text-xs font-semibold text-zinc-600">
+                            <div className="inline-flex items-center rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-semibold text-zinc-600">
                                 Bijgewerkt om {meta.generated_at}
                             </div>
                             <h1 className="mt-4 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
                                 Werkdashboard
                             </h1>
                             <p className="mt-3 max-w-2xl text-sm leading-7 text-zinc-600 sm:text-base">
-                                Alles wat vandaag aandacht vraagt in een scherm: open taken, komende afspraken,
-                                nieuwe leads en omzet uit actieve modules.
+                                Een rustig overzicht van wat vandaag telt: acties die aandacht vragen,
+                                afspraken die eraan komen en kerncijfers van je klantenbestand.
                             </p>
 
                             <div className="mt-6 grid gap-3 sm:grid-cols-3">
                                 <ActionLink href={urls.customers} title="Klanten" subtitle="Open klantoverzicht en werk direct door." accent="lime" />
-                                <ActionLink href={urls.tasks} title="Taken" subtitle="Werk vanuit lijst of board aan je acties." accent="zinc" />
-                                <ActionLink href={urls.reports} title="Rapportages" subtitle="Bekijk groei, omzet en trends." accent="sky" />
+                                <ActionLink href={urls.tasks} title="Taken" subtitle="Werk vanuit lijst of board aan je acties." accent="dark" />
+                                <ActionLink href={urls.reports} title="Rapportages" subtitle="Bekijk groei, omzet en trends." accent="zinc" />
                             </div>
                         </div>
 
@@ -209,7 +201,7 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                                 label="Komende afspraken"
                                 value={formatInt(appointmentItems.length)}
                                 sub={`${formatInt(appointmentsByCompany.length)} klanten met afspraken`}
-                                tone="brand"
+                                tone="accent"
                             />
                             <MetricCard
                                 label="MRR excl. btw"
@@ -231,19 +223,19 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                         label="Leads laatste 30 dagen"
                         value={formatInt(kpis.leads_last_30)}
                         sub="Nieuwe instroom"
-                        tone="brand"
+                        tone="accent"
                     />
                     <MetricCard
                         label="Nieuw actief"
                         value={formatInt(kpis.active_new_last_30)}
                         sub="Geactiveerd in de laatste 30 dagen"
-                        tone="good"
+                        tone="accent"
                     />
                     <MetricCard
                         label="Opzeggingen"
                         value={formatInt(kpis.cancelled_last_30)}
                         sub={`Demo aangevraagd: ${formatInt(kpis.demo_requested_last_30)}`}
-                        tone={kpis.cancelled_last_30 > 0 ? 'warn' : 'default'}
+                        tone={kpis.cancelled_last_30 > 0 ? 'dark' : 'default'}
                     />
                 </div>
 
