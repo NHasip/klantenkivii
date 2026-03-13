@@ -35,9 +35,9 @@ function formatDateTime(isoString) {
 
 function Badge({ children, tone = 'zinc' }) {
     const toneClasses = {
-        zinc: 'bg-zinc-100 text-zinc-700',
-        lime: 'bg-lime-100 text-lime-800',
-        dark: 'bg-zinc-900 text-white',
+        zinc: 'bg-white text-zinc-700 ring-1 ring-zinc-200',
+        lime: 'bg-[#F7FEE7] text-zinc-800 ring-1 ring-lime-200',
+        dark: 'bg-[#F7FEE7] text-zinc-900 ring-1 ring-lime-300',
     }[tone];
 
     return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${toneClasses}`}>{children}</span>;
@@ -63,15 +63,15 @@ function Panel({ title, subtitle, action, children, className = '' }) {
 function MetricCard({ label, value, sub, tone = 'default' }) {
     const toneClasses = {
         default: 'border-zinc-200 bg-white',
-        accent: 'border-lime-200 bg-lime-50',
-        dark: 'border-zinc-900 bg-zinc-900 text-white',
+        accent: 'border-lime-200 bg-[#F7FEE7]',
+        dark: 'border-lime-300 bg-[#F7FEE7]',
     }[tone];
 
-    const labelTone = tone === 'dark' ? 'text-zinc-300' : 'text-zinc-500';
-    const subTone = tone === 'dark' ? 'text-zinc-300' : 'text-zinc-600';
+    const labelTone = 'text-zinc-500';
+    const subTone = 'text-zinc-600';
 
     return (
-        <div className={`rounded-[24px] border p-5 shadow-sm ${toneClasses}`}>
+        <div className={`rounded-[24px] border p-5 shadow-sm shadow-[0_12px_32px_-28px_rgba(15,23,42,0.35)] ${toneClasses}`}>
             <div className={`text-xs font-semibold uppercase tracking-[0.18em] ${labelTone}`}>{label}</div>
             <div className="mt-3 text-3xl font-semibold tracking-tight">{value}</div>
             {sub ? <div className={`mt-2 text-sm leading-6 ${subTone}`}>{sub}</div> : null}
@@ -79,24 +79,24 @@ function MetricCard({ label, value, sub, tone = 'default' }) {
     );
 }
 
-function ActionLink({ href, title, subtitle, accent = 'zinc' }) {
+function ActionLink({ href, title, subtitle, accent = 'zinc', className = '' }) {
     const accentClasses = {
         zinc: 'border-zinc-200 bg-white text-zinc-900 hover:border-zinc-300 hover:bg-zinc-50',
-        lime: 'border-lime-300 bg-lime-300 text-zinc-950 hover:bg-lime-400',
-        dark: 'border-zinc-900 bg-zinc-900 text-white hover:bg-zinc-800',
+        lime: 'border-lime-200 bg-[#F7FEE7] text-zinc-950 hover:border-lime-300 hover:bg-lime-100',
+        dark: 'border-zinc-200 bg-white text-zinc-900 hover:border-lime-200 hover:bg-[#F7FEE7]',
     }[accent];
 
     return (
         <a
             href={href}
-            className={`group rounded-[24px] border p-4 shadow-sm transition hover:translate-y-[-1px] ${accentClasses}`}
+            className={`group rounded-[24px] border p-4 shadow-sm shadow-[0_12px_28px_-28px_rgba(15,23,42,0.4)] transition hover:translate-y-[-1px] ${accentClasses} ${className}`}
         >
             <div className="flex items-start justify-between gap-3">
                 <div>
                     <div className="text-sm font-semibold">{title}</div>
-                    <div className="mt-1 text-xs leading-5 opacity-75">{subtitle}</div>
+                    <div className="mt-1 max-w-md text-xs leading-5 text-zinc-600">{subtitle}</div>
                 </div>
-                <div className="text-sm opacity-60 transition group-hover:translate-x-0.5">Open</div>
+                <div className="text-sm font-medium text-zinc-500 transition group-hover:translate-x-0.5">Open</div>
             </div>
         </a>
     );
@@ -161,7 +161,7 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
     const taskItems = lists?.tasks ?? [];
     const appointmentItems = lists?.appointments?.items ?? [];
     const appointmentsByCompany = lists?.appointments?.by_company ?? [];
-    const tasksTone = kpis.tasks_overdue > 0 ? 'dark' : kpis.tasks_open > 0 ? 'accent' : 'default';
+    const tasksTone = kpis.tasks_overdue > 0 ? 'accent' : kpis.tasks_open > 0 ? 'accent' : 'default';
 
     return (
         <>
@@ -183,10 +183,26 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                                 afspraken die eraan komen en kerncijfers van je klantenbestand.
                             </p>
 
-                            <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                                <ActionLink href={urls.customers} title="Klanten" subtitle="Open klantoverzicht en werk direct door." accent="lime" />
-                                <ActionLink href={urls.tasks} title="Taken" subtitle="Werk vanuit lijst of board aan je acties." accent="dark" />
-                                <ActionLink href={urls.reports} title="Rapportages" subtitle="Bekijk groei, omzet en trends." accent="zinc" />
+                            <div className="mt-6 grid gap-3 md:grid-cols-2">
+                                <ActionLink
+                                    href={urls.customers}
+                                    title="Klanten"
+                                    subtitle="Open klantoverzicht, beheer contactpersonen en werk direct verder vanuit bestaande klantdossiers."
+                                    accent="lime"
+                                    className="md:col-span-2"
+                                />
+                                <ActionLink
+                                    href={urls.tasks}
+                                    title="Taken"
+                                    subtitle="Werk vanuit lijst of board aan je acties."
+                                    accent="zinc"
+                                />
+                                <ActionLink
+                                    href={urls.reports}
+                                    title="Rapportages"
+                                    subtitle="Bekijk groei, omzet en trends."
+                                    accent="zinc"
+                                />
                             </div>
                         </div>
 
@@ -207,7 +223,7 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                                 label="MRR excl. btw"
                                 value={formatEuro(kpis.mrr_excl)}
                                 sub={`BTW ${formatEuro(kpis.mrr_btw)} | Incl. ${formatEuro(kpis.mrr_incl)}`}
-                                tone="dark"
+                                tone="accent"
                             />
                         </div>
                     </div>
@@ -235,7 +251,7 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                         label="Opzeggingen"
                         value={formatInt(kpis.cancelled_last_30)}
                         sub={`Demo aangevraagd: ${formatInt(kpis.demo_requested_last_30)}`}
-                        tone={kpis.cancelled_last_30 > 0 ? 'dark' : 'default'}
+                        tone={kpis.cancelled_last_30 > 0 ? 'accent' : 'default'}
                     />
                 </div>
 

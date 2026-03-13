@@ -1,6 +1,6 @@
 {
-  "_index-B5dhvd0t.js": {
-    "file": "assets/index-B5dhvd0t.js",
+  "_index-DkHOEosf.js": {
+    "file": "assets/index-DkHOEosf.js",
     "name": "index",
     "imports": [
       "resources/js/app.jsx"
@@ -11,12 +11,12 @@
     "name": "module.esm"
   },
   "resources/css/app.css": {
-    "file": "assets/app-Bu4IpmBY.css",
+    "file": "assets/app-CMT4S6Yn.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
   "resources/js/Pages/Crm/Dashboard.jsx": {
-    "file": "assets/Dashboard-DOeVCptQ.js",
+    "file": "assets/Dashboard-CETQpzcn.js",
     "name": "Dashboard",
     "src": "resources/js/Pages/Crm/Dashboard.jsx",
     "isDynamicEntry": true,
@@ -26,18 +26,18 @@
     ]
   },
   "resources/js/Pages/Crm/EmailTemplates/Index.jsx": {
-    "file": "assets/Index-TGBkpbYT.js",
+    "file": "assets/Index-BO-xJUsD.js",
     "name": "Index",
     "src": "resources/js/Pages/Crm/EmailTemplates/Index.jsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
-      "_index-B5dhvd0t.js",
+      "_index-DkHOEosf.js",
       "_module.esm-CDoHWUqT.js"
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/Create.jsx": {
-    "file": "assets/Create-BmJ5DRo8.js",
+    "file": "assets/Create-CUdkzG3M.js",
     "name": "Create",
     "src": "resources/js/Pages/Crm/GarageCompanies/Create.jsx",
     "isDynamicEntry": true,
@@ -47,7 +47,7 @@
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/Index.jsx": {
-    "file": "assets/Index-BcEZG2xe.js",
+    "file": "assets/Index-DI8ci1ei.js",
     "name": "Index",
     "src": "resources/js/Pages/Crm/GarageCompanies/Index.jsx",
     "isDynamicEntry": true,
@@ -57,18 +57,18 @@
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/Show.jsx": {
-    "file": "assets/Show-BHwsy5Lk.js",
+    "file": "assets/Show-vgv40Rr7.js",
     "name": "Show",
     "src": "resources/js/Pages/Crm/GarageCompanies/Show.jsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
-      "_index-B5dhvd0t.js",
+      "_index-DkHOEosf.js",
       "_module.esm-CDoHWUqT.js"
     ]
   },
   "resources/js/Pages/Crm/Tasks.jsx": {
-    "file": "assets/Tasks-CXZrGsER.js",
+    "file": "assets/Tasks-fdutf5x-.js",
     "name": "Tasks",
     "src": "resources/js/Pages/Crm/Tasks.jsx",
     "isDynamicEntry": true,
@@ -87,7 +87,7 @@
     ]
   },
   "resources/js/app.jsx": {
-    "file": "assets/app-0bDyG_aN.js",
+    "file": "assets/app-hpEsFwvj.js",
     "name": "app",
     "src": "resources/js/app.jsx",
     "isEntry": true,
