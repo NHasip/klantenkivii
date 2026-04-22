@@ -79,6 +79,10 @@ class AdminSystemSettings extends Component
             'smtp.from_name' => ['nullable', 'string', 'max:255'],
         ]);
 
+        $existingSmtp = $this->smtpId
+            ? SmtpSetting::query()->find($this->smtpId)
+            : SmtpSetting::query()->first();
+
         $payload = [
             'host' => $data['smtp']['host'] ?? null,
             'port' => $data['smtp']['port'] ?? null,
@@ -94,8 +98,12 @@ class AdminSystemSettings extends Component
             unset($payload['updated_by']);
         }
 
+        if (! filled($data['smtp']['password'] ?? null) && $existingSmtp) {
+            unset($payload['password']);
+        }
+
         $smtp = SmtpSetting::query()->updateOrCreate(
-            ['id' => $this->smtpId],
+            ['id' => $existingSmtp?->id],
             $payload
         );
 

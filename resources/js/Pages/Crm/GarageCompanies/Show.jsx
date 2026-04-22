@@ -298,11 +298,18 @@ export default function Show({
     };
 
     const toggleModule = (index) => {
-        const row = moduleForm.data.rows[index];
-        updateModuleRow(index, 'actief', !row.actief);
-        if (!row.actief && Number(row.aantal || 0) < 1) {
-            updateModuleRow(index, 'aantal', 1);
-        }
+        moduleForm.setData(
+            'rows',
+            moduleForm.data.rows.map((row, i) => {
+                if (i !== index) return row;
+                const actief = !row.actief;
+                return {
+                    ...row,
+                    actief,
+                    aantal: actief && Number(row.aantal || 0) < 1 ? 1 : row.aantal,
+                };
+            })
+        );
     };
 
     const submitModules = () => {
@@ -598,7 +605,7 @@ export default function Show({
         failed: 'bg-rose-50 text-rose-700',
     }[welcomeStatus] || 'bg-zinc-100 text-zinc-700';
 
-    const confirmSendWelcome = async () => {
+    const confirmSendWelcome = async (draftOverride = null) => {
         if (!welcomeEmail) return;
         if (!smtpConfigured) {
             await confirm({
@@ -618,7 +625,13 @@ export default function Show({
             tone: 'success',
         });
         if (!ok) return;
-        welcomeForm.post(urls.update_welcome_email, {
+        const payload = draftOverride || {
+            subject: welcomeForm.data.subject,
+            body_html: welcomeForm.data.body_html,
+            to_email: welcomeForm.data.to_email,
+            template_id: welcomeForm.data.template_id,
+        };
+        router.post(urls.update_welcome_email, payload, {
             preserveScroll: true,
             onSuccess: () => {
                 router.post(urls.send_welcome_email, {}, { preserveScroll: true });
@@ -636,7 +649,14 @@ export default function Show({
         }
         setSelectedTemplateId(template.id);
         if (close) setTemplatePickerOpen(false);
-        if (send) confirmSendWelcome();
+        if (send) {
+            confirmSendWelcome({
+                subject: template.subject || '',
+                body_html: template.body_html || '',
+                to_email: welcomeForm.data.to_email,
+                template_id: template.id,
+            });
+        }
     };
 
     const openTemplatePicker = (sendAfter = false) => {
@@ -1500,8 +1520,14 @@ export default function Show({
                                 </button>
                                 <button
                                     type="button"
-                                    className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
+                                    className={cx(
+                                        'rounded-md border px-3 py-2 text-sm font-semibold',
+                                        hasActiveMandate
+                                            ? 'border-zinc-200 bg-white hover:bg-zinc-50'
+                                            : 'cursor-not-allowed border-zinc-200 bg-zinc-100 text-zinc-400'
+                                    )}
                                     onClick={() => setDemoStatus('actief')}
+                                    disabled={!hasActiveMandate}
                                 >
                                     Actief
                                 </button>
@@ -1667,7 +1693,7 @@ export default function Show({
                                             </span>
                                         </td>
                                         <td className="px-4 py-3 text-sm text-zinc-600">
-                                            {mandate.ontvangen_op ? formatDateTime(mandate.ontvangen_op) : '�'}
+                                            {mandate.ontvangen_op ? formatDateTime(mandate.ontvangen_op) : '-'}
                                         </td>
                                         <td className="px-4 py-3 text-right text-sm">
                                             <button
@@ -1943,7 +1969,7 @@ export default function Show({
                     </div>
 
                     <div className="rounded-xl border border-zinc-200 bg-white p-4 text-sm text-zinc-600">
-                        Totaal: {formatEuro(moduleTotalsLive.totaalExcl)} excl. btw � BTW {formatEuro(moduleTotalsLive.btw)} �{' '}
+                        Totaal: {formatEuro(moduleTotalsLive.totaalExcl)} excl. btw | BTW {formatEuro(moduleTotalsLive.btw)} |{' '}
                         {formatEuro(moduleTotalsLive.totaalIncl)} incl. btw
                     </div>
 
@@ -2011,7 +2037,7 @@ export default function Show({
                                                 />
                                                 {btwError && <div className="mt-1 text-xs text-rose-600">{btwError}</div>}
                                             </td>
-                                            <td className="px-4 py-3 text-sm text-zinc-700">{row.actief ? formatEuro(subtotal) : '�'}</td>
+                                            <td className="px-4 py-3 text-sm text-zinc-700">{row.actief ? formatEuro(subtotal) : '-'}</td>
                                         </tr>
                                     );
                                 })}
@@ -2214,7 +2240,7 @@ export default function Show({
                                         <div>
                                             <div className="text-sm font-semibold">{activity.titel}</div>
                                             <div className="mt-1 text-xs text-zinc-500">
-                                                {activity.type ? activity.type.replace('_', ' ') : 'Activiteit'} �{' '}
+                                                {activity.type ? activity.type.replace('_', ' ') : 'Activiteit'} |{' '}
                                                 {formatDateTime(activity.created_at)}
                                             </div>
                                         </div>
@@ -2224,7 +2250,7 @@ export default function Show({
                                     {(activity.due_at || activity.done_at) && (
                                         <div className="mt-3 text-xs text-zinc-500">
                                             {activity.due_at && `Gepland: ${formatDateTime(activity.due_at)}`}
-                                            {activity.done_at && ` � Afgerond: ${formatDateTime(activity.done_at)}`}
+                                            {activity.done_at && ` | Afgerond: ${formatDateTime(activity.done_at)}`}
                                         </div>
                                     )}
                                 </div>

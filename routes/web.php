@@ -15,7 +15,7 @@ Route::get('/', function () {
 Route::redirect('/dashboard-old', '/dashboard', 301);
 Route::redirect('/taken-old', '/taken', 301);
 
-Route::middleware(['auth', 'active'])->group(function () {
+Route::middleware(['auth', 'active', 'admin.2fa'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
 
     Route::get('/garagebedrijven', [GarageCompaniesController::class, 'index'])->name('crm.garage_companies.index');

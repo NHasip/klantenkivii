@@ -107,11 +107,18 @@ export default function Create({ statusOptions, sourceOptions, moduleRows, defau
     };
 
     const toggleModule = (index) => {
-        const row = data.moduleRows[index];
-        updateModuleRow(index, 'actief', !row.actief);
-        if (!row.actief && Number(row.aantal || 0) < 1) {
-            updateModuleRow(index, 'aantal', 1);
-        }
+        setData(
+            'moduleRows',
+            data.moduleRows.map((row, i) => {
+                if (i !== index) return row;
+                const actief = !row.actief;
+                return {
+                    ...row,
+                    actief,
+                    aantal: actief && Number(row.aantal || 0) < 1 ? 1 : row.aantal,
+                };
+            })
+        );
     };
 
     const submit = (event) => {

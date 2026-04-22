@@ -748,6 +748,8 @@ class GarageCompaniesController
 
     public function updatePerson(Request $request, GarageCompany $garageCompany, CustomerPerson $person): RedirectResponse
     {
+        abort_unless($person->garage_company_id === $garageCompany->id, 404);
+
         $data = $request->validate([
             'voornaam' => ['required', 'string', 'max:255'],
             'achternaam' => ['required', 'string', 'max:255'],
@@ -787,6 +789,8 @@ class GarageCompaniesController
 
     public function deletePerson(GarageCompany $garageCompany, CustomerPerson $person): RedirectResponse
     {
+        abort_unless($person->garage_company_id === $garageCompany->id, 404);
+
         $person->delete();
 
         return back()->with('status', 'Contactpersoon verwijderd.');
@@ -876,6 +880,8 @@ class GarageCompaniesController
 
     public function updateSeat(Request $request, GarageCompany $garageCompany, KiviiSeat $seat): RedirectResponse
     {
+        abort_unless($seat->garage_company_id === $garageCompany->id, 404);
+
         $data = $request->validate([
             'naam' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
@@ -899,6 +905,8 @@ class GarageCompaniesController
 
     public function deleteSeat(GarageCompany $garageCompany, KiviiSeat $seat): RedirectResponse
     {
+        abort_unless($seat->garage_company_id === $garageCompany->id, 404);
+
         $seat->delete();
 
         return back()->with('status', 'Gebruiker verwijderd.');
@@ -985,6 +993,13 @@ class GarageCompaniesController
         }
 
         if ($to === GarageCompanyStatus::Actief->value) {
+            $hasActiveMandate = $garageCompany->mandates
+                ->contains(fn (SepaMandate $mandate) => $mandate->status === SepaMandateStatus::Actief);
+
+            if (! $hasActiveMandate) {
+                return back()->with('status', 'Status actief vereist een actief SEPA mandaat.');
+            }
+
             if (! $garageCompany->actief_vanaf) {
                 $garageCompany->actief_vanaf = now();
             }
@@ -1008,7 +1023,13 @@ class GarageCompaniesController
     public function saveMandate(Request $request, GarageCompany $garageCompany): RedirectResponse
     {
         $data = $request->validate([
-            'mandate_id' => ['nullable', 'integer'],
+            'mandate_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('sepa_mandates', 'id')->where(
+                    fn ($query) => $query->where('garage_company_id', $garageCompany->id)
+                ),
+            ],
             'bedrijfsnaam' => ['required', 'string', 'max:255'],
             'voor_en_achternaam' => ['required', 'string', 'max:255'],
             'straatnaam_en_nummer' => ['required', 'string', 'max:255'],
@@ -1030,6 +1051,13 @@ class GarageCompaniesController
 
         $mandateId = $data['mandate_id'] ?? null;
         unset($data['mandate_id']);
+        $existingMandate = null;
+
+        if ($mandateId) {
+            $existingMandate = SepaMandate::query()
+                ->where('garage_company_id', $garageCompany->id)
+                ->findOrFail($mandateId);
+        }
 
         if ($data['status'] === SepaMandateStatus::Actief->value) {
             SepaMandate::query()
@@ -1043,7 +1071,7 @@ class GarageCompaniesController
             [
                 ...$data,
                 'garage_company_id' => $garageCompany->id,
-                'mandaat_id' => $mandateId ? SepaMandate::findOrFail($mandateId)->mandaat_id : $this->generateMandaatId($garageCompany->id),
+                'mandaat_id' => $existingMandate?->mandaat_id ?? $this->generateMandaatId($garageCompany->id),
             ],
         );
 
@@ -1060,6 +1088,8 @@ class GarageCompaniesController
 
     public function setMandateStatus(Request $request, GarageCompany $garageCompany, SepaMandate $mandate): RedirectResponse
     {
+        abort_unless($mandate->garage_company_id === $garageCompany->id, 404);
+
         $data = $request->validate([
             'status' => ['required', Rule::enum(SepaMandateStatus::class)],
         ]);

@@ -23,6 +23,8 @@ class SmtpSettingsController extends Controller
             'smtp.from_name' => ['nullable', 'string', 'max:255'],
         ]);
 
+        $smtp = SmtpSetting::query()->first();
+
         $payload = [
             'host' => $data['smtp']['host'] ?? null,
             'port' => $data['smtp']['port'] ?? null,
@@ -38,7 +40,10 @@ class SmtpSettingsController extends Controller
             unset($payload['updated_by']);
         }
 
-        $smtp = SmtpSetting::query()->first();
+        if (! filled($data['smtp']['password'] ?? null) && $smtp) {
+            unset($payload['password']);
+        }
+
         if ($smtp) {
             $smtp->fill($payload);
             $smtp->save();
