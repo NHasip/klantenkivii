@@ -31,7 +31,7 @@
                         <td class="px-4 py-3 text-sm text-zinc-600">{{ $u->last_login_at?->format('d-m-Y H:i') ?? '—' }}</td>
                         <td class="px-4 py-3 text-right">
                             <button type="button" class="rounded-md border border-zinc-200 px-2 py-1 text-xs hover:bg-zinc-50" wire:click="startEdit({{ $u->id }})">Bewerken</button>
-                            <button type="button" class="ml-2 rounded-md border border-rose-200 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50" wire:click="delete({{ $u->id }})" onclick="return confirm('Verwijderen?')">Verwijderen</button>
+                            <button type="button" class="ml-2 rounded-md border border-rose-200 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50" wire:click="deleteUser({{ $u->id }})" wire:confirm="Weet je zeker dat je deze gebruiker wilt verwijderen?">Verwijderen</button>
                         </td>
                     </tr>
                 @endforeach
