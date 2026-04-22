@@ -4,6 +4,7 @@ use App\Http\Controllers\Crm\DashboardController;
 use App\Http\Controllers\Crm\EmailTemplatesController;
 use App\Http\Controllers\Crm\GarageCompaniesController;
 use App\Http\Controllers\Crm\TasksController;
+use App\Http\Controllers\Crm\UsersController;
 use App\Http\Controllers\Profile\SmtpSettingsController;
 use Illuminate\Support\Facades\Route;
 
@@ -60,6 +61,9 @@ Route::middleware(['auth', 'active', 'admin.2fa'])->group(function () {
     Route::get('/gebruikers', \App\Livewire\Crm\Users\Index::class)
         ->middleware('admin')
         ->name('crm.users.index');
+    Route::delete('/gebruikers/{user}', [UsersController::class, 'destroy'])
+        ->middleware('admin')
+        ->name('crm.users.delete');
 
     Route::get('/modules', \App\Livewire\Crm\Modules\Index::class)
         ->middleware('admin')

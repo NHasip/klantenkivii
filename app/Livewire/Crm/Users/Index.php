@@ -6,7 +6,6 @@ use App\Enums\UserRole;
 use App\Models\User;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
-use Throwable;
 
 class Index extends Component
 {
@@ -88,24 +87,6 @@ class Index extends Component
         $this->userId = null;
         $this->showForm = false;
         session()->flash('status', 'Gebruiker opgeslagen.');
-    }
-
-    public function deleteUser(int $id): void
-    {
-        $user = User::findOrFail($id);
-
-        if ($user->id === auth()->id()) {
-            session()->flash('status', 'Je kunt jezelf niet verwijderen.');
-            return;
-        }
-
-        try {
-            $user->delete();
-            session()->flash('status', 'Gebruiker verwijderd.');
-        } catch (Throwable $e) {
-            report($e);
-            session()->flash('status', 'Verwijderen mislukt. Controleer of deze gebruiker nog door andere data wordt gebruikt.');
-        }
     }
 
     private function resetForm(): void

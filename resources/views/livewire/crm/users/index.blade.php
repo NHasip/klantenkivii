@@ -31,7 +31,11 @@
                         <td class="px-4 py-3 text-sm text-zinc-600">{{ $u->last_login_at?->format('d-m-Y H:i') ?? '—' }}</td>
                         <td class="px-4 py-3 text-right">
                             <button type="button" class="rounded-md border border-zinc-200 px-2 py-1 text-xs hover:bg-zinc-50" wire:click="startEdit({{ $u->id }})">Bewerken</button>
-                            <button type="button" class="ml-2 rounded-md border border-rose-200 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50" wire:click="deleteUser({{ $u->id }})" wire:confirm="Weet je zeker dat je deze gebruiker wilt verwijderen?">Verwijderen</button>
+                            <form method="POST" action="{{ route('crm.users.delete', ['user' => $u->id]) }}" class="ml-2 inline" onsubmit="return confirm('Weet je zeker dat je deze gebruiker wilt verwijderen?')">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="rounded-md border border-rose-200 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50">Verwijderen</button>
+                            </form>
                         </td>
                     </tr>
                 @endforeach
