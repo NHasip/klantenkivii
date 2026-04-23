@@ -44,6 +44,10 @@ class GarageCompany extends Model
         'created_by',
     ];
 
+    protected $hidden = [
+        'login_password',
+    ];
+
     protected function casts(): array
     {
         return [

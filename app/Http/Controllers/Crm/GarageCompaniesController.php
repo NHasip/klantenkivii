@@ -27,6 +27,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -193,8 +194,8 @@ class GarageCompaniesController
             }
         }
 
-        if (! empty($data['login_email']) xor ! empty($data['login_password'])) {
-            return back()->withErrors(['login_email' => 'Vul zowel e-mail als wachtwoord in voor login.'])->withInput();
+        if (empty($data['login_email']) && ! empty($data['login_password'])) {
+            return back()->withErrors(['login_email' => 'Vul een login e-mail in voordat je een wachtwoord zet.'])->withInput();
         }
 
         if (! empty($data['iban'])) {
@@ -232,7 +233,7 @@ class GarageCompaniesController
             }
 
             if (Schema::hasColumn('garage_companies', 'login_password')) {
-                $companyData['login_password'] = $data['login_password'] ?? null;
+                $companyData['login_password'] = null;
             }
 
             $company = GarageCompany::create($companyData);
@@ -270,11 +271,12 @@ class GarageCompaniesController
                 ]);
             }
 
-            if (! empty($data['login_email']) && ! empty($data['login_password'])) {
+            if (! empty($data['login_email'])) {
+                $password = $data['login_password'] ?: Str::random(24);
                 $user = User::create([
                     'name' => $data['voor_en_achternaam'],
                     'email' => $data['login_email'],
-                    'password' => $data['login_password'],
+                    'password' => $password,
                     'role' => \App\Enums\UserRole::Medewerker->value,
                     'phone' => $data['telefoonnummer'] ?? null,
                     'active' => true,
@@ -511,7 +513,7 @@ class GarageCompaniesController
                 'hoofd_email' => $garageCompany->hoofd_email,
                 'hoofd_telefoon' => $garageCompany->hoofd_telefoon,
                 'login_email' => $garageCompany->login_email,
-                'login_password' => $garageCompany->login_password,
+                'login_password' => '',
                 'status' => $garageCompany->status->value,
                 'bron' => $garageCompany->bron->value,
                 'tags' => $garageCompany->tags,
@@ -638,17 +640,25 @@ class GarageCompaniesController
 
         $data['login_email'] = $data['login_email'] ?: null;
         $data['login_password'] = $data['login_password'] ?: null;
+        if (empty($data['login_email']) && ! empty($data['login_password'])) {
+            return back()->withErrors(['login_email' => 'Vul een login e-mail in voordat je een wachtwoord zet.'])->withInput();
+        }
 
         $oldStatus = $garageCompany->status->value;
         $oldLoginEmail = $garageCompany->login_email;
-        $oldLoginPassword = $garageCompany->login_password;
         $oldHoofdEmail = $garageCompany->hoofd_email;
         $oldBedrijfsnaam = $garageCompany->bedrijfsnaam;
         $oldPrimaryName = $garageCompany->primaryPerson
             ? trim("{$garageCompany->primaryPerson->voornaam} {$garageCompany->primaryPerson->achternaam}")
             : null;
 
+        $loginPassword = $data['login_password'];
+        unset($data['login_password']);
+
         $garageCompany->fill($data);
+        if (Schema::hasColumn('garage_companies', 'login_password')) {
+            $garageCompany->login_password = null;
+        }
         $garageCompany->save();
 
         $primaryPayload = [
@@ -670,16 +680,45 @@ class GarageCompaniesController
             ]);
         }
 
-        if (! empty($data['login_email']) && $garageCompany->eigenaar_user_id) {
-            User::query()
-                ->whereKey($garageCompany->eigenaar_user_id)
-                ->update(['email' => $data['login_email']]);
+        if (! empty($data['login_email'])) {
+            if ($garageCompany->eigenaar_user_id) {
+                User::query()
+                    ->whereKey($garageCompany->eigenaar_user_id)
+                    ->update(['email' => $data['login_email']]);
+            } else {
+                $ownerName = trim("{$data['primary_voornaam']} {$data['primary_achternaam']}");
+                $password = $loginPassword ?: Str::random(24);
+                $user = User::create([
+                    'name' => $ownerName !== '' ? $ownerName : $garageCompany->bedrijfsnaam,
+                    'email' => $data['login_email'],
+                    'password' => $password,
+                    'role' => \App\Enums\UserRole::Medewerker->value,
+                    'phone' => $data['hoofd_telefoon'] ?? null,
+                    'active' => true,
+                ]);
+
+                $garageCompany->update(['eigenaar_user_id' => $user->id]);
+
+                if (! KiviiSeat::query()
+                    ->where('garage_company_id', $garageCompany->id)
+                    ->where('email', $data['login_email'])
+                    ->exists()) {
+                    KiviiSeat::create([
+                        'garage_company_id' => $garageCompany->id,
+                        'naam' => $user->name,
+                        'email' => $user->email,
+                        'rol_in_kivii' => 'eigenaar',
+                        'actief' => true,
+                        'aangemaakt_op' => now()->toDateString(),
+                    ]);
+                }
+            }
         }
 
-        if (! empty($data['login_password']) && $garageCompany->eigenaar_user_id) {
+        if (! empty($loginPassword) && $garageCompany->eigenaar_user_id) {
             User::query()
                 ->whereKey($garageCompany->eigenaar_user_id)
-                ->update(['password' => $data['login_password']]);
+                ->update(['password' => $loginPassword]);
         }
 
         if ($oldStatus !== $garageCompany->status->value) {
@@ -694,7 +733,6 @@ class GarageCompaniesController
 
         if (
             $oldLoginEmail !== $garageCompany->login_email
-            || $oldLoginPassword !== $garageCompany->login_password
             || $oldHoofdEmail !== $garageCompany->hoofd_email
             || $oldBedrijfsnaam !== $garageCompany->bedrijfsnaam
             || $oldPrimaryName !== trim("{$data['primary_voornaam']} {$data['primary_achternaam']}")
@@ -1237,10 +1275,18 @@ class GarageCompaniesController
         try {
             $this->applySmtpSettings($smtp);
 
+            $templateData = $this->welcomeTemplateData($garageCompany, true);
+            $subject = EmailTemplateRenderer::renderString((string) $draft->subject, $templateData);
+            $bodyHtml = EmailTemplateRenderer::renderString((string) ($draft->body_html ?? ''), $templateData);
+            $bodyText = EmailTemplateRenderer::renderString((string) ($draft->body_text ?? ''), $templateData);
+            if (trim($bodyText) === '') {
+                $bodyText = $this->htmlToText($bodyHtml);
+            }
+
             Mail::to($draft->to_email)->send(new TemplateMail(
-                $draft->subject,
-                $draft->body_html,
-                $draft->body_text,
+                $subject,
+                $bodyHtml,
+                $bodyText,
                 $smtp->from_address,
                 $smtp->from_name
             ));
@@ -1387,18 +1433,40 @@ class GarageCompaniesController
     /**
      * @return array<string, string>
      */
-    private function welcomeTemplateData(GarageCompany $garageCompany): array
+    private function welcomeTemplateData(GarageCompany $garageCompany, bool $issuePasswordResetToken = false): array
     {
         $primary = $garageCompany->primaryPerson;
         $naam = $primary ? trim("{$primary->voornaam} {$primary->achternaam}") : $garageCompany->bedrijfsnaam;
+        $ownerUser = $garageCompany->eigenaar_user_id
+            ? User::query()->find($garageCompany->eigenaar_user_id)
+            : null;
+        $passwordSetupLink = $this->passwordSetupLink($ownerUser, $issuePasswordResetToken);
 
         return [
             'naam' => $naam ?: $garageCompany->bedrijfsnaam,
             'bedrijfsnaam' => $garageCompany->bedrijfsnaam,
             'loginnaam' => $garageCompany->login_email ?: '-',
-            'wachtwoord' => $garageCompany->login_password ?: '-',
+            'wachtwoord' => 'Gebruik de activatielink om een wachtwoord te kiezen.',
+            'reset_link' => $passwordSetupLink,
+            'activatielink' => $passwordSetupLink,
             'weblink' => 'https://web.kivii.nl/',
         ];
+    }
+
+    private function passwordSetupLink(?User $user, bool $issueToken): string
+    {
+        if (! $user || ! filled($user->email)) {
+            return url('/forgot-password');
+        }
+
+        if (! $issueToken) {
+            return url('/forgot-password');
+        }
+
+        $token = Password::broker()->createToken($user);
+        $baseUrl = rtrim(config('app.url') ?: url('/'), '/');
+
+        return $baseUrl.'/reset-password/'.$token.'?email='.urlencode((string) $user->email);
     }
 
     private function applySmtpSettings(SmtpSetting $smtp): void

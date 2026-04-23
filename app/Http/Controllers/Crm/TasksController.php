@@ -9,21 +9,43 @@ use App\Models\TaskAttachment;
 use App\Models\TaskComment;
 use App\Models\TaskProject;
 use App\Models\User;
+use App\Services\Security\FileScanService;
 use App\Notifications\TaskAssigned;
 use App\Notifications\TaskCommented;
 use App\Notifications\TaskMentioned;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 class TasksController
 {
+    private const ATTACHMENT_EXTENSIONS = [
+        'pdf', 'jpg', 'jpeg', 'png', 'webp', 'txt', 'csv', 'xls', 'xlsx', 'doc', 'docx',
+    ];
+
+    private const ATTACHMENT_MIME_TYPES = [
+        'application/pdf',
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+        'text/plain',
+        'text/csv',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ];
+
     public function index(Request $request): Response
     {
         return Inertia::render('Crm/Tasks', [
@@ -92,7 +114,7 @@ class TasksController
             'labels' => ['nullable', 'string', 'max:1000'],
             'assignees' => ['array'],
             'assignees.*' => ['integer', 'exists:users,id'],
-            'attachments.*' => ['file', 'max:10240'],
+            'attachments.*' => $this->attachmentValidationRules(),
         ]);
 
         $sortOrder = $this->nextSortOrder(
@@ -119,15 +141,7 @@ class TasksController
         }
 
         foreach ($request->file('attachments', []) as $file) {
-            $path = $file->store("tasks/{$task->id}", 'public');
-            TaskAttachment::create([
-                'task_id' => $task->id,
-                'user_id' => $request->user()->id,
-                'original_name' => $file->getClientOriginalName(),
-                'path' => $path,
-                'size' => $file->getSize() ?? 0,
-                'mime' => $file->getMimeType(),
-            ]);
+            $this->storeTaskAttachment($task, $file, (int) $request->user()->id);
         }
 
         $task->load(['project:id,naam,kleur', 'assignees:id,name']);
@@ -254,21 +268,12 @@ class TasksController
     public function storeAttachment(Request $request, Task $task): JsonResponse
     {
         $data = $request->validate([
-            'file' => ['required', 'file', 'max:10240'],
+            'file' => ['required', ...$this->attachmentValidationRules()],
         ]);
 
         /** @var \Illuminate\Http\UploadedFile $file */
         $file = $data['file'];
-        $path = $file->store("tasks/{$task->id}", 'public');
-
-        $attachment = TaskAttachment::create([
-            'task_id' => $task->id,
-            'user_id' => $request->user()->id,
-            'original_name' => $file->getClientOriginalName(),
-            'path' => $path,
-            'size' => $file->getSize() ?? 0,
-            'mime' => $file->getMimeType(),
-        ]);
+        $attachment = $this->storeTaskAttachment($task, $file, (int) $request->user()->id);
 
         return response()->json([
             'attachment' => [
@@ -276,9 +281,28 @@ class TasksController
                 'original_name' => $attachment->original_name,
                 'size' => $attachment->size,
                 'mime' => $attachment->mime,
-                'url' => asset('storage/'.$attachment->path),
+                'url' => route('crm.tasks.attachments.download', ['attachment' => $attachment->id]),
             ],
         ]);
+    }
+
+    public function downloadAttachment(TaskAttachment $attachment)
+    {
+        if (! $attachment->task()->exists()) {
+            abort(404);
+        }
+
+        $fileName = $attachment->original_name ?: basename($attachment->path);
+
+        if (Storage::disk('local')->exists($attachment->path)) {
+            return Storage::disk('local')->download($attachment->path, $fileName);
+        }
+
+        if (Storage::disk('public')->exists($attachment->path)) {
+            return Storage::disk('public')->download($attachment->path, $fileName);
+        }
+
+        abort(404);
     }
 
     public function storeComment(Request $request, Task $task): JsonResponse
@@ -491,7 +515,7 @@ class TasksController
                     'original_name' => $file->original_name,
                     'size' => $file->size,
                     'mime' => $file->mime,
-                    'url' => asset('storage/'.$file->path),
+                    'url' => route('crm.tasks.attachments.download', ['attachment' => $file->id]),
                 ])
                 ->values(),
         ];
@@ -505,5 +529,45 @@ class TasksController
             ->max('sort_order');
 
         return ((int) $max) + 10;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function attachmentValidationRules(): array
+    {
+        return [
+            'file',
+            'max:10240',
+            'mimes:'.implode(',', self::ATTACHMENT_EXTENSIONS),
+            'mimetypes:'.implode(',', self::ATTACHMENT_MIME_TYPES),
+        ];
+    }
+
+    private function storeTaskAttachment(Task $task, UploadedFile $file, int $userId): TaskAttachment
+    {
+        $path = $file->store("tasks/{$task->id}", 'local');
+        $absolutePath = Storage::disk('local')->path($path);
+
+        try {
+            app(FileScanService::class)->scanOrFail($absolutePath);
+        } catch (ValidationException $e) {
+            Storage::disk('local')->delete($path);
+            throw $e;
+        } catch (Throwable $e) {
+            Storage::disk('local')->delete($path);
+            throw ValidationException::withMessages([
+                'file' => 'Upload geweigerd: virusscan kon niet worden uitgevoerd.',
+            ]);
+        }
+
+        return TaskAttachment::create([
+            'task_id' => $task->id,
+            'user_id' => $userId,
+            'original_name' => $file->getClientOriginalName(),
+            'path' => $path,
+            'size' => $file->getSize() ?? 0,
+            'mime' => $file->getMimeType(),
+        ]);
     }
 }

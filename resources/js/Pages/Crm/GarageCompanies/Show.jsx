@@ -154,7 +154,7 @@ export default function Show({
         hoofd_email: garageCompany.hoofd_email || '',
         hoofd_telefoon: garageCompany.hoofd_telefoon || '',
         login_email: garageCompany.login_email || '',
-        login_password: garageCompany.login_password || '',
+        login_password: '',
         status: garageCompany.status || statusOptions?.[0],
         bron: garageCompany.bron || sourceOptions?.[0],
         tags: garageCompany.tags || '',
@@ -856,7 +856,7 @@ export default function Show({
                                 )}
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-zinc-600">Login wachtwoord</label>
+                                <label className="block text-xs font-medium text-zinc-600">Nieuw login wachtwoord</label>
                                 <input
                                     type="password"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
@@ -866,6 +866,9 @@ export default function Show({
                                 {overviewForm.errors.login_password && (
                                     <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.login_password}</div>
                                 )}
+                                <div className="mt-1 text-[11px] text-zinc-500">
+                                    Huidig wachtwoord wordt nooit getoond. Laat leeg om ongewijzigd te laten.
+                                </div>
                             </div>
 
                             <div className="sm:col-span-2">
@@ -1097,7 +1100,7 @@ export default function Show({
                                         )}
                                         <div className="mt-4 text-xs font-semibold text-zinc-500">Beschikbare velden</div>
                                         <div className="mt-2 space-y-1 text-xs text-zinc-600">
-                                            {['{{ naam }}', '{{ bedrijfsnaam }}', '{{ loginnaam }}', '{{ wachtwoord }}', '{{ weblink }}'].map((token) => (
+                                            {['{{ naam }}', '{{ bedrijfsnaam }}', '{{ loginnaam }}', '{{ activatielink }}', '{{ reset_link }}', '{{ weblink }}'].map((token) => (
                                                 <div key={token} className="rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1 font-mono">
                                                     {token}
                                                 </div>
@@ -1211,7 +1214,7 @@ export default function Show({
                                             <EditorContent editor={welcomeEditor} className="tiptap px-3 py-2 text-sm" />
                                         </div>
                                         <div className="mt-2 text-xs text-zinc-500">
-                                            {`Gebruik variabelen zoals {{ naam }}, {{ loginnaam }}, {{ wachtwoord }}, {{ weblink }}.`}
+                                            {`Gebruik variabelen zoals {{ naam }}, {{ loginnaam }}, {{ activatielink }}, {{ reset_link }}, {{ weblink }}.`}
                                         </div>
                                     </div>
                                 </div>

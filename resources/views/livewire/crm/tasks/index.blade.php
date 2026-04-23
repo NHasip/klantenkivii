@@ -317,7 +317,7 @@
                         @foreach($selectedTask->attachments as $file)
                             <li class="flex items-center justify-between rounded-md border border-zinc-200 px-3 py-2">
                                 <span class="truncate">{{ $file->original_name }}</span>
-                                <a class="text-xs font-semibold text-indigo-700 hover:text-indigo-900" href="{{ asset('storage/'.$file->path) }}" target="_blank" rel="noopener">Open</a>
+                                <a class="text-xs font-semibold text-indigo-700 hover:text-indigo-900" href="{{ route('crm.tasks.attachments.download', ['attachment' => $file->id]) }}" target="_blank" rel="noopener">Open</a>
                             </li>
                         @endforeach
                     </ul>

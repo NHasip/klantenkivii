@@ -42,7 +42,9 @@ class EmailTemplateRenderer
             'naam' => 'Voornaam Achternaam',
             'bedrijfsnaam' => 'Voorbeeld Garagebedrijf',
             'loginnaam' => 'gebruiker@voorbeeld.nl',
-            'wachtwoord' => 'Voorbeeld123!',
+            'wachtwoord' => 'Gebruik activatielink',
+            'activatielink' => 'https://voorbeeld.nl/reset-password/TOKEN?email=gebruiker%40voorbeeld.nl',
+            'reset_link' => 'https://voorbeeld.nl/reset-password/TOKEN?email=gebruiker%40voorbeeld.nl',
             'weblink' => 'https://web.kivii.nl/',
         ];
     }

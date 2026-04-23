@@ -441,7 +441,7 @@ export default function Create({ statusOptions, sourceOptions, moduleRows, defau
                             )}
                         </div>
                         <div className="sm:col-span-2 text-xs text-zinc-500">
-                            Laat leeg als je nog geen account wilt aanmaken. Vul beide velden in om een login te creëren.
+                            Vul alleen login e-mail in om een account met activatielink-flow te maken. Wachtwoord invullen is optioneel.
                         </div>
                     </div>
                 </div>

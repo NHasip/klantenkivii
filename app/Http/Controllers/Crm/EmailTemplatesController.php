@@ -160,7 +160,7 @@ class EmailTemplatesController
             'welcome_customer' => [
                 'name' => 'Welkomstmail',
                 'subject' => 'Welkom bij Kivii',
-                'body_html' => '<p>Hallo {{ naam }},</p><p>Welkom bij Kivii.</p><p>Weblink: {{ weblink }}</p>',
+                'body_html' => '<p>Hallo {{ naam }},</p><p>Welkom bij Kivii.</p><p>Stel je wachtwoord in via: <a href="{{ activatielink }}">{{ activatielink }}</a></p><p>Weblink: {{ weblink }}</p>',
             ],
             'general' => [
                 'name' => 'Algemeen',

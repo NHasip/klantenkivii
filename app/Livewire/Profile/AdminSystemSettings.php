@@ -199,7 +199,8 @@ class AdminSystemSettings extends Component
                 '{{naam}}',
                 '{{bedrijfsnaam}}',
                 '{{loginnaam}}',
-                '{{wachtwoord}}',
+                '{{activatielink}}',
+                '{{reset_link}}',
                 '{{weblink}}',
             ],
         ]);

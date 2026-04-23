@@ -9,19 +9,40 @@ use App\Models\TaskAttachment;
 use App\Models\TaskComment;
 use App\Models\TaskProject;
 use App\Models\User;
+use App\Services\Security\FileScanService;
 use App\Notifications\TaskAssigned;
 use App\Notifications\TaskCommented;
 use App\Notifications\TaskMentioned;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use Throwable;
 
 class Index extends Component
 {
     use WithFileUploads;
+
+    private const ATTACHMENT_EXTENSIONS = [
+        'pdf', 'jpg', 'jpeg', 'png', 'webp', 'txt', 'csv', 'xls', 'xlsx', 'doc', 'docx',
+    ];
+
+    private const ATTACHMENT_MIME_TYPES = [
+        'application/pdf',
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+        'text/plain',
+        'text/csv',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ];
 
     public string $view = 'list'; // list|board|team
     public ?int $filterProject = null;
@@ -85,7 +106,7 @@ class Index extends Component
             'taskLabels' => ['nullable', 'string', 'max:1000'],
             'taskAssignees' => ['array'],
             'taskAssignees.*' => ['integer', 'exists:users,id'],
-            'taskAttachments.*' => ['file', 'max:10240'],
+            'taskAttachments.*' => $this->attachmentValidationRules(),
         ]);
 
         $task = Task::create([
@@ -106,7 +127,21 @@ class Index extends Component
         }
 
         foreach ($this->taskAttachments as $file) {
-            $path = $file->store("tasks/{$task->id}", 'public');
+            $path = $file->store("tasks/{$task->id}", 'local');
+            $absolutePath = Storage::disk('local')->path($path);
+
+            try {
+                app(FileScanService::class)->scanOrFail($absolutePath);
+            } catch (ValidationException $e) {
+                Storage::disk('local')->delete($path);
+                throw $e;
+            } catch (Throwable $e) {
+                Storage::disk('local')->delete($path);
+                throw ValidationException::withMessages([
+                    'taskAttachments' => 'Upload geweigerd: virusscan kon niet worden uitgevoerd.',
+                ]);
+            }
+
             TaskAttachment::create([
                 'task_id' => $task->id,
                 'user_id' => auth()->id(),
@@ -258,6 +293,19 @@ class Index extends Component
             ->orderBy('sort_order');
 
         return $query->get();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function attachmentValidationRules(): array
+    {
+        return [
+            'file',
+            'max:10240',
+            'mimes:'.implode(',', self::ATTACHMENT_EXTENSIONS),
+            'mimetypes:'.implode(',', self::ATTACHMENT_MIME_TYPES),
+        ];
     }
 
     public function render()
