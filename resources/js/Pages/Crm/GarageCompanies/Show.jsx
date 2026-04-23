@@ -546,7 +546,13 @@ export default function Show({
             to_email: welcomeEmail?.to_email || '',
             template_id: welcomeEmail?.template_id || null,
         });
-    }, [welcomeEmail?.id]);
+    }, [
+        welcomeEmail?.id,
+        welcomeEmail?.subject,
+        welcomeEmail?.body_html,
+        welcomeEmail?.to_email,
+        welcomeEmail?.template_id,
+    ]);
 
     useEffect(() => {
         if (welcomeEmail?.template_id) {
