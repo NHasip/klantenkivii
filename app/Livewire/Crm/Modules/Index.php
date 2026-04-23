@@ -5,6 +5,7 @@ namespace App\Livewire\Crm\Modules;
 use App\Models\Module;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
+use Throwable;
 
 class Index extends Component
 {
@@ -59,10 +60,15 @@ class Index extends Component
         session()->flash('status', 'Module opgeslagen.');
     }
 
-    public function delete(int $id): void
+    public function deleteModule(int $id): void
     {
-        Module::findOrFail($id)->delete();
-        session()->flash('status', 'Module verwijderd.');
+        try {
+            Module::findOrFail($id)->delete();
+            session()->flash('status', 'Module verwijderd.');
+        } catch (Throwable $e) {
+            report($e);
+            session()->flash('status', 'Verwijderen mislukt. Deze module wordt mogelijk nog gebruikt.');
+        }
     }
 
     private function resetForm(): void

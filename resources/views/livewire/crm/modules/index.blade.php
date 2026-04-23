@@ -27,7 +27,7 @@
                         <td class="px-4 py-3 text-sm text-zinc-600">{{ \Illuminate\Support\Str::limit($m->omschrijving ?? '', 80) ?: '—' }}</td>
                         <td class="px-4 py-3 text-right">
                             <button type="button" class="rounded-md border border-zinc-200 px-2 py-1 text-xs hover:bg-zinc-50" wire:click="startEdit({{ $m->id }})">Bewerken</button>
-                            <button type="button" class="ml-2 rounded-md border border-rose-200 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50" wire:click="delete({{ $m->id }})" onclick="return confirm('Verwijderen?')">Verwijderen</button>
+                            <button type="button" class="ml-2 rounded-md border border-rose-200 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50" wire:click="deleteModule({{ $m->id }})" wire:confirm="Weet je zeker dat je deze module wilt verwijderen?">Verwijderen</button>
                         </td>
                     </tr>
                 @empty
