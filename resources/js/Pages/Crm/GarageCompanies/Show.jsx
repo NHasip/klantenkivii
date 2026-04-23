@@ -412,7 +412,14 @@ export default function Show({
     };
 
     const setDemoStatus = (status) => {
-        router.patch(urls.set_demo_status, { status }, { preserveScroll: true });
+        router.patch(
+            urls.set_demo_status,
+            { status },
+            {
+                preserveScroll: true,
+                preserveState: false,
+            }
+        );
     };
 
     const [statusDraft, setStatusDraft] = useState(garageCompany.status || statusOptions?.[0] || 'lead');
@@ -421,18 +428,8 @@ export default function Show({
         setStatusDraft(garageCompany.status || statusOptions?.[0] || 'lead');
     }, [garageCompany.status]);
 
-    const applyDemoStatus = async () => {
+    const applyDemoStatus = () => {
         if (!statusDraft) return;
-        if (['opgezegd', 'verloren'].includes(statusDraft)) {
-            const ok = await confirm({
-                title: 'Status wijzigen',
-                message: `Weet je zeker dat je status naar "${statusDraft}" wilt zetten?`,
-                confirmText: 'Doorgaan',
-                cancelText: 'Annuleren',
-                tone: 'danger',
-            });
-            if (!ok) return;
-        }
         setDemoStatus(statusDraft);
     };
 
