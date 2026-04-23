@@ -1577,23 +1577,15 @@ export default function Show({
                                     </button>
                                     <button
                                         type="button"
-                                        className={cx(
-                                            'rounded-md border px-3 py-2 text-sm font-semibold',
-                                            hasActiveMandate
-                                                ? 'border-zinc-200 bg-white hover:bg-zinc-50'
-                                                : 'cursor-not-allowed border-zinc-200 bg-zinc-100 text-zinc-400'
-                                        )}
+                                        className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
                                         onClick={() => setDemoStatus('actief')}
-                                        disabled={!hasActiveMandate}
                                     >
                                         Actief
                                     </button>
                                 </div>
                             </div>
                         </div>
-                        {!hasActiveMandate && (
-                            <div className="mt-3 text-xs text-amber-800">Let op: geen actief SEPA mandaat gekoppeld.</div>
-                        )}
+                        {!hasActiveMandate && <div className="mt-3 text-xs text-amber-800">Let op: er is nog geen actief SEPA mandaat gekoppeld.</div>}
                     </div>
 
                     <form onSubmit={submitDemoDates} className="grid grid-cols-1 gap-4 sm:grid-cols-2">

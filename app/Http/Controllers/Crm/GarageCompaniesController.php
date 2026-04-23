@@ -1023,7 +1023,6 @@ class GarageCompaniesController
             'status' => ['required', Rule::enum(GarageCompanyStatus::class)],
         ]);
 
-        $garageCompany->load('mandates');
         $from = $garageCompany->status->value;
         $to = $data['status'];
 
@@ -1045,13 +1044,6 @@ class GarageCompaniesController
         }
 
         if ($to === GarageCompanyStatus::Actief->value) {
-            $hasActiveMandate = $garageCompany->mandates
-                ->contains(fn (SepaMandate $mandate) => $mandate->status === SepaMandateStatus::Actief);
-
-            if (! $hasActiveMandate) {
-                return back()->with('status', 'Status actief vereist een actief SEPA mandaat.');
-            }
-
             if (! $garageCompany->actief_vanaf) {
                 $garageCompany->actief_vanaf = now();
             }
