@@ -12,7 +12,7 @@
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-6 sm:items-end">
                     <div class="sm:col-span-2">
                         <label class="block text-xs font-medium text-zinc-600">Periode</label>
-                        <select class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model="preset">
+                        <select class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model.live="preset">
                             @foreach($this->presetOptions() as $key => $label)
                                 <option value="{{ $key }}">{{ $label }}</option>
                             @endforeach
@@ -22,16 +22,19 @@
                     @if($preset === 'custom')
                         <div class="sm:col-span-2">
                             <label class="block text-xs font-medium text-zinc-600">Van</label>
-                            <input type="date" class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model="from" />
+                            <input type="date" class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model.live="from" />
                         </div>
                         <div class="sm:col-span-2">
                             <label class="block text-xs font-medium text-zinc-600">Tot</label>
-                            <input type="date" class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model="to" />
+                            <input type="date" class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model.live="to" />
                         </div>
                     @else
                         <div class="sm:col-span-4 hidden sm:block">
                             <div class="rounded-md border border-dashed border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
-                                Kies "Aangepast" voor vrije datumselectie.
+                                <button type="button" class="font-semibold text-zinc-700 underline decoration-zinc-400 underline-offset-2 hover:text-zinc-900" wire:click="$set('preset', 'custom')">
+                                    Kies "Aangepast"
+                                </button>
+                                voor vrije datumselectie.
                             </div>
                         </div>
                     @endif
