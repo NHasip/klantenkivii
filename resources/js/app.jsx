@@ -1,5 +1,4 @@
 import './bootstrap';
-import Alpine from 'alpinejs';
 
 import { createInertiaApp } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
@@ -17,8 +16,6 @@ createInertiaApp({
         return module.default;
     },
     setup({ el, App, props }) {
-        window.Alpine = Alpine;
-        Alpine.start();
         createRoot(el).render(
             <ConfirmProvider>
                 <App {...props} />
