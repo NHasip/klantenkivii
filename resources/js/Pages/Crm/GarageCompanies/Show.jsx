@@ -415,6 +415,27 @@ export default function Show({
         router.patch(urls.set_demo_status, { status }, { preserveScroll: true });
     };
 
+    const [statusDraft, setStatusDraft] = useState(garageCompany.status || statusOptions?.[0] || 'lead');
+
+    useEffect(() => {
+        setStatusDraft(garageCompany.status || statusOptions?.[0] || 'lead');
+    }, [garageCompany.status]);
+
+    const applyDemoStatus = async () => {
+        if (!statusDraft) return;
+        if (['opgezegd', 'verloren'].includes(statusDraft)) {
+            const ok = await confirm({
+                title: 'Status wijzigen',
+                message: `Weet je zeker dat je status naar "${statusDraft}" wilt zetten?`,
+                confirmText: 'Doorgaan',
+                cancelText: 'Annuleren',
+                tone: 'danger',
+            });
+            if (!ok) return;
+        }
+        setDemoStatus(statusDraft);
+    };
+
     const [showMandateForm, setShowMandateForm] = useState(false);
     const [editingMandateId, setEditingMandateId] = useState(null);
 
@@ -1500,46 +1521,72 @@ export default function Show({
                     </div>
 
                     <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex flex-wrap items-start justify-between gap-4">
                             <div>
                                 <div className="text-xs font-medium text-zinc-500">Huidige status</div>
                                 <div className="mt-1 text-lg font-semibold">{garageCompany.status}</div>
                             </div>
-                            <div className="flex flex-wrap gap-2">
-                                <button
-                                    type="button"
-                                    className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
-                                    onClick={() => setDemoStatus('demo_aangevraagd')}
-                                >
-                                    Naar demo aangevraagd
-                                </button>
-                                <button
-                                    type="button"
-                                    className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
-                                    onClick={() => setDemoStatus('demo_gepland')}
-                                >
-                                    Naar demo gepland
-                                </button>
-                                <button
-                                    type="button"
-                                    className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
-                                    onClick={() => setDemoStatus('proefperiode')}
-                                >
-                                    Naar proefperiode
-                                </button>
-                                <button
-                                    type="button"
-                                    className={cx(
-                                        'rounded-md border px-3 py-2 text-sm font-semibold',
-                                        hasActiveMandate
-                                            ? 'border-zinc-200 bg-white hover:bg-zinc-50'
-                                            : 'cursor-not-allowed border-zinc-200 bg-zinc-100 text-zinc-400'
-                                    )}
-                                    onClick={() => setDemoStatus('actief')}
-                                    disabled={!hasActiveMandate}
-                                >
-                                    Actief
-                                </button>
+                            <div className="flex flex-col gap-3">
+                                <div className="flex flex-wrap items-end gap-2">
+                                    <div>
+                                        <label className="block text-xs font-medium text-zinc-600">Nieuwe status</label>
+                                        <select
+                                            className="mt-1 min-w-44 rounded-md border-zinc-300 text-sm"
+                                            value={statusDraft}
+                                            onChange={(e) => setStatusDraft(e.target.value)}
+                                        >
+                                            {statusOptions.map((status) => (
+                                                <option key={status} value={status}>
+                                                    {status}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
+                                        onClick={applyDemoStatus}
+                                    >
+                                        Status opslaan
+                                    </button>
+                                </div>
+
+                                <div className="flex flex-wrap gap-2">
+                                    <button
+                                        type="button"
+                                        className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
+                                        onClick={() => setDemoStatus('demo_aangevraagd')}
+                                    >
+                                        Naar demo aangevraagd
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
+                                        onClick={() => setDemoStatus('demo_gepland')}
+                                    >
+                                        Naar demo gepland
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
+                                        onClick={() => setDemoStatus('proefperiode')}
+                                    >
+                                        Naar proefperiode
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={cx(
+                                            'rounded-md border px-3 py-2 text-sm font-semibold',
+                                            hasActiveMandate
+                                                ? 'border-zinc-200 bg-white hover:bg-zinc-50'
+                                                : 'cursor-not-allowed border-zinc-200 bg-zinc-100 text-zinc-400'
+                                        )}
+                                        onClick={() => setDemoStatus('actief')}
+                                        disabled={!hasActiveMandate}
+                                    >
+                                        Actief
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         {!hasActiveMandate && (

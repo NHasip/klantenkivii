@@ -1027,16 +1027,17 @@ class GarageCompaniesController
         $from = $garageCompany->status->value;
         $to = $data['status'];
 
-        if (! $this->canTransition($from, $to)) {
-            return back()->with('status', 'Ongeldige status overgang.');
-        }
-
         if ($to === GarageCompanyStatus::DemoAangevraagd->value && ! $garageCompany->demo_aangevraagd_op) {
             $garageCompany->demo_aangevraagd_op = now();
         }
 
-        if ($to === GarageCompanyStatus::DemoGepland->value && ! $garageCompany->demo_gepland_op) {
-            return back()->with('status', 'Vul eerst demo_gepland_op in.');
+        if ($to === GarageCompanyStatus::DemoGepland->value) {
+            if (! $garageCompany->demo_aangevraagd_op) {
+                $garageCompany->demo_aangevraagd_op = now();
+            }
+            if (! $garageCompany->demo_gepland_op) {
+                $garageCompany->demo_gepland_op = now();
+            }
         }
 
         if ($to === GarageCompanyStatus::Proefperiode->value && ! $garageCompany->proefperiode_start) {
@@ -1054,6 +1055,14 @@ class GarageCompaniesController
             if (! $garageCompany->actief_vanaf) {
                 $garageCompany->actief_vanaf = now();
             }
+        }
+
+        if ($to === GarageCompanyStatus::Opgezegd->value && ! $garageCompany->opgezegd_op) {
+            $garageCompany->opgezegd_op = now();
+        }
+
+        if ($to === GarageCompanyStatus::Verloren->value && ! $garageCompany->verloren_op) {
+            $garageCompany->verloren_op = now();
         }
 
         $garageCompany->status = GarageCompanyStatus::from($to);
@@ -1607,41 +1616,6 @@ class GarageCompaniesController
     private function moduleRowIndexByModuleId(array $rows, int $moduleId): int
     {
         return $this->rowIndexByModuleId($rows, $moduleId);
-    }
-
-    private function canTransition(string $from, string $to): bool
-    {
-        if ($from === $to) {
-            return true;
-        }
-
-        $flow = [
-            GarageCompanyStatus::Lead->value => [
-                GarageCompanyStatus::DemoAangevraagd->value,
-                GarageCompanyStatus::Actief->value,
-                GarageCompanyStatus::Verloren->value,
-            ],
-            GarageCompanyStatus::DemoAangevraagd->value => [
-                GarageCompanyStatus::DemoGepland->value,
-                GarageCompanyStatus::Actief->value,
-                GarageCompanyStatus::Verloren->value,
-            ],
-            GarageCompanyStatus::DemoGepland->value => [
-                GarageCompanyStatus::Proefperiode->value,
-                GarageCompanyStatus::Actief->value,
-                GarageCompanyStatus::Verloren->value,
-            ],
-            GarageCompanyStatus::Proefperiode->value => [
-                GarageCompanyStatus::Actief->value,
-                GarageCompanyStatus::Opgezegd->value,
-                GarageCompanyStatus::Verloren->value,
-            ],
-            GarageCompanyStatus::Actief->value => [GarageCompanyStatus::Opgezegd->value, GarageCompanyStatus::Verloren->value],
-            GarageCompanyStatus::Opgezegd->value => [],
-            GarageCompanyStatus::Verloren->value => [],
-        ];
-
-        return in_array($to, $flow[$from] ?? [], true);
     }
 
     private function formatDateTime(?Carbon $date): ?string
