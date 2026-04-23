@@ -411,6 +411,14 @@ export default function Show({
         });
     };
 
+    const statusForm = useForm({
+        status: garageCompany.status || statusOptions?.[0] || 'lead',
+    });
+
+    useEffect(() => {
+        statusForm.setData('status', garageCompany.status || statusOptions?.[0] || 'lead');
+    }, [garageCompany.status]);
+
     const setDemoStatus = (status) => {
         router.patch(
             urls.set_demo_status,
@@ -422,15 +430,12 @@ export default function Show({
         );
     };
 
-    const [statusDraft, setStatusDraft] = useState(garageCompany.status || statusOptions?.[0] || 'lead');
-
-    useEffect(() => {
-        setStatusDraft(garageCompany.status || statusOptions?.[0] || 'lead');
-    }, [garageCompany.status]);
-
-    const applyDemoStatus = () => {
-        if (!statusDraft) return;
-        setDemoStatus(statusDraft);
+    const submitDemoStatus = (event) => {
+        event.preventDefault();
+        statusForm.patch(urls.set_demo_status, {
+            preserveScroll: true,
+            preserveState: false,
+        });
     };
 
     const [showMandateForm, setShowMandateForm] = useState(false);
@@ -1524,13 +1529,13 @@ export default function Show({
                                 <div className="mt-1 text-lg font-semibold">{garageCompany.status}</div>
                             </div>
                             <div className="flex flex-col gap-3">
-                                <div className="flex flex-wrap items-end gap-2">
+                                <form className="flex flex-wrap items-end gap-2" onSubmit={submitDemoStatus}>
                                     <div>
                                         <label className="block text-xs font-medium text-zinc-600">Nieuwe status</label>
                                         <select
                                             className="mt-1 min-w-44 rounded-md border-zinc-300 text-sm"
-                                            value={statusDraft}
-                                            onChange={(e) => setStatusDraft(e.target.value)}
+                                            value={statusForm.data.status}
+                                            onChange={(e) => statusForm.setData('status', e.target.value)}
                                         >
                                             {statusOptions.map((status) => (
                                                 <option key={status} value={status}>
@@ -1540,13 +1545,13 @@ export default function Show({
                                         </select>
                                     </div>
                                     <button
-                                        type="button"
+                                        type="submit"
                                         className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
-                                        onClick={applyDemoStatus}
+                                        disabled={statusForm.processing}
                                     >
-                                        Status opslaan
+                                        {statusForm.processing ? 'Opslaan...' : 'Status opslaan'}
                                     </button>
-                                </div>
+                                </form>
 
                                 <div className="flex flex-wrap gap-2">
                                     <button
