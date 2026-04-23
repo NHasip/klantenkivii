@@ -48,22 +48,19 @@ class GarageCompaniesController
 
         $perPage = (int) $request->query('perPage', 15);
 
-        $query = GarageCompany::query()
-            ->withCount(['customerPersons as klantpersonen_aantal'])
-            ->withCount(['seats as actieve_seats' => fn ($q) => $q->where('actief', true)])
-            ->withSum(['modules as omzet_excl' => fn ($q) => $q->where('actief', true)], 'prijs_maand_excl');
+        $baseQuery = GarageCompany::query();
 
         if ($filters['status'] !== 'alle') {
-            $query->where('status', $filters['status']);
+            $baseQuery->where('status', $filters['status']);
         }
 
         if (! empty($filters['tag'])) {
-            $query->where('tags', 'like', '%'.$filters['tag'].'%');
+            $baseQuery->where('tags', 'like', '%'.$filters['tag'].'%');
         }
 
         if (! empty($filters['search'])) {
             $search = trim($filters['search']);
-            $query->where(function ($q) use ($search) {
+            $baseQuery->where(function ($q) use ($search) {
                 $q->where('bedrijfsnaam', 'like', '%'.$search.'%')
                     ->orWhere('hoofd_email', 'like', '%'.$search.'%')
                     ->orWhere('hoofd_telefoon', 'like', '%'.$search.'%')
@@ -73,11 +70,26 @@ class GarageCompaniesController
             });
         }
 
+        $query = (clone $baseQuery)
+            ->withCount(['customerPersons as klantpersonen_aantal'])
+            ->withCount(['seats as actieve_seats' => fn ($q) => $q->where('actief', true)])
+            ->withSum(['modules as omzet_excl' => fn ($q) => $q->where('actief', true)], 'prijs_maand_excl');
+
         $query->when($filters['sort'] === 'actief_vanaf_desc', fn ($q) => $q->orderByDesc('actief_vanaf'))
             ->when($filters['sort'] === 'omzet_desc', fn ($q) => $q->orderByDesc('omzet_excl'))
             ->when($filters['sort'] === 'updated_desc', fn ($q) => $q->orderByDesc('updated_at'));
 
         $companies = $query->paginate($perPage)->withQueryString();
+
+        $totals = [
+            'bedrijven' => (int) (clone $baseQuery)->count(),
+            'omzet_excl' => (float) ((clone $baseQuery)
+                ->leftJoin('garage_company_modules as gcm', function ($join) {
+                    $join->on('gcm.garage_company_id', '=', 'garage_companies.id')
+                        ->where('gcm.actief', true);
+                })
+                ->sum('gcm.prijs_maand_excl')),
+        ];
 
         $companies->through(fn (GarageCompany $company) => [
             'id' => $company->id,
@@ -95,6 +107,7 @@ class GarageCompaniesController
 
         return Inertia::render('Crm/GarageCompanies/Index', [
             'companies' => $companies,
+            'totals' => $totals,
             'filters' => $filters,
             'statusOptions' => collect(GarageCompanyStatus::cases())->map(fn ($s) => $s->value)->values(),
             'urls' => [

@@ -52,7 +52,7 @@ function Pagination({ links }) {
     );
 }
 
-export default function Index({ companies, filters, statusOptions, sourceOptions, urls }) {
+export default function Index({ companies, totals, filters, statusOptions, sourceOptions, urls }) {
     const confirm = useConfirm();
     const { data, setData } = useForm({
         search: filters.search || '',
@@ -227,6 +227,22 @@ export default function Index({ companies, filters, statusOptions, sourceOptions
             </div>
 
             <Pagination links={companies.links} />
+
+            <div className="rounded-xl border border-zinc-200 bg-white p-4">
+                <div className="mb-3 text-sm font-semibold text-zinc-900">Totaal overzicht</div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3">
+                        <div className="text-xs font-medium text-zinc-500">Totale bedrijven</div>
+                        <div className="mt-1 text-xl font-semibold text-zinc-900">
+                            {Number(totals?.bedrijven ?? companies.total ?? 0).toLocaleString('nl-NL')}
+                        </div>
+                    </div>
+                    <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3">
+                        <div className="text-xs font-medium text-zinc-500">Totale omzet excl. btw</div>
+                        <div className="mt-1 text-xl font-semibold text-zinc-900">{formatEuro(totals?.omzet_excl ?? 0)}</div>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }
