@@ -231,16 +231,72 @@ class Create extends Component
 
     private function loadModuleRows(): void
     {
+        $fallbackByModuleId = $this->modulePricingFallbacks();
         $modules = Module::query()->orderBy('naam')->get();
 
-        $this->moduleRows = $modules->map(fn ($m) => [
-            'module_id' => (int) $m->id,
-            'naam' => $m->naam,
-            'aantal' => 1,
-            'actief' => false,
-            'prijs_maand_excl' => (string) ($m->default_prijs_maand_excl ?? '0'),
-            'btw_percentage' => (string) ($m->default_btw_percentage ?? '21'),
-        ])->all();
+        $this->moduleRows = $modules->map(function (Module $module) use ($fallbackByModuleId) {
+            $resolvedDefaults = $this->resolveModulePricingDefaults($module, $fallbackByModuleId);
+
+            return [
+                'module_id' => (int) $module->id,
+                'naam' => $module->naam,
+                'aantal' => 1,
+                'actief' => false,
+                'prijs_maand_excl' => (string) $resolvedDefaults['prijs_maand_excl'],
+                'btw_percentage' => (string) $resolvedDefaults['btw_percentage'],
+            ];
+        })->all();
+    }
+
+    /**
+     * @return array<int, array{prijs_maand_excl: float, btw_percentage: float}>
+     */
+    private function modulePricingFallbacks(): array
+    {
+        return GarageCompanyModule::query()
+            ->select(['module_id', 'prijs_maand_excl', 'btw_percentage'])
+            ->whereIn('id', function ($query) {
+                $query->from('garage_company_modules')
+                    ->selectRaw('MAX(id)')
+                    ->where('prijs_maand_excl', '>', 0)
+                    ->groupBy('module_id');
+            })
+            ->get()
+            ->mapWithKeys(fn (GarageCompanyModule $row) => [
+                (int) $row->module_id => [
+                    'prijs_maand_excl' => (float) $row->prijs_maand_excl,
+                    'btw_percentage' => (float) $row->btw_percentage,
+                ],
+            ])
+            ->all();
+    }
+
+    /**
+     * @param array<int, array{prijs_maand_excl: float, btw_percentage: float}> $fallbackByModuleId
+     * @return array{prijs_maand_excl: float, btw_percentage: float}
+     */
+    private function resolveModulePricingDefaults(Module $module, array $fallbackByModuleId): array
+    {
+        $fallback = $fallbackByModuleId[(int) $module->id] ?? null;
+
+        $price = (float) ($module->default_prijs_maand_excl ?? 0);
+        if ($price <= 0 && $fallback) {
+            $price = (float) $fallback['prijs_maand_excl'];
+        }
+
+        $vat = (float) ($module->default_btw_percentage ?? 0);
+        if ($vat <= 0 && $fallback) {
+            $vat = (float) $fallback['btw_percentage'];
+        }
+
+        if ($vat <= 0) {
+            $vat = 21.0;
+        }
+
+        return [
+            'prijs_maand_excl' => $price,
+            'btw_percentage' => $vat,
+        ];
     }
 
     private function moduleRowIndexByModuleId(int $moduleId): int

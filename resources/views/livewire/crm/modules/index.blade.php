@@ -14,8 +14,10 @@
             <thead class="bg-zinc-50">
                 <tr>
                     <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Naam</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Prijs (excl.)</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">BTW %</th>
+                    @if($supportsDefaultPricing)
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Prijs (excl.)</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">BTW %</th>
+                    @endif
                     <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Default zichtbaar</th>
                     <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Omschrijving</th>
                     <th class="px-4 py-3"></th>
@@ -25,8 +27,10 @@
                 @forelse($modules as $m)
                     <tr class="hover:bg-zinc-50">
                         <td class="px-4 py-3 text-sm font-semibold">{{ $m->naam }}</td>
-                        <td class="px-4 py-3 text-sm">EUR {{ number_format((float) $m->default_prijs_maand_excl, 2, ',', '.') }}</td>
-                        <td class="px-4 py-3 text-sm">{{ number_format((float) $m->default_btw_percentage, 2, ',', '.') }}%</td>
+                        @if($supportsDefaultPricing)
+                            <td class="px-4 py-3 text-sm">EUR {{ number_format((float) $m->default_prijs_maand_excl, 2, ',', '.') }}</td>
+                            <td class="px-4 py-3 text-sm">{{ number_format((float) $m->default_btw_percentage, 2, ',', '.') }}%</td>
+                        @endif
                         <td class="px-4 py-3 text-sm">{{ $m->default_visible ? 'Ja' : 'Nee' }}</td>
                         <td class="px-4 py-3 text-sm text-zinc-600">{{ \Illuminate\Support\Str::limit($m->omschrijving ?? '', 80) ?: '—' }}</td>
                         <td class="px-4 py-3 text-right">
@@ -36,7 +40,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="px-4 py-10 text-center text-sm text-zinc-600">Nog geen modules.</td>
+                        <td colspan="{{ $supportsDefaultPricing ? 6 : 4 }}" class="px-4 py-10 text-center text-sm text-zinc-600">Nog geen modules.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -62,16 +66,22 @@
                     <input type="checkbox" class="rounded border-zinc-300" wire:model.live="default_visible" id="default_visible">
                     <label for="default_visible" class="text-sm">Default zichtbaar</label>
                 </div>
-                <div>
-                    <label class="block text-xs font-medium text-zinc-600">Prijs (excl.) *</label>
-                    <input type="number" step="0.01" min="0" class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model.live="default_prijs_maand_excl" />
-                    @error('default_prijs_maand_excl') <div class="mt-1 text-xs text-rose-600">{{ $message }}</div> @enderror
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-zinc-600">BTW percentage *</label>
-                    <input type="number" step="0.01" min="0" max="100" class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model.live="default_btw_percentage" />
-                    @error('default_btw_percentage') <div class="mt-1 text-xs text-rose-600">{{ $message }}</div> @enderror
-                </div>
+                @if($supportsDefaultPricing)
+                    <div>
+                        <label class="block text-xs font-medium text-zinc-600">Prijs (excl.) *</label>
+                        <input type="number" step="0.01" min="0" class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model.live="default_prijs_maand_excl" />
+                        @error('default_prijs_maand_excl') <div class="mt-1 text-xs text-rose-600">{{ $message }}</div> @enderror
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-zinc-600">BTW percentage *</label>
+                        <input type="number" step="0.01" min="0" max="100" class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model.live="default_btw_percentage" />
+                        @error('default_btw_percentage') <div class="mt-1 text-xs text-rose-600">{{ $message }}</div> @enderror
+                    </div>
+                @else
+                    <div class="sm:col-span-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                        Standaard moduleprijzen zijn nog niet beschikbaar. Draai eerst de nieuwste migraties.
+                    </div>
+                @endif
                 <div class="sm:col-span-2">
                     <label class="block text-xs font-medium text-zinc-600">Omschrijving</label>
                     <textarea class="mt-1 w-full rounded-md border-zinc-300 text-sm" rows="3" wire:model.live="omschrijving"></textarea>

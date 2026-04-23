@@ -3,6 +3,7 @@
 namespace App\Livewire\Crm\Modules;
 
 use App\Models\Module;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Throwable;
@@ -18,6 +19,13 @@ class Index extends Component
     public bool $default_visible = true;
     public string $default_prijs_maand_excl = '0';
     public string $default_btw_percentage = '21';
+    public bool $supportsDefaultPricing = false;
+
+    public function mount(): void
+    {
+        $this->supportsDefaultPricing = Schema::hasColumn('modules', 'default_prijs_maand_excl')
+            && Schema::hasColumn('modules', 'default_btw_percentage');
+    }
 
     public function startCreate(): void
     {
@@ -33,8 +41,12 @@ class Index extends Component
         $this->naam = $module->naam;
         $this->omschrijving = $module->omschrijving;
         $this->default_visible = (bool) $module->default_visible;
-        $this->default_prijs_maand_excl = (string) ($module->default_prijs_maand_excl ?? '0');
-        $this->default_btw_percentage = (string) ($module->default_btw_percentage ?? '21');
+        $this->default_prijs_maand_excl = $this->supportsDefaultPricing
+            ? (string) ($module->default_prijs_maand_excl ?? '0')
+            : '0';
+        $this->default_btw_percentage = $this->supportsDefaultPricing
+            ? (string) ($module->default_btw_percentage ?? '21')
+            : '21';
         $this->showForm = true;
     }
 
@@ -47,21 +59,30 @@ class Index extends Component
 
     public function save(): void
     {
-        $data = $this->validate([
+        $rules = [
             'naam' => ['required', 'string', 'max:255', Rule::unique('modules', 'naam')->ignore($this->moduleId)],
             'omschrijving' => ['nullable', 'string'],
             'default_visible' => ['boolean'],
-            'default_prijs_maand_excl' => ['required', 'numeric', 'min:0'],
-            'default_btw_percentage' => ['required', 'numeric', 'min:0', 'max:100'],
-        ]);
+        ];
+
+        if ($this->supportsDefaultPricing) {
+            $rules['default_prijs_maand_excl'] = ['required', 'numeric', 'min:0'];
+            $rules['default_btw_percentage'] = ['required', 'numeric', 'min:0', 'max:100'];
+        }
+
+        $data = $this->validate($rules);
+
+        $payload = $data;
+        if ($this->supportsDefaultPricing) {
+            $payload['default_prijs_maand_excl'] = (float) $data['default_prijs_maand_excl'];
+            $payload['default_btw_percentage'] = (float) $data['default_btw_percentage'];
+        } else {
+            unset($payload['default_prijs_maand_excl'], $payload['default_btw_percentage']);
+        }
 
         Module::updateOrCreate(
             ['id' => $this->moduleId],
-            [
-                ...$data,
-                'default_prijs_maand_excl' => (float) $data['default_prijs_maand_excl'],
-                'default_btw_percentage' => (float) $data['default_btw_percentage'],
-            ],
+            $payload,
         );
 
         $this->resetForm();
