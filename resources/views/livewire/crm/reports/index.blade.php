@@ -1,6 +1,6 @@
 <div class="space-y-5">
     <div class="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5">
-        <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
                 <h1 class="text-2xl font-semibold tracking-tight">Rapportages</h1>
                 <div class="mt-2 inline-flex items-center rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-medium text-zinc-700">
@@ -8,9 +8,9 @@
                 </div>
             </div>
 
-            <div class="w-full xl:w-auto">
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-4 sm:items-end">
-                    <div class="sm:col-span-2 xl:w-56">
+            <div class="w-full xl:max-w-3xl">
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-6 sm:items-end">
+                    <div class="sm:col-span-2">
                         <label class="block text-xs font-medium text-zinc-600">Periode</label>
                         <select class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model="preset">
                             @foreach($this->presetOptions() as $key => $label)
@@ -20,23 +20,23 @@
                     </div>
 
                     @if($preset === 'custom')
-                        <div>
+                        <div class="sm:col-span-2">
                             <label class="block text-xs font-medium text-zinc-600">Van</label>
                             <input type="date" class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model="from" />
                         </div>
-                        <div>
+                        <div class="sm:col-span-2">
                             <label class="block text-xs font-medium text-zinc-600">Tot</label>
                             <input type="date" class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model="to" />
                         </div>
                     @else
-                        <div class="sm:col-span-2 hidden sm:block">
+                        <div class="sm:col-span-4 hidden sm:block">
                             <div class="rounded-md border border-dashed border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
                                 Kies "Aangepast" voor vrije datumselectie.
                             </div>
                         </div>
                     @endif
 
-                    <div class="sm:col-span-4 flex items-center justify-between gap-3">
+                    <div class="sm:col-span-6 flex items-center justify-between gap-3">
                         <div class="text-xs text-rose-600">
                             @error('from') {{ $message }} @enderror
                             @error('to') {{ $message }} @enderror
@@ -68,8 +68,8 @@
         $topModules = $modulesOverview->sortByDesc(fn ($row) => (float) $row->mrr_excl)->take(3);
     @endphp
 
-    <div class="grid grid-cols-1 gap-4 xl:grid-cols-4">
-        <div class="rounded-2xl border border-zinc-200 bg-white p-4 xl:col-span-2">
+    <div class="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-12">
+        <div class="flex h-full flex-col rounded-2xl border border-zinc-200 bg-white p-4 xl:col-span-6">
             <div class="flex items-start justify-between gap-3">
                 <div>
                     <div class="text-xs font-medium uppercase tracking-wide text-zinc-500">Omzet per maand</div>
@@ -97,16 +97,18 @@
             </div>
         </div>
 
-        <div class="rounded-2xl border border-zinc-200 bg-white p-4">
+        <div class="flex h-full flex-col rounded-2xl border border-zinc-200 bg-white p-4 xl:col-span-3">
             <div class="text-xs font-medium uppercase tracking-wide text-zinc-500">Klanten</div>
             <div class="mt-2 text-2xl font-semibold">{{ number_format($kpis['companies_total'], 0, ',', '.') }}</div>
             <div class="mt-1 text-sm text-zinc-600">Actief: {{ number_format($kpis['companies_active'], 0, ',', '.') }} ({{ $activeRatio }}%)</div>
-            <div class="mt-4 h-2 overflow-hidden rounded-full bg-zinc-100">
-                <div class="h-2 rounded-full bg-zinc-800" style="width: {{ min(100, max(0, $activeRatio)) }}%"></div>
+            <div class="mt-auto pt-4">
+                <div class="h-2 overflow-hidden rounded-full bg-zinc-100">
+                    <div class="h-2 rounded-full bg-zinc-800" style="width: {{ min(100, max(0, $activeRatio)) }}%"></div>
+                </div>
             </div>
         </div>
 
-        <div class="rounded-2xl border border-zinc-200 bg-white p-4">
+        <div class="flex h-full flex-col rounded-2xl border border-zinc-200 bg-white p-4 xl:col-span-3">
             <div class="text-xs font-medium uppercase tracking-wide text-zinc-500">Instroom</div>
             <div class="mt-3 space-y-2 text-sm">
                 <div class="flex items-center justify-between">
@@ -129,35 +131,35 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-        <div class="rounded-xl border border-zinc-200 bg-white px-3 py-2">
+    <div class="grid grid-cols-2 items-stretch gap-3 sm:grid-cols-3 xl:grid-cols-6">
+        <div class="h-full rounded-xl border border-zinc-200 bg-white px-3 py-2">
             <div class="text-xs text-zinc-500">Mandaten actief</div>
             <div class="text-sm font-semibold">{{ number_format($kpis['mandates_active'], 0, ',', '.') }}</div>
         </div>
-        <div class="rounded-xl border border-zinc-200 bg-white px-3 py-2">
+        <div class="h-full rounded-xl border border-zinc-200 bg-white px-3 py-2">
             <div class="text-xs text-zinc-500">Mandaten pending</div>
             <div class="text-sm font-semibold">{{ number_format($kpis['mandates_pending'], 0, ',', '.') }}</div>
         </div>
-        <div class="rounded-xl border border-zinc-200 bg-white px-3 py-2">
+        <div class="h-full rounded-xl border border-zinc-200 bg-white px-3 py-2">
             <div class="text-xs text-zinc-500">Actief zonder mandaat</div>
             <div class="text-sm font-semibold">{{ number_format($kpis['active_without_mandate'], 0, ',', '.') }}</div>
         </div>
-        <div class="rounded-xl border border-zinc-200 bg-white px-3 py-2">
+        <div class="h-full rounded-xl border border-zinc-200 bg-white px-3 py-2">
             <div class="text-xs text-zinc-500">Opzeggingen</div>
             <div class="text-sm font-semibold">{{ number_format($kpis['cancelled'], 0, ',', '.') }}</div>
         </div>
-        <div class="rounded-xl border border-zinc-200 bg-white px-3 py-2">
+        <div class="h-full rounded-xl border border-zinc-200 bg-white px-3 py-2">
             <div class="text-xs text-zinc-500">Verloren</div>
             <div class="text-sm font-semibold">{{ number_format($kpis['lost'], 0, ',', '.') }}</div>
         </div>
-        <div class="rounded-xl border border-zinc-200 bg-white px-3 py-2">
+        <div class="h-full rounded-xl border border-zinc-200 bg-white px-3 py-2">
             <div class="text-xs text-zinc-500">Beschikbare modules</div>
             <div class="text-sm font-semibold">{{ number_format($kpis['modules_total'], 0, ',', '.') }}</div>
         </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <div class="rounded-2xl border border-zinc-200 bg-white p-4">
+    <div class="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-12">
+        <div class="h-full rounded-2xl border border-zinc-200 bg-white p-4 lg:col-span-4">
             <div class="flex items-center justify-between gap-2">
                 <div class="text-sm font-semibold">Funnel overzicht</div>
                 <div class="text-xs text-zinc-500">Totaalbestand</div>
@@ -181,7 +183,7 @@
             </div>
         </div>
 
-        <div class="rounded-2xl border border-zinc-200 bg-white p-4 lg:col-span-2">
+        <div class="flex h-full flex-col rounded-2xl border border-zinc-200 bg-white p-4 lg:col-span-8">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <div class="text-sm font-semibold">Modules prestaties</div>
@@ -190,7 +192,7 @@
                         &middot; Totaal aantallen: {{ number_format($kpis['modules_total_aantal'], 0, ',', '.') }}
                     </div>
                 </div>
-                <div class="grid grid-cols-1 gap-2 sm:w-80">
+                <div class="grid grid-cols-1 gap-2 sm:w-72">
                     @forelse($topModules as $module)
                         <div class="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs">
                             <div class="flex items-center justify-between gap-2">
@@ -204,7 +206,7 @@
                 </div>
             </div>
 
-            <div class="mt-4 overflow-hidden rounded-lg border border-zinc-200">
+            <div class="mt-4 flex-1 overflow-hidden rounded-lg border border-zinc-200">
                 <table class="min-w-full divide-y divide-zinc-100">
                     <thead class="bg-zinc-50">
                         <tr>
@@ -245,8 +247,8 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <div class="rounded-2xl border border-zinc-200 bg-white p-4 lg:col-span-2">
+    <div class="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-12">
+        <div class="h-full rounded-2xl border border-zinc-200 bg-white p-4 lg:col-span-8">
             <div class="flex items-center justify-between gap-3">
                 <div class="text-sm font-semibold">Top 10 klanten op MRR</div>
                 <div class="text-xs text-zinc-500">Actieve module-omzet</div>
@@ -277,7 +279,7 @@
             </div>
         </div>
 
-        <div class="rounded-2xl border border-zinc-200 bg-white p-4">
+        <div class="h-full rounded-2xl border border-zinc-200 bg-white p-4 lg:col-span-4">
             <div class="flex items-center justify-between gap-3">
                 <div class="text-sm font-semibold">Opzeggingen per maand</div>
                 <div class="text-xs text-zinc-500">Laatste 6 maanden</div>
