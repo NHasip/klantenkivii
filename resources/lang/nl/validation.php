@@ -158,7 +158,7 @@ return [
 
         'bedrijfsnaam' => 'bedrijfsnaam',
         'land' => 'land',
-        'voor_en_achternaam' => 'voor- en achternaam',
+        'voor_en_achternaam' => 'volledige naam',
         'telefoonnummer' => 'telefoonnummer',
         'straatnaam_en_nummer' => 'straatnaam en nummer',
         'postcode' => 'postcode',

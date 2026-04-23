@@ -64,7 +64,7 @@
                     @error('bedrijfsnaam') <div class="mt-1 text-xs text-rose-600">{{ $message }}</div> @enderror
                 </div>
                 <div class="sm:col-span-2">
-                    <label class="block text-xs font-medium text-zinc-600">Voor- en achternaam *</label>
+                    <label class="block text-xs font-medium text-zinc-600">Volledige naam *</label>
                     <input class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model.live="voor_en_achternaam" />
                 </div>
                 <div class="sm:col-span-2">

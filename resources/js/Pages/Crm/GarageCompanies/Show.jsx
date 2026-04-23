@@ -1765,7 +1765,7 @@ export default function Show({
                                     )}
                                 </div>
                                 <div className="sm:col-span-2">
-                                    <label className="block text-xs font-medium text-zinc-600">Voor- en achternaam *</label>
+                                    <label className="block text-xs font-medium text-zinc-600">Volledige naam *</label>
                                     <input
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={mandateForm.data.voor_en_achternaam}

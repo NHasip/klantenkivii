@@ -183,7 +183,7 @@ export default function Create({ statusOptions, sourceOptions, moduleRows, defau
                     <div className="text-sm font-semibold">Contactpersoon</div>
                     <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="sm:col-span-2">
-                            <label className="block text-xs font-medium text-zinc-600">Voor- en achternaam *</label>
+                            <label className="block text-xs font-medium text-zinc-600">Volledige naam *</label>
                             <input
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={data.voor_en_achternaam}

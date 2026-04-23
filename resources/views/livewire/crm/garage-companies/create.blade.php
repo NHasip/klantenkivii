@@ -26,8 +26,8 @@
 
                 <div class="sm:col-span-2 border-t border-zinc-200 pt-4 text-xs font-semibold text-zinc-500">Contactpersoon</div>
                 <div class="sm:col-span-2">
-                    <label class="block text-xs font-medium text-zinc-600">Voor- en achternaam *</label>
-                    <input class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model.live="voor_en_achternaam" placeholder="bijv. Jan Jansen" />
+                    <label class="block text-xs font-medium text-zinc-600">Volledige naam *</label>
+                    <input class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model.live="voor_en_achternaam" placeholder="bijv. Jan of Jan Jansen" />
                     @error('voor_en_achternaam') <div class="mt-1 text-xs text-rose-600">{{ $message }}</div> @enderror
                 </div>
                 <div>
