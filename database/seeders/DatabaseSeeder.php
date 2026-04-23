@@ -29,11 +29,11 @@ class DatabaseSeeder extends Seeder
         );
 
         $modules = [
-            ['naam' => 'Basis', 'omschrijving' => 'Basis abonnement', 'default_visible' => true],
-            ['naam' => 'Planning', 'omschrijving' => 'Afspraken en planning', 'default_visible' => true],
-            ['naam' => 'Rapportages', 'omschrijving' => 'Rapportages en inzichten', 'default_visible' => true],
-            ['naam' => 'SEPA Incasso', 'omschrijving' => 'SEPA incasso ondersteuning', 'default_visible' => true],
-            ['naam' => 'Koppelingen', 'omschrijving' => 'Externe koppelingen / API', 'default_visible' => false],
+            ['naam' => 'Basis', 'omschrijving' => 'Basis abonnement', 'default_visible' => true, 'default_prijs_maand_excl' => 99.00, 'default_btw_percentage' => 21.00],
+            ['naam' => 'Planning', 'omschrijving' => 'Afspraken en planning', 'default_visible' => true, 'default_prijs_maand_excl' => 49.00, 'default_btw_percentage' => 21.00],
+            ['naam' => 'Rapportages', 'omschrijving' => 'Rapportages en inzichten', 'default_visible' => true, 'default_prijs_maand_excl' => 29.00, 'default_btw_percentage' => 21.00],
+            ['naam' => 'SEPA Incasso', 'omschrijving' => 'SEPA incasso ondersteuning', 'default_visible' => true, 'default_prijs_maand_excl' => 19.00, 'default_btw_percentage' => 21.00],
+            ['naam' => 'Koppelingen', 'omschrijving' => 'Externe koppelingen / API', 'default_visible' => false, 'default_prijs_maand_excl' => 39.00, 'default_btw_percentage' => 21.00],
         ];
 
         foreach ($modules as $module) {

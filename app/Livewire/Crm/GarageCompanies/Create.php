@@ -231,15 +231,15 @@ class Create extends Component
 
     private function loadModuleRows(): void
     {
-        $modules = Module::query()->orderBy('naam')->get(['id', 'naam']);
+        $modules = Module::query()->orderBy('naam')->get();
 
         $this->moduleRows = $modules->map(fn ($m) => [
             'module_id' => (int) $m->id,
             'naam' => $m->naam,
             'aantal' => 1,
             'actief' => false,
-            'prijs_maand_excl' => '0',
-            'btw_percentage' => '21',
+            'prijs_maand_excl' => (string) ($m->default_prijs_maand_excl ?? '0'),
+            'btw_percentage' => (string) ($m->default_btw_percentage ?? '21'),
         ])->all();
     }
 

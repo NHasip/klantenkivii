@@ -16,6 +16,8 @@ class Index extends Component
     public string $naam = '';
     public ?string $omschrijving = null;
     public bool $default_visible = true;
+    public string $default_prijs_maand_excl = '0';
+    public string $default_btw_percentage = '21';
 
     public function startCreate(): void
     {
@@ -31,6 +33,8 @@ class Index extends Component
         $this->naam = $module->naam;
         $this->omschrijving = $module->omschrijving;
         $this->default_visible = (bool) $module->default_visible;
+        $this->default_prijs_maand_excl = (string) ($module->default_prijs_maand_excl ?? '0');
+        $this->default_btw_percentage = (string) ($module->default_btw_percentage ?? '21');
         $this->showForm = true;
     }
 
@@ -47,11 +51,17 @@ class Index extends Component
             'naam' => ['required', 'string', 'max:255', Rule::unique('modules', 'naam')->ignore($this->moduleId)],
             'omschrijving' => ['nullable', 'string'],
             'default_visible' => ['boolean'],
+            'default_prijs_maand_excl' => ['required', 'numeric', 'min:0'],
+            'default_btw_percentage' => ['required', 'numeric', 'min:0', 'max:100'],
         ]);
 
         Module::updateOrCreate(
             ['id' => $this->moduleId],
-            $data,
+            [
+                ...$data,
+                'default_prijs_maand_excl' => (float) $data['default_prijs_maand_excl'],
+                'default_btw_percentage' => (float) $data['default_btw_percentage'],
+            ],
         );
 
         $this->resetForm();
@@ -76,6 +86,8 @@ class Index extends Component
         $this->naam = '';
         $this->omschrijving = null;
         $this->default_visible = true;
+        $this->default_prijs_maand_excl = '0';
+        $this->default_btw_percentage = '21';
     }
 
     public function render()

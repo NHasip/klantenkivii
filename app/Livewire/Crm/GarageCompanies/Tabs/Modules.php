@@ -95,18 +95,18 @@ class Modules extends Component
 
     private function ensureAssignmentsExist(): void
     {
-        $moduleIds = Module::query()->pluck('id')->all();
-        foreach ($moduleIds as $moduleId) {
+        $modules = Module::query()->get();
+        foreach ($modules as $module) {
             GarageCompanyModule::firstOrCreate(
                 [
                     'garage_company_id' => $this->garageCompanyId,
-                    'module_id' => $moduleId,
+                    'module_id' => $module->id,
                 ],
                 [
                     'aantal' => 1,
                     'actief' => false,
-                    'prijs_maand_excl' => 0,
-                    'btw_percentage' => 21.00,
+                    'prijs_maand_excl' => (float) ($module->default_prijs_maand_excl ?? 0),
+                    'btw_percentage' => (float) ($module->default_btw_percentage ?? 21),
                 ],
             );
         }
