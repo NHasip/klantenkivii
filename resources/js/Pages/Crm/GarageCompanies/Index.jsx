@@ -30,7 +30,7 @@ function cx(...parts) {
 }
 
 function Pagination({ links }) {
-    if (!links || links.length <= 1) return null;
+    if (!Array.isArray(links) || links.length <= 1) return null;
 
     return (
         <div className="mt-6 flex flex-wrap gap-2">
@@ -53,14 +53,23 @@ function Pagination({ links }) {
 }
 
 export default function Index({ companies, totals, trashCount, filters, statusOptions, sourceOptions, urls }) {
+    const safeCompanies = companies && typeof companies === 'object'
+        ? companies
+        : { data: [], links: [], total: 0, per_page: 15 };
+    const safeFilters = filters && typeof filters === 'object' ? filters : {};
+    const safeStatusOptions = Array.isArray(statusOptions) ? statusOptions : [];
+    const safeUrls = urls && typeof urls === 'object'
+        ? urls
+        : { index: '/garagebedrijven', create: '/garagebedrijven/nieuw' };
+
     const confirm = useConfirm();
     const { data, setData } = useForm({
-        view: filters.view || 'actief',
-        search: filters.search || '',
-        status: filters.status || 'alle',
-        tag: filters.tag || '',
-        sort: filters.sort || 'updated_desc',
-        perPage: filters.perPage || companies.per_page || 15,
+        view: safeFilters.view || 'actief',
+        search: safeFilters.search || '',
+        status: safeFilters.status || 'alle',
+        tag: safeFilters.tag || '',
+        sort: safeFilters.sort || 'updated_desc',
+        perPage: safeFilters.perPage || safeCompanies.per_page || 15,
     });
     const isTrashView = data.view === 'prullenbak';
 
@@ -93,12 +102,12 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
             view,
         };
         setData('view', view);
-        router.get(urls.index, nextData, { preserveState: true, replace: true });
+        router.get(safeUrls.index, nextData, { preserveState: true, replace: true });
     };
 
     const submit = (event) => {
         event.preventDefault();
-        router.get(urls.index, data, { preserveState: true, replace: true });
+        router.get(safeUrls.index, data, { preserveState: true, replace: true });
     };
 
     return (
@@ -135,9 +144,9 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                             Prullenbak ({Number(trashCount || 0)})
                         </button>
                     </div>
-                    {!isTrashView && (
+                    {!isTrashView && safeUrls.create && (
                         <Link
-                            href={urls.create}
+                            href={safeUrls.create}
                             className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
                         >
                             Nieuwe klant
@@ -165,7 +174,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                             onChange={(e) => setData('status', e.target.value)}
                         >
                             <option value="alle">Alle</option>
-                            {statusOptions.map((s) => (
+                            {safeStatusOptions.map((s) => (
                                 <option key={s} value={s}>
                                     {s}
                                 </option>
@@ -208,7 +217,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                         </select>
                     </div>
                     <div className="flex items-end justify-between gap-3">
-                        <div className="text-xs text-zinc-500">Totaal: {companies.total} bedrijven</div>
+                        <div className="text-xs text-zinc-500">Totaal: {safeCompanies.total} bedrijven</div>
                         <button
                             type="submit"
                             className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
@@ -235,14 +244,14 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
-                        {companies.data.length === 0 && (
+                        {safeCompanies.data.length === 0 && (
                             <tr>
                                 <td colSpan={7} className="px-4 py-10 text-center text-sm text-zinc-500">
                                     {isTrashView ? 'Prullenbak is leeg.' : 'Geen klanten gevonden.'}
                                 </td>
                             </tr>
                         )}
-                        {companies.data.map((company) => (
+                        {safeCompanies.data.map((company) => (
                             <tr key={company.id} className="hover:bg-zinc-50">
                                 <td className="px-4 py-3 text-sm font-semibold">
                                     <div>{company.bedrijfsnaam}</div>
@@ -297,7 +306,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                 </table>
             </div>
 
-            <Pagination links={companies.links} />
+            <Pagination links={safeCompanies.links} />
 
             <div className="rounded-xl border border-zinc-200 bg-white p-4">
                 <div className="mb-3 text-sm font-semibold text-zinc-900">Totaal overzicht</div>
@@ -305,7 +314,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                     <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3">
                         <div className="text-xs font-medium text-zinc-500">Totale bedrijven</div>
                         <div className="mt-1 text-xl font-semibold text-zinc-900">
-                            {Number(totals?.bedrijven ?? companies.total ?? 0).toLocaleString('nl-NL')}
+                            {Number(totals?.bedrijven ?? safeCompanies.total ?? 0).toLocaleString('nl-NL')}
                         </div>
                     </div>
                     <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3">

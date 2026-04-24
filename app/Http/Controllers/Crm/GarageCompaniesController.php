@@ -133,6 +133,7 @@ class GarageCompaniesController
                 : 0,
             'filters' => $filters,
             'statusOptions' => collect(GarageCompanyStatus::cases())->map(fn ($s) => $s->value)->values(),
+            'sourceOptions' => collect(GarageCompanySource::cases())->map(fn ($s) => $s->value)->values(),
             'urls' => [
                 'index' => route('crm.garage_companies.index'),
                 'create' => route('crm.garage_companies.create'),
