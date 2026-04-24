@@ -8,10 +8,17 @@ use App\Models\SmtpSetting;
 use App\Services\EmailTemplateRenderer;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Livewire\Component;
 
 class AdminSystemSettings extends Component
 {
+    private const SYSTEM_TEMPLATE_KEYS = [
+        'welcome_customer',
+        'general',
+        'announcement',
+    ];
+
     public array $smtp = [
         'host' => '',
         'port' => 587,
@@ -22,15 +29,19 @@ class AdminSystemSettings extends Component
         'from_name' => '',
     ];
 
-    public array $template = [
+    public array $templateForm = [
+        'name' => '',
         'subject' => '',
         'body_text' => '',
+        'is_active' => true,
     ];
+
+    public array $templateItems = [];
+    public ?int $editingTemplateId = null;
 
     public string $testEmail = '';
 
     private ?int $smtpId = null;
-    private ?int $templateId = null;
 
     public function mount(): void
     {
@@ -50,17 +61,7 @@ class AdminSystemSettings extends Component
             ];
         }
 
-        $template = EmailTemplate::query()
-            ->where('key', 'welcome_customer')
-            ->first();
-
-        if ($template) {
-            $this->templateId = $template->id;
-            $this->template = [
-                'subject' => $template->subject ?? '',
-                'body_text' => $template->body_text ?: strip_tags((string) $template->body_html),
-            ];
-        }
+        $this->loadTemplateItems();
 
         $this->testEmail = auth()->user()?->email ?? '';
     }
@@ -107,36 +108,69 @@ class AdminSystemSettings extends Component
 
         $this->smtpId = $smtp->id;
 
-        $this->dispatch('saved');
+        $this->dispatch('smtp-saved');
         $this->dispatch('notify', message: 'SMTP instellingen opgeslagen.');
+    }
+
+    public function newTemplate(): void
+    {
+        $this->editingTemplateId = null;
+        $this->templateForm = [
+            'name' => '',
+            'subject' => '',
+            'body_text' => '',
+            'is_active' => true,
+        ];
+    }
+
+    public function selectTemplate(int $templateId): void
+    {
+        $this->loadTemplateItems($templateId);
     }
 
     public function saveTemplate(): void
     {
         $data = $this->validate([
-            'template.subject' => ['required', 'string', 'max:255'],
-            'template.body_text' => ['nullable', 'string'],
+            'templateForm.name' => ['required', 'string', 'max:120'],
+            'templateForm.subject' => ['required', 'string', 'max:255'],
+            'templateForm.body_text' => ['nullable', 'string'],
+            'templateForm.is_active' => ['nullable', 'boolean'],
         ]);
 
-        $bodyText = (string) ($data['template']['body_text'] ?? '');
+        $bodyText = (string) ($data['templateForm']['body_text'] ?? '');
         $bodyHtml = $this->textToHtml($bodyText);
+        $hasActiveColumn = Schema::hasColumn('email_templates', 'is_active');
 
-        $template = EmailTemplate::query()->updateOrCreate(
-            ['id' => $this->templateId],
-            [
-                'key' => 'welcome_customer',
-                'name' => 'Welkomstmail nieuwe klant',
-                'subject' => $data['template']['subject'],
-                'body_html' => $bodyHtml,
-                'body_text' => $bodyText,
-                'is_active' => true,
-            ]
-        );
+        $payload = [
+            'name' => $data['templateForm']['name'],
+            'subject' => $data['templateForm']['subject'],
+            'body_html' => $bodyHtml,
+            'body_text' => $bodyText,
+        ];
 
-        $this->templateId = $template->id;
+        if ($hasActiveColumn) {
+            $payload['is_active'] = (bool) ($data['templateForm']['is_active'] ?? true);
+        }
 
-        $this->dispatch('saved');
-        $this->dispatch('notify', message: 'Template opgeslagen.');
+        $template = $this->editingTemplateId
+            ? EmailTemplate::query()->find($this->editingTemplateId)
+            : null;
+
+        if ($template) {
+            $template->update($payload);
+            $message = 'Template opgeslagen.';
+        } else {
+            $template = EmailTemplate::query()->create(array_merge(
+                $payload,
+                ['key' => $this->makeTemplateKey($data['templateForm']['name'])]
+            ));
+            $message = 'Nieuwe template aangemaakt.';
+        }
+
+        $this->loadTemplateItems($template->id);
+
+        $this->dispatch('template-saved');
+        $this->dispatch('notify', message: $message);
     }
 
     public function sendTestEmail(): void
@@ -182,6 +216,70 @@ class AdminSystemSettings extends Component
         ]);
     }
 
+    private function loadTemplateItems(?int $preferredTemplateId = null): void
+    {
+        $hasActiveColumn = Schema::hasColumn('email_templates', 'is_active');
+
+        $templates = EmailTemplate::query()
+            ->orderByRaw("CASE WHEN `key` = 'welcome_customer' THEN 0 ELSE 1 END")
+            ->orderBy('name')
+            ->get();
+
+        $this->templateItems = $templates->map(function (EmailTemplate $template) use ($hasActiveColumn): array {
+            return [
+                'id' => $template->id,
+                'key' => $template->key,
+                'name' => $template->name,
+                'subject' => $template->subject,
+                'is_active' => $hasActiveColumn ? (bool) $template->is_active : true,
+                'is_system' => in_array($template->key, self::SYSTEM_TEMPLATE_KEYS, true),
+            ];
+        })->values()->all();
+
+        if ($templates->isEmpty()) {
+            $this->newTemplate();
+
+            return;
+        }
+
+        $selected = null;
+        if ($preferredTemplateId) {
+            $selected = $templates->firstWhere('id', $preferredTemplateId);
+        }
+        if (! $selected && $this->editingTemplateId) {
+            $selected = $templates->firstWhere('id', $this->editingTemplateId);
+        }
+        if (! $selected) {
+            $selected = $templates->firstWhere('key', 'welcome_customer') ?: $templates->first();
+        }
+
+        $this->editingTemplateId = $selected->id;
+        $this->templateForm = [
+            'name' => $selected->name ?? '',
+            'subject' => $selected->subject ?? '',
+            'body_text' => $selected->body_text ?: strip_tags((string) $selected->body_html),
+            'is_active' => $hasActiveColumn ? (bool) $selected->is_active : true,
+        ];
+    }
+
+    private function makeTemplateKey(string $name): string
+    {
+        $base = Str::slug($name);
+        if ($base === '') {
+            $base = 'template';
+        }
+
+        $key = $base;
+        $suffix = 1;
+
+        while (EmailTemplate::query()->where('key', $key)->exists()) {
+            $suffix++;
+            $key = $base.'-'.$suffix;
+        }
+
+        return $key;
+    }
+
     private function textToHtml(string $text): string
     {
         $safe = e($text);
@@ -201,6 +299,7 @@ class AdminSystemSettings extends Component
                 '{{reset_link}}',
                 '{{weblink}}',
             ],
+            'advancedTemplatesUrl' => route('crm.email_templates.index'),
         ]);
     }
 }
