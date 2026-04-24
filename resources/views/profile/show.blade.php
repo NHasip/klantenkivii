@@ -29,6 +29,12 @@
                 <x-section-border />
             @endif
 
+            <div class="mt-10 sm:mt-0">
+                @include('profile.passkeys-form')
+            </div>
+
+            <x-section-border />
+
             @if (auth()->user()?->isAdmin())
                 @livewire('profile.admin-system-settings')
             @endif

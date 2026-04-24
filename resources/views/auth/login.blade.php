@@ -44,5 +44,88 @@
                 </x-button>
             </div>
         </form>
+
+        <div class="mt-6 border-t border-gray-200 pt-4">
+            <div class="text-sm font-semibold text-gray-700">{{ __('Of log in met passkey') }}</div>
+            <p class="mt-1 text-xs text-gray-500">{{ __('Gebruik hetzelfde e-mailadres en bevestig op je apparaat.') }}</p>
+
+            <div class="mt-3 flex items-center gap-3">
+                <x-secondary-button id="passkey-login-button" type="button">
+                    {{ __('Log in met passkey') }}
+                </x-secondary-button>
+                <span id="passkey-login-status" class="text-xs text-gray-600"></span>
+            </div>
+        </div>
     </x-authentication-card>
+
+    <script>
+    (() => {
+        let simpleWebAuthnPromise = null;
+        const button = document.getElementById('passkey-login-button');
+        const statusEl = document.getElementById('passkey-login-status');
+        const emailEl = document.getElementById('email');
+        if (!button || !statusEl || !emailEl) return;
+
+        const csrfToken = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+        const loadSimpleWebAuthn = async () => {
+            if (!simpleWebAuthnPromise) {
+                simpleWebAuthnPromise = import('https://cdn.jsdelivr.net/npm/@simplewebauthn/browser@13/+esm');
+            }
+            return simpleWebAuthnPromise;
+        };
+
+        const setStatus = (message, isError = false) => {
+            statusEl.textContent = message || '';
+            statusEl.classList.toggle('text-red-600', !!isError);
+            statusEl.classList.toggle('text-gray-600', !isError);
+        };
+
+        const jsonPost = async (url, body) => {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken(),
+                },
+                body: JSON.stringify(body ?? {}),
+            });
+
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                const firstError = payload?.errors ? Object.values(payload.errors).flat()?.[0] : null;
+                throw new Error(firstError || payload?.message || 'Passkey login mislukt.');
+            }
+
+            return payload;
+        };
+
+        button.addEventListener('click', async () => {
+            const email = (emailEl.value || '').trim();
+            if (!email) {
+                setStatus('Vul eerst je e-mailadres in.', true);
+                emailEl.focus();
+                return;
+            }
+
+            button.disabled = true;
+            setStatus('Passkey login starten...');
+
+            try {
+                const { startAuthentication } = await loadSimpleWebAuthn();
+                const options = await jsonPost('{{ route('auth.passkeys.options') }}', { email });
+                const credential = await startAuthentication({ optionsJSON: options });
+                const result = await jsonPost('{{ route('auth.passkeys.verify') }}', { email, credential });
+
+                setStatus('Inloggen gelukt, doorsturen...');
+                window.location.href = result.redirect || '{{ route('dashboard') }}';
+            } catch (error) {
+                setStatus(error?.message || 'Passkey login mislukt.', true);
+            } finally {
+                button.disabled = false;
+            }
+        });
+    })();
+    </script>
 </x-guest-layout>
