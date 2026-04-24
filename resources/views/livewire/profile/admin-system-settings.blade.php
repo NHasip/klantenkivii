@@ -171,11 +171,31 @@
                     <x-action-message class="me-2" on="template-saved">
                         {{ __('Opgeslagen.') }}
                     </x-action-message>
+                    <x-action-message class="me-2" on="template-deleted">
+                        {{ __('Verwijderd.') }}
+                    </x-action-message>
+
+                    <x-danger-button
+                        type="button"
+                        wire:click="deleteTemplate"
+                        wire:loading.attr="disabled"
+                        wire:target="deleteTemplate"
+                        @if(! $editingTemplateId || $editingTemplateIsSystem) disabled @endif
+                        onclick="if(!confirm('Weet je zeker dat je deze template wilt verwijderen?')) return false;"
+                    >
+                        Template verwijderen
+                    </x-danger-button>
 
                     <x-button wire:loading.attr="disabled" wire:target="saveTemplate">
                         {{ $editingTemplateId ? 'Template opslaan' : 'Template aanmaken' }}
                     </x-button>
                 </div>
+
+                @if ($editingTemplateIsSystem)
+                    <p class="text-xs text-gray-500">
+                        Dit is een standaard template en kan niet verwijderd worden.
+                    </p>
+                @endif
             </form>
         </div>
     </section>
