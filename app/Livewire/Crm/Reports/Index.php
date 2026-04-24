@@ -91,7 +91,7 @@ class Index extends Component
     {
         $today = CarbonImmutable::now('Europe/Amsterdam')->toDateString();
 
-        return GarageCompanyModule::query()
+        $query = GarageCompanyModule::query()
             ->where('actief', true)
             ->where(function ($q) use ($today) {
                 $q->whereNull('startdatum')->orWhere('startdatum', '<=', $today);
@@ -99,6 +99,12 @@ class Index extends Component
             ->where(function ($q) use ($today) {
                 $q->whereNull('einddatum')->orWhere('einddatum', '>=', $today);
             });
+
+        if (GarageCompany::hasTrashColumn()) {
+            $query->whereIn('garage_company_id', GarageCompany::query()->select('id'));
+        }
+
+        return $query;
     }
 
     public function render()
@@ -175,6 +181,10 @@ class Index extends Component
                     ->where(function ($q) use ($today) {
                         $q->whereNull('gcm.einddatum')->orWhere('gcm.einddatum', '>=', $today);
                     });
+
+                if (GarageCompany::hasTrashColumn()) {
+                    $join->whereIn('gcm.garage_company_id', GarageCompany::query()->select('id'));
+                }
             })
             ->select('modules.id', 'modules.naam')
             ->selectRaw('COUNT(gcm.id) as active_subscriptions')

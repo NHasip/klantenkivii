@@ -130,9 +130,9 @@ export default function Show({
 
     const deleteCompany = async () => {
         const ok = await confirm({
-            title: 'Klant verwijderen',
-            message: `Weet je zeker dat je "${garageCompany.bedrijfsnaam}" wilt verwijderen?`,
-            confirmText: 'Verwijder',
+            title: 'Naar prullenbak',
+            message: `Weet je zeker dat je "${garageCompany.bedrijfsnaam}" naar de prullenbak wilt verplaatsen?`,
+            confirmText: 'Verplaats',
             cancelText: 'Annuleren',
             tone: 'danger',
         });

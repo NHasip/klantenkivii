@@ -39,16 +39,28 @@ class GarageCompaniesController
 {
     public function index(Request $request): Response
     {
+        $view = (string) $request->query('view', 'actief');
+        if (! in_array($view, ['actief', 'prullenbak'], true)) {
+            $view = 'actief';
+        }
+        if ($view === 'prullenbak' && ! GarageCompany::hasTrashColumn()) {
+            $view = 'actief';
+        }
+
         $filters = [
+            'view' => $view,
             'search' => (string) $request->query('search', ''),
             'status' => (string) $request->query('status', 'alle'),
             'tag' => (string) $request->query('tag', ''),
             'sort' => (string) $request->query('sort', 'updated_desc'),
+            'perPage' => (int) $request->query('perPage', 15),
         ];
 
-        $perPage = (int) $request->query('perPage', 15);
+        $perPage = $filters['perPage'];
 
-        $baseQuery = GarageCompany::query();
+        $baseQuery = $view === 'prullenbak'
+            ? GarageCompany::query()->onlyDeleted()
+            : GarageCompany::query();
 
         if ($filters['status'] !== 'alle') {
             $baseQuery->where('status', $filters['status']);
@@ -99,15 +111,26 @@ class GarageCompaniesController
             'hoofd_telefoon' => $company->hoofd_telefoon,
             'plaats' => $company->plaats,
             'updated_at' => $company->updated_at?->toIso8601String(),
+            'deleted_at' => $company->deleted_at?->toIso8601String(),
             'actieve_seats' => (int) ($company->actieve_seats ?? 0),
             'omzet_excl' => (float) ($company->omzet_excl ?? 0),
-            'show_url' => route('crm.garage_companies.show', ['garageCompany' => $company->id]),
-            'delete_url' => route('crm.garage_companies.destroy', ['garageCompany' => $company->id]),
+            'show_url' => $view === 'prullenbak'
+                ? null
+                : route('crm.garage_companies.show', ['garageCompany' => $company->id]),
+            'delete_url' => $view === 'prullenbak'
+                ? null
+                : route('crm.garage_companies.destroy', ['garageCompany' => $company->id]),
+            'restore_url' => $view === 'prullenbak'
+                ? route('crm.garage_companies.restore', ['garageCompany' => $company->id])
+                : null,
         ]);
 
         return Inertia::render('Crm/GarageCompanies/Index', [
             'companies' => $companies,
             'totals' => $totals,
+            'trashCount' => GarageCompany::hasTrashColumn()
+                ? GarageCompany::query()->onlyDeleted()->count()
+                : 0,
             'filters' => $filters,
             'statusOptions' => collect(GarageCompanyStatus::cases())->map(fn ($s) => $s->value)->values(),
             'urls' => [
@@ -602,11 +625,32 @@ class GarageCompaniesController
     public function destroy(GarageCompany $garageCompany): RedirectResponse
     {
         $naam = $garageCompany->bedrijfsnaam;
-        $garageCompany->delete();
+        $garageCompany->moveToTrash();
 
         return redirect()
             ->route('crm.garage_companies.index')
-            ->with('status', "Klant verwijderd: {$naam}");
+            ->with('status', "Klant verplaatst naar prullenbak: {$naam}");
+    }
+
+    public function restore(int $garageCompany): RedirectResponse
+    {
+        if (! GarageCompany::hasTrashColumn()) {
+            return redirect()
+                ->route('crm.garage_companies.index')
+                ->with('status', 'Prullenbak is nog niet beschikbaar. Draai eerst migraties.');
+        }
+
+        $company = GarageCompany::query()
+            ->onlyDeleted()
+            ->whereKey($garageCompany)
+            ->firstOrFail();
+
+        $naam = $company->bedrijfsnaam;
+        $company->restoreFromTrash();
+
+        return redirect()
+            ->route('crm.garage_companies.index', ['view' => 'prullenbak'])
+            ->with('status', "Klant hersteld: {$naam}");
     }
 
 

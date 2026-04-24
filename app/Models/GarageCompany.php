@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\GarageCompanySource;
 use App\Enums\GarageCompanyStatus;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,9 +12,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class GarageCompany extends Model
 {
+    protected static ?bool $hasDeletedAtColumn = null;
+
     protected $fillable = [
         'bedrijfsnaam',
         'kvk_nummer',
@@ -62,7 +66,76 @@ class GarageCompany extends Model
             'opgezegd_op' => 'datetime',
             'verloren_op' => 'datetime',
             'login_password' => 'encrypted',
+            'deleted_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope('not_deleted', function (Builder $builder) {
+            if (! static::hasTrashColumn()) {
+                return;
+            }
+
+            $builder->whereNull($builder->getModel()->getTable().'.deleted_at');
+        });
+    }
+
+    public static function hasTrashColumn(): bool
+    {
+        if (static::$hasDeletedAtColumn !== null) {
+            return static::$hasDeletedAtColumn;
+        }
+
+        try {
+            static::$hasDeletedAtColumn = Schema::hasColumn((new static())->getTable(), 'deleted_at');
+        } catch (\Throwable) {
+            static::$hasDeletedAtColumn = false;
+        }
+
+        return static::$hasDeletedAtColumn;
+    }
+
+    public function scopeOnlyDeleted(Builder $query): Builder
+    {
+        if (! static::hasTrashColumn()) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query
+            ->withoutGlobalScope('not_deleted')
+            ->whereNotNull($this->getTable().'.deleted_at');
+    }
+
+    public function scopeWithDeleted(Builder $query): Builder
+    {
+        if (! static::hasTrashColumn()) {
+            return $query;
+        }
+
+        return $query->withoutGlobalScope('not_deleted');
+    }
+
+    public function moveToTrash(): bool
+    {
+        if (! static::hasTrashColumn()) {
+            return (bool) $this->delete();
+        }
+
+        $this->forceFill(['deleted_at' => now()]);
+
+        return $this->save();
+    }
+
+    public function restoreFromTrash(): bool
+    {
+        if (! static::hasTrashColumn()) {
+            return false;
+        }
+
+        $this->forceFill(['deleted_at' => null]);
+
+        return $this->save();
     }
 
     public function createdByUser(): BelongsTo

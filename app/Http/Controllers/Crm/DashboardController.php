@@ -49,6 +49,10 @@ class DashboardController
                 $q->whereNull('einddatum')->orWhere('einddatum', '>=', $today);
             });
 
+        if (GarageCompany::hasTrashColumn()) {
+            $activeModulesQuery->whereIn('garage_company_id', GarageCompany::query()->select('id'));
+        }
+
         $mrrExclExpr = GarageCompanyModule::hasAantalColumn()
             ? DB::raw('(prijs_maand_excl * aantal)')
             : 'prijs_maand_excl';
@@ -97,6 +101,7 @@ class DashboardController
             ->where('type', ActivityType::Afspraak)
             ->whereNull('done_at')
             ->whereNotNull('due_at')
+            ->whereHas('garageCompany')
             ->orderBy('due_at')
             ->limit(50)
             ->get(['id', 'garage_company_id', 'titel', 'due_at'])
