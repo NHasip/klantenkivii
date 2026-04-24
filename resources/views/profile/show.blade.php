@@ -64,14 +64,7 @@
 
                     @if (auth()->user()?->isAdmin())
                         <section id="admin-mail" class="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                            @php
-                                try {
-                                    echo \Livewire\Livewire::mount('profile.admin-system-settings')->html();
-                                } catch (\Throwable $e) {
-                                    report($e);
-                                    echo '<div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">E-mailbeheer kon niet geladen worden. Controleer migraties en cache op de server.</div>';
-                                }
-                            @endphp
+                            @livewire('profile.admin-system-settings')
                         </section>
                     @endif
 
