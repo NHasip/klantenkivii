@@ -10,8 +10,8 @@
       "_axios-lzVaaQ-7.js"
     ]
   },
-  "_dist-D_R5HZU-.js": {
-    "file": "assets/dist-D_R5HZU-.js",
+  "_dist-DawkDeQ7.js": {
+    "file": "assets/dist-DawkDeQ7.js",
     "name": "dist",
     "imports": [
       "_axios-lzVaaQ-7.js",
@@ -19,7 +19,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-DXBiZgyx.css",
+    "file": "assets/app-C06jTu_g.css",
     "name": "app",
     "names": [
       "app.css"
@@ -28,7 +28,7 @@
     "isEntry": true
   },
   "resources/js/Pages/Crm/Dashboard.jsx": {
-    "file": "assets/Dashboard-fEVDrxwo.js",
+    "file": "assets/Dashboard-BlYPI8wi.js",
     "name": "Dashboard",
     "src": "resources/js/Pages/Crm/Dashboard.jsx",
     "isDynamicEntry": true,
@@ -38,18 +38,18 @@
     ]
   },
   "resources/js/Pages/Crm/EmailTemplates/Index.jsx": {
-    "file": "assets/Index--iYpLriE.js",
+    "file": "assets/Index-BpZ0Oclh.js",
     "name": "Index",
     "src": "resources/js/Pages/Crm/EmailTemplates/Index.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_axios-lzVaaQ-7.js",
       "resources/js/app.jsx",
-      "_dist-D_R5HZU-.js"
+      "_dist-DawkDeQ7.js"
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/Create.jsx": {
-    "file": "assets/Create-DPYz6SUk.js",
+    "file": "assets/Create-BipkOvDD.js",
     "name": "Create",
     "src": "resources/js/Pages/Crm/GarageCompanies/Create.jsx",
     "isDynamicEntry": true,
@@ -59,7 +59,7 @@
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/Index.jsx": {
-    "file": "assets/Index-C72at_cD.js",
+    "file": "assets/Index-BYPzK_Po.js",
     "name": "Index",
     "src": "resources/js/Pages/Crm/GarageCompanies/Index.jsx",
     "isDynamicEntry": true,
@@ -69,18 +69,18 @@
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/Show.jsx": {
-    "file": "assets/Show-Cbz7BF3n.js",
+    "file": "assets/Show-DHIxnudw.js",
     "name": "Show",
     "src": "resources/js/Pages/Crm/GarageCompanies/Show.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_axios-lzVaaQ-7.js",
       "resources/js/app.jsx",
-      "_dist-D_R5HZU-.js"
+      "_dist-DawkDeQ7.js"
     ]
   },
   "resources/js/Pages/Crm/Tasks.jsx": {
-    "file": "assets/Tasks-DeLFHURl.js",
+    "file": "assets/Tasks-BCHtbmX0.js",
     "name": "Tasks",
     "src": "resources/js/Pages/Crm/Tasks.jsx",
     "isDynamicEntry": true,
@@ -99,7 +99,7 @@
     ]
   },
   "resources/js/app.jsx": {
-    "file": "assets/app-vgs73_VL.js",
+    "file": "assets/app--dMupSsP.js",
     "name": "app",
     "src": "resources/js/app.jsx",
     "isEntry": true,

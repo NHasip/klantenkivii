@@ -32,6 +32,8 @@ Route::middleware(['auth', 'active', 'admin.2fa'])->group(function () {
     Route::get('/garagebedrijven/{garageCompany}', [GarageCompaniesController::class, 'show'])->name('crm.garage_companies.show');
     Route::delete('/garagebedrijven/{garageCompany}', [GarageCompaniesController::class, 'destroy'])->name('crm.garage_companies.destroy');
     Route::post('/garagebedrijven/{garageCompany}/restore', [GarageCompaniesController::class, 'restore'])->name('crm.garage_companies.restore');
+    Route::delete('/garagebedrijven/{garageCompany}/force', [GarageCompaniesController::class, 'forceDelete'])->name('crm.garage_companies.force_delete');
+    Route::delete('/garagebedrijven/prullenbak/leegmaken', [GarageCompaniesController::class, 'purgeTrash'])->name('crm.garage_companies.purge_trash');
     Route::patch('/garagebedrijven/{garageCompany}', [GarageCompaniesController::class, 'updateOverview'])->name('crm.garage_companies.update');
     Route::post('/garagebedrijven/{garageCompany}/contactpersonen', [GarageCompaniesController::class, 'storePerson'])->name('crm.garage_companies.persons.store');
     Route::patch('/garagebedrijven/{garageCompany}/contactpersonen/{person}', [GarageCompaniesController::class, 'updatePerson'])->name('crm.garage_companies.persons.update');

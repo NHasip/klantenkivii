@@ -60,7 +60,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
     const safeStatusOptions = Array.isArray(statusOptions) ? statusOptions : [];
     const safeUrls = urls && typeof urls === 'object'
         ? urls
-        : { index: '/garagebedrijven', create: '/garagebedrijven/nieuw' };
+        : { index: '/garagebedrijven', create: '/garagebedrijven/nieuw', purge_trash: null };
 
     const confirm = useConfirm();
     const { data, setData } = useForm({
@@ -94,6 +94,30 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
         });
         if (!ok) return;
         router.post(company.restore_url, {}, { preserveScroll: true });
+    };
+
+    const forceDeleteCompany = async (company) => {
+        const ok = await confirm({
+            title: 'Definitief verwijderen',
+            message: `Weet je zeker dat je "${company.bedrijfsnaam}" definitief wilt verwijderen? Dit kan niet ongedaan worden gemaakt.`,
+            confirmText: 'Definitief verwijderen',
+            cancelText: 'Annuleren',
+            tone: 'danger',
+        });
+        if (!ok) return;
+        router.delete(company.force_delete_url, { preserveScroll: true });
+    };
+
+    const purgeTrash = async () => {
+        const ok = await confirm({
+            title: 'Prullenbak leegmaken',
+            message: 'Weet je zeker dat je alle klanten in de prullenbak definitief wilt verwijderen? Dit kan niet ongedaan worden gemaakt.',
+            confirmText: 'Alles verwijderen',
+            cancelText: 'Annuleren',
+            tone: 'danger',
+        });
+        if (!ok) return;
+        router.delete(safeUrls.purge_trash, { preserveScroll: true });
     };
 
     const switchView = (view) => {
@@ -151,6 +175,15 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                         >
                             Nieuwe klant
                         </Link>
+                    )}
+                    {isTrashView && safeUrls.purge_trash && Number(trashCount || 0) > 0 && (
+                        <button
+                            type="button"
+                            onClick={purgeTrash}
+                            className="rounded-md border border-rose-300 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100"
+                        >
+                            Prullenbak leegmaken
+                        </button>
                     )}
                 </div>
             </div>
@@ -282,13 +315,24 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                                             </Link>
                                         )}
                                         {isTrashView ? (
-                                            <button
-                                                type="button"
-                                                onClick={() => restoreCompany(company)}
-                                                className="rounded-md border border-emerald-200 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50"
-                                            >
-                                                Herstel
-                                            </button>
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => restoreCompany(company)}
+                                                    className="rounded-md border border-emerald-200 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50"
+                                                >
+                                                    Herstel
+                                                </button>
+                                                {company.force_delete_url && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => forceDeleteCompany(company)}
+                                                        className="rounded-md border border-rose-200 px-2 py-1 text-xs text-rose-600 hover:bg-rose-50"
+                                                    >
+                                                        Definitief verwijderen
+                                                    </button>
+                                                )}
+                                            </>
                                         ) : (
                                             <button
                                                 type="button"

@@ -123,6 +123,9 @@ class GarageCompaniesController
             'restore_url' => $view === 'prullenbak'
                 ? route('crm.garage_companies.restore', ['garageCompany' => $company->id])
                 : null,
+            'force_delete_url' => $view === 'prullenbak'
+                ? route('crm.garage_companies.force_delete', ['garageCompany' => $company->id])
+                : null,
         ]);
 
         return Inertia::render('Crm/GarageCompanies/Index', [
@@ -137,6 +140,7 @@ class GarageCompaniesController
             'urls' => [
                 'index' => route('crm.garage_companies.index'),
                 'create' => route('crm.garage_companies.create'),
+                'purge_trash' => route('crm.garage_companies.purge_trash'),
             ],
         ]);
     }
@@ -652,6 +656,55 @@ class GarageCompaniesController
         return redirect()
             ->route('crm.garage_companies.index', ['view' => 'prullenbak'])
             ->with('status', "Klant hersteld: {$naam}");
+    }
+
+    public function forceDelete(int $garageCompany): RedirectResponse
+    {
+        if (! GarageCompany::hasTrashColumn()) {
+            return redirect()
+                ->route('crm.garage_companies.index')
+                ->with('status', 'Prullenbak is nog niet beschikbaar. Draai eerst migraties.');
+        }
+
+        $company = GarageCompany::query()
+            ->onlyDeleted()
+            ->whereKey($garageCompany)
+            ->firstOrFail();
+
+        $naam = $company->bedrijfsnaam;
+        $company->delete();
+
+        return redirect()
+            ->route('crm.garage_companies.index', ['view' => 'prullenbak'])
+            ->with('status', "Klant definitief verwijderd: {$naam}");
+    }
+
+    public function purgeTrash(): RedirectResponse
+    {
+        if (! GarageCompany::hasTrashColumn()) {
+            return redirect()
+                ->route('crm.garage_companies.index')
+                ->with('status', 'Prullenbak is nog niet beschikbaar. Draai eerst migraties.');
+        }
+
+        $ids = GarageCompany::query()
+            ->onlyDeleted()
+            ->pluck('id');
+
+        if ($ids->isEmpty()) {
+            return redirect()
+                ->route('crm.garage_companies.index', ['view' => 'prullenbak'])
+                ->with('status', 'Prullenbak is al leeg.');
+        }
+
+        $removed = GarageCompany::query()
+            ->withoutGlobalScope('not_deleted')
+            ->whereIn('id', $ids)
+            ->delete();
+
+        return redirect()
+            ->route('crm.garage_companies.index', ['view' => 'prullenbak'])
+            ->with('status', "{$removed} klant(en) definitief verwijderd uit prullenbak.");
     }
 
 
