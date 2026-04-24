@@ -24,7 +24,6 @@ class AdminSystemSettings extends Component
 
     public array $template = [
         'subject' => '',
-        'body_html' => '',
         'body_text' => '',
     ];
 
@@ -59,8 +58,7 @@ class AdminSystemSettings extends Component
             $this->templateId = $template->id;
             $this->template = [
                 'subject' => $template->subject ?? '',
-                'body_html' => $template->body_html ?? '',
-                'body_text' => $template->body_text ?? '',
+                'body_text' => $template->body_text ?: strip_tags((string) $template->body_html),
             ];
         }
 
@@ -117,9 +115,11 @@ class AdminSystemSettings extends Component
     {
         $data = $this->validate([
             'template.subject' => ['required', 'string', 'max:255'],
-            'template.body_html' => ['nullable', 'string'],
             'template.body_text' => ['nullable', 'string'],
         ]);
+
+        $bodyText = (string) ($data['template']['body_text'] ?? '');
+        $bodyHtml = $this->textToHtml($bodyText);
 
         $template = EmailTemplate::query()->updateOrCreate(
             ['id' => $this->templateId],
@@ -127,8 +127,8 @@ class AdminSystemSettings extends Component
                 'key' => 'welcome_customer',
                 'name' => 'Welkomstmail nieuwe klant',
                 'subject' => $data['template']['subject'],
-                'body_html' => $data['template']['body_html'] ?? '',
-                'body_text' => $data['template']['body_text'] ?? '',
+                'body_html' => $bodyHtml,
+                'body_text' => $bodyText,
                 'is_active' => true,
             ]
         );
@@ -168,16 +168,6 @@ class AdminSystemSettings extends Component
         $this->dispatch('notify', message: 'Testmail verstuurd.');
     }
 
-    public function getPreviewHtmlProperty(): string
-    {
-        return EmailTemplateRenderer::renderString($this->template['body_html'] ?? '', EmailTemplateRenderer::sampleData());
-    }
-
-    public function getPreviewTextProperty(): string
-    {
-        return EmailTemplateRenderer::renderString($this->template['body_text'] ?? '', EmailTemplateRenderer::sampleData());
-    }
-
     private function applySmtpConfig(): void
     {
         config([
@@ -190,6 +180,14 @@ class AdminSystemSettings extends Component
             'mail.from.address' => $this->smtp['from_address'] ?? null,
             'mail.from.name' => $this->smtp['from_name'] ?? config('app.name'),
         ]);
+    }
+
+    private function textToHtml(string $text): string
+    {
+        $safe = e($text);
+        $safe = str_replace(["\r\n", "\r"], "\n", $safe);
+
+        return nl2br($safe);
     }
 
     public function render()
