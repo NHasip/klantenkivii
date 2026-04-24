@@ -39,7 +39,7 @@ class Create extends Component
     public string $datum_van_tekenen = '';
 
     // CRM
-    public string $status = 'lead';
+    public string $status = 'demo_aangevraagd';
     public string $bron = 'website_formulier';
     public ?string $tags = null;
 
@@ -81,7 +81,7 @@ class Create extends Component
             'plaats_van_tekenen' => ['required', 'string', 'max:255'],
             'datum_van_tekenen' => ['required', 'date'],
 
-            'status' => ['required', Rule::enum(GarageCompanyStatus::class)],
+            'status' => ['required', Rule::in(GarageCompanyStatus::selectableValues())],
             'bron' => ['required', Rule::enum(GarageCompanySource::class)],
             'tags' => ['nullable', 'string'],
         ]);
@@ -327,7 +327,7 @@ class Create extends Component
         }
 
         return view('livewire.crm.garage-companies.create', [
-            'statuses' => GarageCompanyStatus::cases(),
+            'statuses' => GarageCompanyStatus::selectable(),
             'sources' => GarageCompanySource::cases(),
             'actieveModules' => $actieveModules,
             'totaalModules' => count($this->moduleRows),

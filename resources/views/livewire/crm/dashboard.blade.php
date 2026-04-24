@@ -21,8 +21,8 @@
                 <label class="block text-xs font-medium text-zinc-600">Status</label>
                 <select class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model.live="status">
                     <option value="alle">Alle</option>
-                    @foreach(\App\Enums\GarageCompanyStatus::cases() as $case)
-                        <option value="{{ $case->value }}">{{ $case->value }}</option>
+                    @foreach(\App\Enums\GarageCompanyStatus::selectable() as $case)
+                        <option value="{{ $case->value }}">{{ $case->label() }}</option>
                     @endforeach
                 </select>
             </div>
@@ -89,9 +89,9 @@
                 <a href="{{ route('crm.garage_companies.index') }}" class="text-sm font-semibold text-indigo-700 hover:text-indigo-900">Open lijst</a>
             </div>
             <div class="space-y-2">
-                @foreach(\App\Enums\GarageCompanyStatus::cases() as $case)
+                @foreach(\App\Enums\GarageCompanyStatus::selectable() as $case)
                     <a class="flex items-center justify-between rounded-md px-2 py-1 hover:bg-zinc-50" href="{{ route('crm.garage_companies.index', ['status' => $case->value]) }}">
-                        <span class="text-sm">{{ $case->value }}</span>
+                        <span class="text-sm">{{ $case->label() }}</span>
                         <span class="text-sm font-semibold">{{ $pipeline[$case->value] ?? 0 }}</span>
                     </a>
                 @endforeach

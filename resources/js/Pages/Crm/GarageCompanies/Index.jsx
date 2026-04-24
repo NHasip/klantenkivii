@@ -52,12 +52,13 @@ function Pagination({ links }) {
     );
 }
 
-export default function Index({ companies, totals, trashCount, filters, statusOptions, sourceOptions, urls }) {
+export default function Index({ companies, totals, trashCount, filters, statusOptions, statusLabels, sourceOptions, urls }) {
     const safeCompanies = companies && typeof companies === 'object'
         ? companies
         : { data: [], links: [], total: 0, per_page: 15 };
     const safeFilters = filters && typeof filters === 'object' ? filters : {};
     const safeStatusOptions = Array.isArray(statusOptions) ? statusOptions : [];
+    const safeStatusLabels = statusLabels && typeof statusLabels === 'object' ? statusLabels : {};
     const safeUrls = urls && typeof urls === 'object'
         ? urls
         : { index: '/garagebedrijven', create: '/garagebedrijven/nieuw', purge_trash: null };
@@ -209,7 +210,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                             <option value="alle">Alle</option>
                             {safeStatusOptions.map((s) => (
                                 <option key={s} value={s}>
-                                    {s}
+                                    {safeStatusLabels[s] || s}
                                 </option>
                             ))}
                         </select>
@@ -292,7 +293,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                                 </td>
                                 <td className="px-4 py-3 text-sm">
                                     <span className="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
-                                        {company.status}
+                                        {safeStatusLabels[company.status] || company.status}
                                     </span>
                                 </td>
                                 <td className="px-4 py-3 text-sm">

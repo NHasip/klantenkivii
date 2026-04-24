@@ -108,6 +108,7 @@ export default function Show({
     garageCompany,
     tab,
     statusOptions,
+    statusLabels,
     sourceOptions,
     moduleRows,
     moduleTotals,
@@ -127,6 +128,14 @@ export default function Show({
 }) {
     const activeTab = tab || 'overzicht';
     const confirm = useConfirm();
+    const safeStatusLabels = statusLabels && typeof statusLabels === 'object' ? statusLabels : {};
+    const normalizeStatus = (value) => {
+        if (value === 'lead') return 'demo_aangevraagd';
+        if (value === 'demo_gepland') return 'proefperiode';
+        return value;
+    };
+    const statusLabel = (value) => safeStatusLabels[value] || value;
+    const normalizedCompanyStatus = normalizeStatus(garageCompany.status || statusOptions?.[0] || 'demo_aangevraagd');
 
     const deleteCompany = async () => {
         const ok = await confirm({
@@ -155,7 +164,7 @@ export default function Show({
         hoofd_telefoon: garageCompany.hoofd_telefoon || '',
         login_email: garageCompany.login_email || '',
         login_password: '',
-        status: garageCompany.status || statusOptions?.[0],
+        status: normalizedCompanyStatus,
         bron: garageCompany.bron || sourceOptions?.[0],
         tags: garageCompany.tags || '',
         demo_aangevraagd_op: garageCompany.demo_aangevraagd_op || '',
@@ -412,11 +421,11 @@ export default function Show({
     };
 
     const statusForm = useForm({
-        status: garageCompany.status || statusOptions?.[0] || 'lead',
+        status: normalizedCompanyStatus,
     });
 
     useEffect(() => {
-        statusForm.setData('status', garageCompany.status || statusOptions?.[0] || 'lead');
+        statusForm.setData('status', normalizedCompanyStatus);
     }, [garageCompany.status]);
 
     const setDemoStatus = (status) => {
@@ -828,7 +837,7 @@ export default function Show({
                                 >
                                     {statusOptions.map((status) => (
                                         <option key={status} value={status}>
-                                            {status}
+                                            {statusLabel(status)}
                                         </option>
                                     ))}
                                 </select>
@@ -965,7 +974,7 @@ export default function Show({
                             </div>
 
                             <div>
-                                <label className="block text-xs font-medium text-zinc-600">Proefperiode start</label>
+                                <label className="block text-xs font-medium text-zinc-600">Demo start</label>
                                 <input
                                     type="datetime-local"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
@@ -1526,7 +1535,7 @@ export default function Show({
                         <div className="flex flex-wrap items-start justify-between gap-4">
                             <div>
                                 <div className="text-xs font-medium text-zinc-500">Huidige status</div>
-                                <div className="mt-1 text-lg font-semibold">{garageCompany.status}</div>
+                                <div className="mt-1 text-lg font-semibold">{statusLabel(normalizedCompanyStatus)}</div>
                             </div>
                             <div className="flex flex-col gap-3">
                                 <form className="flex flex-wrap items-end gap-2" onSubmit={submitDemoStatus}>
@@ -1539,7 +1548,7 @@ export default function Show({
                                         >
                                             {statusOptions.map((status) => (
                                                 <option key={status} value={status}>
-                                                    {status}
+                                                    {statusLabel(status)}
                                                 </option>
                                             ))}
                                         </select>
@@ -1564,16 +1573,9 @@ export default function Show({
                                     <button
                                         type="button"
                                         className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
-                                        onClick={() => setDemoStatus('demo_gepland')}
-                                    >
-                                        Naar demo gepland
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
                                         onClick={() => setDemoStatus('proefperiode')}
                                     >
-                                        Naar proefperiode
+                                        Naar demo
                                     </button>
                                     <button
                                         type="button"
@@ -1628,7 +1630,7 @@ export default function Show({
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">Proefperiode start</label>
+                            <label className="block text-xs font-medium text-zinc-600">Demo start</label>
                             <input
                                 type="datetime-local"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"

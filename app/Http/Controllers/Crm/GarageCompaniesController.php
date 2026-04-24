@@ -106,7 +106,7 @@ class GarageCompaniesController
         $companies->through(fn (GarageCompany $company) => [
             'id' => $company->id,
             'bedrijfsnaam' => $company->bedrijfsnaam,
-            'status' => $company->status?->value,
+            'status' => GarageCompanyStatus::normalize($company->status?->value ?? ''),
             'hoofd_email' => $company->hoofd_email,
             'hoofd_telefoon' => $company->hoofd_telefoon,
             'plaats' => $company->plaats,
@@ -135,7 +135,8 @@ class GarageCompaniesController
                 ? GarageCompany::query()->onlyDeleted()->count()
                 : 0,
             'filters' => $filters,
-            'statusOptions' => collect(GarageCompanyStatus::cases())->map(fn ($s) => $s->value)->values(),
+            'statusOptions' => collect(GarageCompanyStatus::selectableValues())->values(),
+            'statusLabels' => GarageCompanyStatus::labelMap(),
             'sourceOptions' => collect(GarageCompanySource::cases())->map(fn ($s) => $s->value)->values(),
             'urls' => [
                 'index' => route('crm.garage_companies.index'),
@@ -150,7 +151,8 @@ class GarageCompaniesController
         $moduleRows = $this->defaultModuleRows();
 
         return Inertia::render('Crm/GarageCompanies/Create', [
-            'statusOptions' => collect(GarageCompanyStatus::cases())->map(fn ($s) => $s->value)->values(),
+            'statusOptions' => collect(GarageCompanyStatus::selectableValues())->values(),
+            'statusLabels' => GarageCompanyStatus::labelMap(),
             'sourceOptions' => collect(GarageCompanySource::cases())->map(fn ($s) => $s->value)->values(),
             'moduleRows' => $moduleRows,
             'defaults' => [
@@ -185,7 +187,7 @@ class GarageCompaniesController
             'plaats_van_tekenen' => ['nullable', 'string', 'max:255'],
             'datum_van_tekenen' => ['nullable', 'date'],
 
-            'status' => ['required', Rule::enum(GarageCompanyStatus::class)],
+            'status' => ['required', Rule::in(GarageCompanyStatus::selectableValues())],
             'bron' => ['required', Rule::enum(GarageCompanySource::class)],
             'tags' => ['nullable', 'string'],
             'proefperiode_start' => ['nullable', 'date'],
@@ -551,7 +553,7 @@ class GarageCompaniesController
                 'hoofd_telefoon' => $garageCompany->hoofd_telefoon,
                 'login_email' => $garageCompany->login_email,
                 'login_password' => '',
-                'status' => $garageCompany->status->value,
+                'status' => GarageCompanyStatus::normalize($garageCompany->status->value),
                 'bron' => $garageCompany->bron->value,
                 'tags' => $garageCompany->tags,
                 'demo_aangevraagd_op' => $this->formatDateTime($garageCompany->demo_aangevraagd_op),
@@ -587,7 +589,8 @@ class GarageCompaniesController
             'emailTemplates' => $emailTemplates,
             'smtpConfigured' => $smtpConfigured,
             'tab' => $tab,
-            'statusOptions' => collect(GarageCompanyStatus::cases())->map(fn ($s) => $s->value)->values(),
+            'statusOptions' => collect(GarageCompanyStatus::selectableValues())->values(),
+            'statusLabels' => GarageCompanyStatus::labelMap(),
             'sourceOptions' => collect(GarageCompanySource::cases())->map(fn ($s) => $s->value)->values(),
             'moduleRows' => $moduleRows,
             'moduleTotals' => $moduleTotals,
@@ -725,7 +728,7 @@ class GarageCompaniesController
             'website' => ['nullable', 'string', 'max:255'],
             'hoofd_email' => ['required', 'email', 'max:255'],
             'hoofd_telefoon' => ['required', 'string', 'max:50'],
-            'status' => ['required', Rule::enum(GarageCompanyStatus::class)],
+            'status' => ['required', Rule::in(GarageCompanyStatus::selectableValues())],
             'bron' => ['required', Rule::enum(GarageCompanySource::class)],
             'tags' => ['nullable', 'string'],
             'demo_aangevraagd_op' => ['nullable', 'date'],
@@ -1114,7 +1117,7 @@ class GarageCompaniesController
     public function setDemoStatus(Request $request, GarageCompany $garageCompany): RedirectResponse
     {
         $data = $request->validate([
-            'status' => ['required', Rule::enum(GarageCompanyStatus::class)],
+            'status' => ['required', Rule::in(GarageCompanyStatus::selectableValues())],
         ]);
 
         $from = $garageCompany->status->value;
@@ -1122,15 +1125,6 @@ class GarageCompaniesController
 
         if ($to === GarageCompanyStatus::DemoAangevraagd->value && ! $garageCompany->demo_aangevraagd_op) {
             $garageCompany->demo_aangevraagd_op = now();
-        }
-
-        if ($to === GarageCompanyStatus::DemoGepland->value) {
-            if (! $garageCompany->demo_aangevraagd_op) {
-                $garageCompany->demo_aangevraagd_op = now();
-            }
-            if (! $garageCompany->demo_gepland_op) {
-                $garageCompany->demo_gepland_op = now();
-            }
         }
 
         if ($to === GarageCompanyStatus::Proefperiode->value && ! $garageCompany->proefperiode_start) {
@@ -1781,11 +1775,8 @@ class GarageCompaniesController
         if ($company->status->value === GarageCompanyStatus::DemoAangevraagd->value && ! $company->demo_aangevraagd_op) {
             $statusErrors[] = 'Status demo_aangevraagd vereist demo_aangevraagd_op.';
         }
-        if ($company->status->value === GarageCompanyStatus::DemoGepland->value && (! $company->demo_aangevraagd_op || ! $company->demo_gepland_op)) {
-            $statusErrors[] = 'Status demo_gepland vereist demo_aangevraagd_op en demo_gepland_op.';
-        }
         if ($company->status->value === GarageCompanyStatus::Proefperiode->value && ! $company->proefperiode_start) {
-            $statusErrors[] = 'Status proefperiode vereist proefperiode_start.';
+            $statusErrors[] = 'Status demo vereist proefperiode_start.';
         }
         if ($company->status->value === GarageCompanyStatus::Actief->value) {
             if (! $company->actief_vanaf) {

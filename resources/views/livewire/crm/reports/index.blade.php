@@ -59,10 +59,8 @@
             ? (int) round(($kpis['companies_active'] / $kpis['companies_total']) * 100)
             : 0;
         $funnelLabels = [
-            'lead' => 'Lead',
             'demo_aangevraagd' => 'Demo aangevraagd',
-            'demo_gepland' => 'Demo gepland',
-            'proefperiode' => 'Proefperiode',
+            'proefperiode' => 'Demo',
             'actief' => 'Actief',
             'opgezegd' => 'Opgezegd',
             'verloren' => 'Verloren',

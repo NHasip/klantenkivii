@@ -39,7 +39,7 @@ function generatePassword(length = 12) {
     return result.join('');
 }
 
-export default function Create({ statusOptions, sourceOptions, moduleRows, defaults, urls }) {
+export default function Create({ statusOptions, statusLabels, sourceOptions, moduleRows, defaults, urls }) {
     const [showPassword, setShowPassword] = useState(false);
     const { data, setData, post, processing, errors } = useForm({
         bedrijfsnaam: '',
@@ -55,7 +55,7 @@ export default function Create({ statusOptions, sourceOptions, moduleRows, defau
         bic: '',
         plaats_van_tekenen: '',
         datum_van_tekenen: defaults.datum_van_tekenen || '',
-        status: statusOptions?.[0] || 'lead',
+        status: statusOptions?.[0] || 'demo_aangevraagd',
         bron: sourceOptions?.[0] || 'website_formulier',
         tags: '',
         proefperiode_start: defaults.proefperiode_start || toLocalDateInput(new Date()),
@@ -309,14 +309,14 @@ export default function Create({ statusOptions, sourceOptions, moduleRows, defau
                             >
                                 {statusOptions.map((status) => (
                                     <option key={status} value={status}>
-                                        {status}
+                                        {statusLabels?.[status] || status}
                                     </option>
                                 ))}
                             </select>
                             {errors.status && <div className="mt-1 text-xs text-rose-600">{errors.status}</div>}
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">Proefperiode start</label>
+                            <label className="block text-xs font-medium text-zinc-600">Demo start</label>
                             <input
                                 type="date"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"

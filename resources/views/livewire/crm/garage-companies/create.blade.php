@@ -148,11 +148,11 @@
             <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                     <label class="block text-xs font-medium text-zinc-600">Status</label>
-                    <select class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model.live="status">
-                        @foreach($statuses as $s)
-                            <option value="{{ $s->value }}">{{ $s->value }}</option>
-                        @endforeach
-                    </select>
+                        <select class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model.live="status">
+                            @foreach($statuses as $s)
+                                <option value="{{ $s->value }}">{{ $s->label() }}</option>
+                            @endforeach
+                        </select>
                     @error('status') <div class="mt-1 text-xs text-rose-600">{{ $message }}</div> @enderror
                 </div>
                 <div>

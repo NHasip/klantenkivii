@@ -26,7 +26,7 @@
             <select class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model.live="status">
                 <option value="alle">Alle</option>
                 @foreach($statuses as $s)
-                    <option value="{{ $s->value }}">{{ $s->value }}</option>
+                    <option value="{{ $s->value }}">{{ $s->label() }}</option>
                 @endforeach
             </select>
         </div>
@@ -77,7 +77,7 @@
                         </td>
                         <td class="px-4 py-3 text-sm">
                             <span class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-700">
-                                {{ $c->status->value }}
+                                {{ $c->status->label() }}
                             </span>
                         </td>
                         <td class="px-4 py-3 text-sm font-semibold">&euro; {{ number_format((float) ($c->omzet_excl ?? 0), 2, ',', '.') }}</td>

@@ -13,7 +13,7 @@ class DemoStatus extends Component
 {
     public int $garageCompanyId;
 
-    public string $status = 'lead';
+    public string $status = 'demo_aangevraagd';
     public ?string $demo_aangevraagd_op = null;
     public ?string $demo_gepland_op = null;
     public ?int $demo_duur_dagen = null;
@@ -101,11 +101,6 @@ class DemoStatus extends Component
             $company->demo_aangevraagd_op = now();
         }
 
-        if ($to === GarageCompanyStatus::DemoGepland->value && ! $company->demo_gepland_op) {
-            session()->flash('status', 'Vul eerst demo_gepland_op in.');
-            return;
-        }
-
         if ($to === GarageCompanyStatus::Proefperiode->value && ! $company->proefperiode_start) {
             $company->proefperiode_start = now();
         }
@@ -141,7 +136,7 @@ class DemoStatus extends Component
     {
         $company = GarageCompany::findOrFail($this->garageCompanyId);
 
-        $this->status = $company->status->value;
+        $this->status = GarageCompanyStatus::normalize($company->status->value);
         $this->demo_aangevraagd_op = optional($company->demo_aangevraagd_op)->format('Y-m-d\TH:i');
         $this->demo_gepland_op = optional($company->demo_gepland_op)->format('Y-m-d\TH:i');
         $this->demo_duur_dagen = $company->demo_duur_dagen;
@@ -158,7 +153,7 @@ class DemoStatus extends Component
 
         $flow = [
             GarageCompanyStatus::Lead->value => [GarageCompanyStatus::DemoAangevraagd->value, GarageCompanyStatus::Verloren->value],
-            GarageCompanyStatus::DemoAangevraagd->value => [GarageCompanyStatus::DemoGepland->value, GarageCompanyStatus::Verloren->value],
+            GarageCompanyStatus::DemoAangevraagd->value => [GarageCompanyStatus::Proefperiode->value, GarageCompanyStatus::Verloren->value],
             GarageCompanyStatus::DemoGepland->value => [GarageCompanyStatus::Proefperiode->value, GarageCompanyStatus::Verloren->value],
             GarageCompanyStatus::Proefperiode->value => [GarageCompanyStatus::Actief->value, GarageCompanyStatus::Opgezegd->value, GarageCompanyStatus::Verloren->value],
             GarageCompanyStatus::Actief->value => [GarageCompanyStatus::Opgezegd->value, GarageCompanyStatus::Verloren->value],

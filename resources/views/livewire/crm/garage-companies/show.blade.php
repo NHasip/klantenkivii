@@ -8,7 +8,7 @@
             </div>
             <h1 class="mt-1 truncate text-2xl font-semibold tracking-tight">{{ $garageCompany->bedrijfsnaam }}</h1>
             <div class="mt-2 flex flex-wrap items-center gap-2 text-sm text-zinc-600">
-                <span class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-700">{{ $garageCompany->status->value }}</span>
+                <span class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-700">{{ $garageCompany->status->label() }}</span>
                 <span>&middot;</span>
                 <span>{{ $garageCompany->hoofd_email }}</span>
                 <span>&middot;</span>

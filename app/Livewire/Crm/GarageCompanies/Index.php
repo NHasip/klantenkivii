@@ -87,7 +87,7 @@ class Index extends Component
 
         return view('livewire.crm.garage-companies.index', [
             'companies' => $query->paginate($this->perPage),
-            'statuses' => GarageCompanyStatus::cases(),
+            'statuses' => GarageCompanyStatus::selectable(),
             'sources' => GarageCompanySource::cases(),
         ])->layout('layouts.crm', ['title' => 'Klanten']);
     }

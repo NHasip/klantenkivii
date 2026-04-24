@@ -25,7 +25,7 @@ class Overview extends Component
     public ?string $website = null;
     public string $hoofd_email = '';
     public string $hoofd_telefoon = '';
-    public string $status = 'lead';
+    public string $status = 'demo_aangevraagd';
     public string $bron = 'website_formulier';
     public ?string $tags = null;
 
@@ -82,7 +82,7 @@ class Overview extends Component
         $this->website = $company->website;
         $this->hoofd_email = $company->hoofd_email;
         $this->hoofd_telefoon = $company->hoofd_telefoon;
-        $this->status = $company->status->value;
+        $this->status = GarageCompanyStatus::normalize($company->status->value);
         $this->bron = $company->bron->value;
         $this->tags = $company->tags;
 
@@ -112,7 +112,7 @@ class Overview extends Component
             'website' => ['nullable', 'string', 'max:255'],
             'hoofd_email' => ['required', 'email', 'max:255'],
             'hoofd_telefoon' => ['required', 'string', 'max:50'],
-            'status' => ['required', Rule::enum(GarageCompanyStatus::class)],
+            'status' => ['required', Rule::in(GarageCompanyStatus::selectableValues())],
             'bron' => ['required', Rule::enum(GarageCompanySource::class)],
             'tags' => ['nullable', 'string'],
 
@@ -148,11 +148,8 @@ class Overview extends Component
         if ($this->status === GarageCompanyStatus::DemoAangevraagd->value && ! $this->demo_aangevraagd_op) {
             $statusErrors[] = 'Status demo_aangevraagd vereist demo_aangevraagd_op.';
         }
-        if ($this->status === GarageCompanyStatus::DemoGepland->value && (! $this->demo_aangevraagd_op || ! $this->demo_gepland_op)) {
-            $statusErrors[] = 'Status demo_gepland vereist demo_aangevraagd_op en demo_gepland_op.';
-        }
         if ($this->status === GarageCompanyStatus::Proefperiode->value && ! $this->proefperiode_start) {
-            $statusErrors[] = 'Status proefperiode vereist proefperiode_start.';
+            $statusErrors[] = 'Status demo vereist proefperiode_start.';
         }
         if ($this->status === GarageCompanyStatus::Actief->value) {
             if (! $this->actief_vanaf) {
@@ -171,11 +168,10 @@ class Overview extends Component
 
         return view('livewire.crm.garage-companies.tabs.overview', [
             'company' => $company,
-            'statuses' => GarageCompanyStatus::cases(),
+            'statuses' => GarageCompanyStatus::selectable(),
             'sources' => GarageCompanySource::cases(),
             'statusErrors' => $statusErrors,
             'hasActiveMandate' => $hasActiveMandate,
         ]);
     }
 }
-

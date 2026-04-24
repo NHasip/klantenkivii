@@ -8,12 +8,11 @@
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
                 <div class="text-xs font-medium text-zinc-500">Huidige status</div>
-                <div class="mt-1 text-lg font-semibold">{{ $company->status->value }}</div>
+                <div class="mt-1 text-lg font-semibold">{{ \App\Enums\GarageCompanyStatus::from($status)->label() }}</div>
             </div>
             <div class="flex flex-wrap gap-2">
                 <button class="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50" wire:click="setStatus('demo_aangevraagd')">Naar demo aangevraagd</button>
-                <button class="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50" wire:click="setStatus('demo_gepland')">Naar demo gepland</button>
-                <button class="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50" wire:click="setStatus('proefperiode')">Naar proefperiode</button>
+                <button class="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50" wire:click="setStatus('proefperiode')">Naar demo</button>
                 <button class="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50" wire:click="setStatus('actief')" @if(! $hasActiveMandate) disabled @endif>Actief</button>
             </div>
         </div>
@@ -51,7 +50,7 @@
             @endif
         </div>
         <div>
-            <label class="block text-xs font-medium text-zinc-600">Proefperiode start</label>
+            <label class="block text-xs font-medium text-zinc-600">Demo start</label>
             <input type="datetime-local" class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model.live="proefperiode_start" />
         </div>
         <div>

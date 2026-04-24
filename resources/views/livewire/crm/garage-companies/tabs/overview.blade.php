@@ -46,7 +46,7 @@
                 <label class="block text-xs font-medium text-zinc-600">Status</label>
                 <select class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model.live="status">
                     @foreach($statuses as $s)
-                        <option value="{{ $s->value }}">{{ $s->value }}</option>
+                        <option value="{{ $s->value }}">{{ $s->label() }}</option>
                     @endforeach
                 </select>
             </div>
@@ -103,7 +103,7 @@
             </div>
 
             <div>
-                <label class="block text-xs font-medium text-zinc-600">Proefperiode start</label>
+                <label class="block text-xs font-medium text-zinc-600">Demo start</label>
                 <input type="datetime-local" class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model.live="proefperiode_start" />
             </div>
             <div>
