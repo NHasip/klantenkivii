@@ -14,14 +14,12 @@ function numberValue(value) {
     return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function toLocalDateTimeInput(date) {
+function toLocalDateInput(date) {
     const pad = (value) => String(value).padStart(2, '0');
     const year = date.getFullYear();
     const month = pad(date.getMonth() + 1);
     const day = pad(date.getDate());
-    const hour = pad(date.getHours());
-    const minute = pad(date.getMinutes());
-    return `${year}-${month}-${day}T${hour}:${minute}`;
+    return `${year}-${month}-${day}`;
 }
 
 function generatePassword(length = 12) {
@@ -60,7 +58,7 @@ export default function Create({ statusOptions, sourceOptions, moduleRows, defau
         status: statusOptions?.[0] || 'lead',
         bron: sourceOptions?.[0] || 'website_formulier',
         tags: '',
-        proefperiode_start: defaults.proefperiode_start || toLocalDateTimeInput(new Date()),
+        proefperiode_start: defaults.proefperiode_start || toLocalDateInput(new Date()),
         actief_vanaf: '',
         opgezegd_op: '',
         opzegreden: '',
@@ -320,7 +318,7 @@ export default function Create({ statusOptions, sourceOptions, moduleRows, defau
                         <div>
                             <label className="block text-xs font-medium text-zinc-600">Proefperiode start</label>
                             <input
-                                type="datetime-local"
+                                type="date"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={data.proefperiode_start}
                                 onChange={(e) => setData('proefperiode_start', e.target.value)}
@@ -332,7 +330,7 @@ export default function Create({ statusOptions, sourceOptions, moduleRows, defau
                         <div>
                             <label className="block text-xs font-medium text-zinc-600">Actief vanaf</label>
                             <input
-                                type="datetime-local"
+                                type="date"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={data.actief_vanaf}
                                 onChange={(e) => setData('actief_vanaf', e.target.value)}

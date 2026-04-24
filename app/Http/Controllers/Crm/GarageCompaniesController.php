@@ -128,7 +128,7 @@ class GarageCompaniesController
             'defaults' => [
                 'land' => 'Nederland',
                 'datum_van_tekenen' => now()->toDateString(),
-                'proefperiode_start' => now()->format('Y-m-d\TH:i'),
+                'proefperiode_start' => now()->toDateString(),
             ],
             'urls' => [
                 'index' => route('crm.garage_companies.index'),
@@ -192,10 +192,6 @@ class GarageCompaniesController
                     ->withErrors(["moduleRows.{$this->moduleRowIndexByModuleId($moduleRows, (int) $row['module_id'])}.aantal" => 'Actieve module vereist aantal >= 1.'])
                     ->withInput();
             }
-        }
-
-        if ($data['status'] === GarageCompanyStatus::Actief->value && empty($data['actief_vanaf'])) {
-            return back()->withErrors(['actief_vanaf' => 'Actief vanaf is verplicht bij status actief.'])->withInput();
         }
 
         if ($data['status'] === GarageCompanyStatus::Opgezegd->value) {
