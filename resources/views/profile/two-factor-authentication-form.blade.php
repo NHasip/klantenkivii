@@ -8,38 +8,6 @@
     </x-slot>
 
     <x-slot name="content">
-        @php
-            $qrCodeSvg = null;
-            $setupKey = null;
-            $recoveryCodes = [];
-            $twoFactorRenderError = null;
-
-            if ($this->enabled && $showingQrCode) {
-                try {
-                    $qrCodeSvg = $this->user->twoFactorQrCodeSvg();
-                } catch (\Throwable $e) {
-                    report($e);
-                    $twoFactorRenderError = 'QR-code kon niet geladen worden.';
-                }
-
-                try {
-                    $setupKey = decrypt((string) $this->user->two_factor_secret);
-                } catch (\Throwable $e) {
-                    report($e);
-                    $twoFactorRenderError = $twoFactorRenderError ?: 'Setup key kon niet geladen worden.';
-                }
-            }
-
-            if ($this->enabled && $showingRecoveryCodes) {
-                try {
-                    $recoveryCodes = json_decode(decrypt((string) $this->user->two_factor_recovery_codes), true) ?: [];
-                } catch (\Throwable $e) {
-                    report($e);
-                    $twoFactorRenderError = $twoFactorRenderError ?: 'Herstelcodes konden niet geladen worden.';
-                }
-            }
-        @endphp
-
         <h3 class="text-lg font-medium text-gray-900">
             @if ($this->enabled)
                 @if ($showingConfirmation)
@@ -58,12 +26,6 @@
             </p>
         </div>
 
-        @if ($twoFactorRenderError)
-            <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                {{ $twoFactorRenderError }}
-            </div>
-        @endif
-
         @if ($this->enabled)
             @if ($showingQrCode)
                 <div class="mt-4 max-w-xl text-sm text-gray-600">
@@ -77,17 +39,13 @@
                 </div>
 
                 <div class="mt-4 p-2 inline-block bg-white">
-                    @if ($qrCodeSvg)
-                        {!! $qrCodeSvg !!}
-                    @endif
+                    {!! $this->user->twoFactorQrCodeSvg() !!}
                 </div>
 
                 <div class="mt-4 max-w-xl text-sm text-gray-600">
-                    @if ($setupKey)
-                        <p class="font-semibold">
-                            {{ __('Setup Key') }}: {{ $setupKey }}
-                        </p>
-                    @endif
+                    <p class="font-semibold">
+                        {{ __('Setup Key') }}: {{ decrypt($this->user->two_factor_secret) }}
+                    </p>
                 </div>
 
                 @if ($showingConfirmation)
@@ -111,7 +69,7 @@
                 </div>
 
                 <div class="grid gap-1 max-w-xl mt-4 px-4 py-4 font-mono text-sm bg-gray-100 rounded-lg">
-                    @foreach ($recoveryCodes as $code)
+                    @foreach (json_decode(decrypt($this->user->two_factor_recovery_codes), true) as $code)
                         <div>{{ $code }}</div>
                     @endforeach
                 </div>

@@ -1,18 +1,6 @@
 @php
-    $passkeysEnabled = false;
-    $passkeys = collect();
-    $passkeysError = null;
-
-    try {
-        $passkeysEnabled = \Illuminate\Support\Facades\Schema::hasTable('passkeys');
-        if ($passkeysEnabled && auth()->check()) {
-            $passkeys = auth()->user()->passkeys()->latest()->get();
-        }
-    } catch (\Throwable $e) {
-        report($e);
-        $passkeysEnabled = false;
-        $passkeysError = 'Passkeys konden niet geladen worden.';
-    }
+    $passkeysEnabled = \Illuminate\Support\Facades\Schema::hasTable('passkeys');
+    $passkeys = $passkeysEnabled ? auth()->user()->passkeys()->latest()->get() : collect();
 @endphp
 
 <x-action-section>
@@ -25,12 +13,6 @@
     </x-slot>
 
     <x-slot name="content">
-        @if ($passkeysError)
-            <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                {{ $passkeysError }}
-            </div>
-        @endif
-
         @if ($passkeysEnabled)
             <h3 class="text-lg font-medium text-gray-900">
                 {{ __('Ingestelde passkeys') }}
