@@ -7,11 +7,9 @@ use App\Models\EmailTemplate;
 use App\Models\SmtpSetting;
 use App\Services\EmailTemplateRenderer;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Livewire\Component;
-use Throwable;
 
 class AdminSystemSettings extends Component
 {
@@ -134,12 +132,6 @@ class AdminSystemSettings extends Component
 
     public function saveTemplate(): void
     {
-        if (! Schema::hasTable('email_templates')) {
-            $this->dispatch('notify', message: 'Email template tabel ontbreekt. Draai migraties.');
-
-            return;
-        }
-
         $data = $this->validate([
             'templateForm.name' => ['required', 'string', 'max:120'],
             'templateForm.subject' => ['required', 'string', 'max:255'],
@@ -185,13 +177,6 @@ class AdminSystemSettings extends Component
 
     public function deleteTemplate(): void
     {
-        if (! Schema::hasTable('email_templates')) {
-            $this->newTemplate();
-            $this->dispatch('notify', message: 'Email template tabel ontbreekt.');
-
-            return;
-        }
-
         if (! $this->editingTemplateId) {
             $this->dispatch('notify', message: 'Selecteer eerst een bestaande template.');
 
@@ -264,27 +249,12 @@ class AdminSystemSettings extends Component
 
     private function loadTemplateItems(?int $preferredTemplateId = null): void
     {
-        if (! Schema::hasTable('email_templates')) {
-            $this->templateItems = [];
-            $this->newTemplate();
+        $hasActiveColumn = Schema::hasColumn('email_templates', 'is_active');
 
-            return;
-        }
-
-        try {
-            $hasActiveColumn = Schema::hasColumn('email_templates', 'is_active');
-
-            $templates = EmailTemplate::query()
-                ->orderByRaw("CASE WHEN `key` = 'welcome_customer' THEN 0 ELSE 1 END")
-                ->orderBy('name')
-                ->get();
-        } catch (Throwable $e) {
-            report($e);
-            $this->templateItems = [];
-            $this->newTemplate();
-
-            return;
-        }
+        $templates = EmailTemplate::query()
+            ->orderByRaw("CASE WHEN `key` = 'welcome_customer' THEN 0 ELSE 1 END")
+            ->orderBy('name')
+            ->get();
 
         $this->templateItems = $templates->map(function (EmailTemplate $template) use ($hasActiveColumn): array {
             return [
@@ -361,9 +331,7 @@ class AdminSystemSettings extends Component
                 '{{reset_link}}',
                 '{{weblink}}',
             ],
-            'advancedTemplatesUrl' => Route::has('crm.email_templates.index')
-                ? route('crm.email_templates.index')
-                : null,
+            'advancedTemplatesUrl' => route('crm.email_templates.index'),
         ]);
     }
 }
