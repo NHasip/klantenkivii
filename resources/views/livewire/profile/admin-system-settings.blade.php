@@ -1,10 +1,4 @@
 <div class="space-y-6">
-    @if ($adminSettingsError)
-        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            {{ $adminSettingsError }}
-        </div>
-    @endif
-
     <section class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -15,11 +9,6 @@
             </div>
         </div>
 
-        @if (! $smtpAvailable)
-            <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                SMTP instellingen zijn nu niet beschikbaar. Controleer of de database migraties volledig zijn uitgevoerd.
-            </div>
-        @else
         <form wire:submit.prevent="saveSmtp" class="mt-4 space-y-4">
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div class="lg:col-span-2">
@@ -89,7 +78,6 @@
                 </x-button>
             </div>
         </form>
-        @endif
     </section>
 
     <section class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
@@ -116,11 +104,6 @@
             </div>
         </div>
 
-        @if (! $templatesAvailable)
-            <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                E-mail templates zijn nu niet beschikbaar. Controleer of de database migraties volledig zijn uitgevoerd.
-            </div>
-        @else
         <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[280px,minmax(0,1fr)]">
             <aside class="rounded-lg border border-gray-200 bg-gray-50 p-3">
                 <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Templatebibliotheek</div>
@@ -217,6 +200,5 @@
                 @endif
             </form>
         </div>
-        @endif
     </section>
 </div>

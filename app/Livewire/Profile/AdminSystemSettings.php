@@ -41,9 +41,6 @@ class AdminSystemSettings extends Component
     public array $templateItems = [];
     public ?int $editingTemplateId = null;
     public bool $editingTemplateIsSystem = false;
-    public bool $smtpAvailable = true;
-    public bool $templatesAvailable = true;
-    public ?string $adminSettingsError = null;
 
     public string $testEmail = '';
 
@@ -53,52 +50,27 @@ class AdminSystemSettings extends Component
     {
         abort_unless(auth()->user()?->isAdmin(), 403);
 
-        try {
-            if (Schema::hasTable('smtp_settings')) {
-                $smtp = SmtpSetting::query()->first();
-                if ($smtp) {
-                    $this->smtpId = $smtp->id;
-                    $this->smtp = [
-                        'host' => $smtp->host ?? '',
-                        'port' => $smtp->port ?? 587,
-                        'username' => $smtp->username ?? '',
-                        'password' => $smtp->password ?? '',
-                        'encryption' => $smtp->encryption ?? 'tls',
-                        'from_address' => $smtp->from_address ?? '',
-                        'from_name' => $smtp->from_name ?? '',
-                    ];
-                }
-            } else {
-                $this->smtpAvailable = false;
-            }
-        } catch (Throwable $e) {
-            report($e);
-            $this->smtpAvailable = false;
-            $this->adminSettingsError = 'SMTP instellingen konden niet geladen worden.';
+        $smtp = SmtpSetting::query()->first();
+        if ($smtp) {
+            $this->smtpId = $smtp->id;
+            $this->smtp = [
+                'host' => $smtp->host ?? '',
+                'port' => $smtp->port ?? 587,
+                'username' => $smtp->username ?? '',
+                'password' => $smtp->password ?? '',
+                'encryption' => $smtp->encryption ?? 'tls',
+                'from_address' => $smtp->from_address ?? '',
+                'from_name' => $smtp->from_name ?? '',
+            ];
         }
 
-        try {
-            $this->loadTemplateItems();
-        } catch (Throwable $e) {
-            report($e);
-            $this->templatesAvailable = false;
-            $this->templateItems = [];
-            $this->newTemplate();
-            $this->adminSettingsError = 'Email templates konden niet geladen worden.';
-        }
+        $this->loadTemplateItems();
 
         $this->testEmail = auth()->user()?->email ?? '';
     }
 
     public function saveSmtp(): void
     {
-        if (! Schema::hasTable('smtp_settings')) {
-            $this->smtpAvailable = false;
-            $this->dispatch('notify', message: 'SMTP tabel ontbreekt. Draai migraties.');
-
-            return;
-        }
-
         $data = $this->validate([
             'smtp.host' => ['nullable', 'string', 'max:255'],
             'smtp.port' => ['nullable', 'integer', 'min:1', 'max:65535'],
@@ -163,7 +135,6 @@ class AdminSystemSettings extends Component
     public function saveTemplate(): void
     {
         if (! Schema::hasTable('email_templates')) {
-            $this->templatesAvailable = false;
             $this->dispatch('notify', message: 'Email template tabel ontbreekt. Draai migraties.');
 
             return;
@@ -215,7 +186,6 @@ class AdminSystemSettings extends Component
     public function deleteTemplate(): void
     {
         if (! Schema::hasTable('email_templates')) {
-            $this->templatesAvailable = false;
             $this->newTemplate();
             $this->dispatch('notify', message: 'Email template tabel ontbreekt.');
 
@@ -251,13 +221,6 @@ class AdminSystemSettings extends Component
 
     public function sendTestEmail(): void
     {
-        if (! Schema::hasTable('smtp_settings')) {
-            $this->smtpAvailable = false;
-            $this->dispatch('notify', message: 'SMTP tabel ontbreekt. Draai migraties.');
-
-            return;
-        }
-
         $this->validate([
             'testEmail' => ['required', 'email'],
             'smtp.host' => ['required', 'string'],
@@ -302,7 +265,6 @@ class AdminSystemSettings extends Component
     private function loadTemplateItems(?int $preferredTemplateId = null): void
     {
         if (! Schema::hasTable('email_templates')) {
-            $this->templatesAvailable = false;
             $this->templateItems = [];
             $this->newTemplate();
 
@@ -318,14 +280,11 @@ class AdminSystemSettings extends Component
                 ->get();
         } catch (Throwable $e) {
             report($e);
-            $this->templatesAvailable = false;
             $this->templateItems = [];
             $this->newTemplate();
 
             return;
         }
-
-        $this->templatesAvailable = true;
 
         $this->templateItems = $templates->map(function (EmailTemplate $template) use ($hasActiveColumn): array {
             return [
