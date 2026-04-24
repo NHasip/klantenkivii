@@ -272,7 +272,7 @@ class GarageCompaniesController
             }
 
             if (Schema::hasColumn('garage_companies', 'login_password')) {
-                $companyData['login_password'] = null;
+                $companyData['login_password'] = $data['login_password'] ?? null;
             }
 
             $company = GarageCompany::create($companyData);
@@ -758,6 +758,7 @@ class GarageCompaniesController
         $oldLoginEmail = $garageCompany->login_email;
         $oldHoofdEmail = $garageCompany->hoofd_email;
         $oldBedrijfsnaam = $garageCompany->bedrijfsnaam;
+        $oldLoginPassword = $garageCompany->login_password;
         $oldPrimaryName = $garageCompany->primaryPerson
             ? trim("{$garageCompany->primaryPerson->voornaam} {$garageCompany->primaryPerson->achternaam}")
             : null;
@@ -767,7 +768,11 @@ class GarageCompaniesController
 
         $garageCompany->fill($data);
         if (Schema::hasColumn('garage_companies', 'login_password')) {
-            $garageCompany->login_password = null;
+            if (! empty($loginPassword)) {
+                $garageCompany->login_password = $loginPassword;
+            } elseif (empty($data['login_email'])) {
+                $garageCompany->login_password = null;
+            }
         }
         $garageCompany->save();
 
@@ -845,6 +850,7 @@ class GarageCompaniesController
             $oldLoginEmail !== $garageCompany->login_email
             || $oldHoofdEmail !== $garageCompany->hoofd_email
             || $oldBedrijfsnaam !== $garageCompany->bedrijfsnaam
+            || $oldLoginPassword !== $garageCompany->login_password
             || $oldPrimaryName !== trim("{$data['primary_voornaam']} {$data['primary_achternaam']}")
         ) {
             $this->refreshWelcomeDraft($garageCompany, true);
@@ -1543,12 +1549,16 @@ class GarageCompaniesController
             ? User::query()->find($garageCompany->eigenaar_user_id)
             : null;
         $passwordSetupLink = $this->passwordSetupLink($ownerUser, $issuePasswordResetToken);
+        $storedLoginPassword = is_string($garageCompany->login_password) ? trim($garageCompany->login_password) : '';
+        $welcomePassword = $storedLoginPassword !== ''
+            ? $storedLoginPassword
+            : 'Gebruik de activatielink om een wachtwoord te kiezen.';
 
         return [
             'naam' => $naam ?: $garageCompany->bedrijfsnaam,
             'bedrijfsnaam' => $garageCompany->bedrijfsnaam,
             'loginnaam' => $garageCompany->login_email ?: '-',
-            'wachtwoord' => 'Gebruik de activatielink om een wachtwoord te kiezen.',
+            'wachtwoord' => $welcomePassword,
             'reset_link' => $passwordSetupLink,
             'activatielink' => $passwordSetupLink,
             'weblink' => 'https://web.kivii.nl/',
