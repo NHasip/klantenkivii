@@ -137,6 +137,48 @@ class DashboardController
             ->take(12)
             ->values();
 
+        $todayStart = $now->startOfDay();
+
+        $demoDurationRows = GarageCompany::query()
+            ->where('status', 'proefperiode')
+            ->get(['id', 'bedrijfsnaam', 'proefperiode_start', 'created_at'])
+            ->map(function (GarageCompany $company) use ($todayStart) {
+                $since = $company->proefperiode_start ?? $company->created_at;
+                $days = 0;
+
+                if ($since) {
+                    $days = max(0, $since->copy()->startOfDay()->diffInDays($todayStart, false));
+                }
+
+                return [
+                    'id' => $company->id,
+                    'bedrijfsnaam' => $company->bedrijfsnaam,
+                    'url' => route('crm.garage_companies.show', ['garageCompany' => $company->id]),
+                    'since_at' => $since?->toDateString(),
+                    'days' => $days,
+                ];
+            });
+
+        $activeDurationRows = GarageCompany::query()
+            ->where('status', 'actief')
+            ->get(['id', 'bedrijfsnaam', 'actief_vanaf', 'created_at'])
+            ->map(function (GarageCompany $company) use ($todayStart) {
+                $since = $company->actief_vanaf ?? $company->created_at;
+                $days = 0;
+
+                if ($since) {
+                    $days = max(0, $since->copy()->startOfDay()->diffInDays($todayStart, false));
+                }
+
+                return [
+                    'id' => $company->id,
+                    'bedrijfsnaam' => $company->bedrijfsnaam,
+                    'url' => route('crm.garage_companies.show', ['garageCompany' => $company->id]),
+                    'since_at' => $since?->toDateString(),
+                    'days' => $days,
+                ];
+            });
+
         return Inertia::render('Crm/Dashboard', [
             'kpis' => [
                 'companies_total' => $companiesTotal,
@@ -151,12 +193,19 @@ class DashboardController
                 'tasks_open' => $tasksOpen,
                 'tasks_overdue' => $tasksOverdue,
                 'tasks_due_7' => $tasksDue7,
+                'demo_customers' => $demoDurationRows->count(),
+                'demo_avg_days' => (int) round((float) ($demoDurationRows->avg('days') ?? 0)),
+                'active_avg_days' => (int) round((float) ($activeDurationRows->avg('days') ?? 0)),
             ],
             'lists' => [
                 'tasks' => $taskItems,
                 'appointments' => [
                     'items' => $appointments->take(12)->values(),
                     'by_company' => $appointmentsByCompany,
+                ],
+                'status_duration' => [
+                    'demo' => $demoDurationRows->sortByDesc('days')->take(12)->values(),
+                    'active' => $activeDurationRows->sortByDesc('days')->take(12)->values(),
                 ],
             ],
             'urls' => [
