@@ -90,12 +90,14 @@
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
-                <a
-                    href="{{ $advancedTemplatesUrl }}"
-                    class="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                    Geavanceerd beheer
-                </a>
+                @if ($advancedTemplatesUrl)
+                    <a
+                        href="{{ $advancedTemplatesUrl }}"
+                        class="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                        Geavanceerd beheer
+                    </a>
+                @endif
                 <x-button type="button" wire:click="newTemplate">
                     {{ __('Nieuwe template') }}
                 </x-button>
