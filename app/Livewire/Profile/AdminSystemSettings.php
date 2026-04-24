@@ -38,7 +38,6 @@ class AdminSystemSettings extends Component
 
     public array $templateItems = [];
     public ?int $editingTemplateId = null;
-    public bool $editingTemplateIsSystem = false;
 
     public string $testEmail = '';
 
@@ -116,7 +115,6 @@ class AdminSystemSettings extends Component
     public function newTemplate(): void
     {
         $this->editingTemplateId = null;
-        $this->editingTemplateIsSystem = false;
         $this->templateForm = [
             'name' => '',
             'subject' => '',
@@ -173,35 +171,6 @@ class AdminSystemSettings extends Component
 
         $this->dispatch('template-saved');
         $this->dispatch('notify', message: $message);
-    }
-
-    public function deleteTemplate(): void
-    {
-        if (! $this->editingTemplateId) {
-            $this->dispatch('notify', message: 'Selecteer eerst een bestaande template.');
-
-            return;
-        }
-
-        $template = EmailTemplate::query()->find($this->editingTemplateId);
-        if (! $template) {
-            $this->loadTemplateItems();
-            $this->dispatch('notify', message: 'Template niet gevonden.');
-
-            return;
-        }
-
-        if (in_array($template->key, self::SYSTEM_TEMPLATE_KEYS, true)) {
-            $this->dispatch('notify', message: 'Standaard templates kun je hier niet verwijderen.');
-
-            return;
-        }
-
-        $template->delete();
-        $this->loadTemplateItems();
-
-        $this->dispatch('template-deleted');
-        $this->dispatch('notify', message: 'Template verwijderd.');
     }
 
     public function sendTestEmail(): void
@@ -285,7 +254,6 @@ class AdminSystemSettings extends Component
         }
 
         $this->editingTemplateId = $selected->id;
-        $this->editingTemplateIsSystem = in_array($selected->key, self::SYSTEM_TEMPLATE_KEYS, true);
         $this->templateForm = [
             'name' => $selected->name ?? '',
             'subject' => $selected->subject ?? '',
