@@ -193,6 +193,7 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
     const appointmentsByCompany = lists?.appointments?.by_company ?? [];
     const demoDurationItems = lists?.status_duration?.demo ?? [];
     const activeDurationItems = lists?.status_duration?.active ?? [];
+    const activeMissingSepaItems = lists?.active_missing_sepa ?? [];
 
     const tasksTone = kpis.tasks_overdue > 0 ? 'danger' : kpis.tasks_open > 0 ? 'info' : 'default';
     const cancelledTone = kpis.cancelled_last_30 > 0 ? 'danger' : 'default';
@@ -253,6 +254,34 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                         tone={cancelledTone}
                     />
                 </div>
+
+                {kpis.active_missing_sepa > 0 && (
+                    <Panel
+                        title="Actieve klanten zonder complete SEPA"
+                        subtitle="Vul de ontbrekende gegevens aan in de Incasso-tab per klant."
+                        action={
+                            <a
+                                href={`${urls.customers}?status=actief`}
+                                className="inline-flex items-center rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
+                            >
+                                Actieve klanten
+                            </a>
+                        }
+                    >
+                        <div className="space-y-3">
+                            {activeMissingSepaItems.map((item) => (
+                                <a
+                                    key={item.id}
+                                    href={item.url}
+                                    className="block rounded-xl border border-amber-200 bg-amber-50 p-4 transition hover:border-amber-300"
+                                >
+                                    <div className="text-sm font-semibold text-zinc-900">{item.bedrijfsnaam}</div>
+                                    <div className="mt-1 text-xs text-amber-900">{item.missing.join(', ')}</div>
+                                </a>
+                            ))}
+                        </div>
+                    </Panel>
+                )}
 
                 <div className="grid gap-6 xl:grid-cols-2">
                     <Panel
@@ -370,4 +399,3 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
         </>
     );
 }
-

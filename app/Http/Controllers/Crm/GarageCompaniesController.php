@@ -29,11 +29,14 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use ZipArchive;
 
 class GarageCompaniesController
 {
@@ -399,6 +402,8 @@ class GarageCompaniesController
         }
 
         $garageCompany->load(['primaryPerson', 'mandates', 'modules.module', 'seats']);
+        $activeMandate = $garageCompany->mandates->firstWhere('status', SepaMandateStatus::Actief);
+        [$incassoIsComplete, $incassoMissingFields] = $this->incassoCompleteness($garageCompany, $activeMandate);
 
         $this->ensureAssignmentsExist($garageCompany->id);
 
@@ -586,6 +591,16 @@ class GarageCompaniesController
                 'status' => $welcomeEmail->status,
                 'sent_at' => optional($welcomeEmail->sent_at)->toIso8601String(),
             ] : null,
+            'incasso' => [
+                'kenmerk_machtiging' => $garageCompany->incasso_kenmerk_machtiging,
+                'formulier_naam' => $garageCompany->incasso_formulier_naam,
+                'formulier_url' => $garageCompany->incasso_formulier_path
+                    ? Storage::disk('public')->url($garageCompany->incasso_formulier_path)
+                    : null,
+                'formulier_uploaded_at' => $garageCompany->incasso_formulier_uploaded_at?->toIso8601String(),
+                'is_complete' => $incassoIsComplete,
+                'missing_fields' => $incassoMissingFields,
+            ],
             'emailTemplates' => $emailTemplates,
             'smtpConfigured' => $smtpConfigured,
             'tab' => $tab,
@@ -601,7 +616,7 @@ class GarageCompaniesController
             'tasks' => $taken,
             'appointments' => $afspraken,
             'reminderChannels' => collect(ReminderChannel::cases())->map(fn ($c) => $c->value)->values(),
-            'hasActiveMandate' => $garageCompany->mandates->firstWhere('status', SepaMandateStatus::Actief) !== null,
+            'hasActiveMandate' => $activeMandate !== null,
             'statusErrors' => $this->statusErrors($garageCompany),
             'urls' => [
                 'index' => route('crm.garage_companies.index'),
@@ -619,6 +634,8 @@ class GarageCompaniesController
                 'extend_demo' => route('crm.garage_companies.demo.extend', ['garageCompany' => $garageCompany->id]),
                 'set_demo_status' => route('crm.garage_companies.demo.status', ['garageCompany' => $garageCompany->id]),
                 'save_mandate' => route('crm.garage_companies.mandates.save', ['garageCompany' => $garageCompany->id]),
+                'save_incasso_settings' => route('crm.garage_companies.incasso.settings', ['garageCompany' => $garageCompany->id]),
+                'export_incasso_batch' => route('crm.incasso.export'),
                 'set_mandate_status' => route('crm.garage_companies.mandates.status', ['garageCompany' => $garageCompany->id, 'mandate' => '__MANDATE__']),
                 'add_note' => route('crm.garage_companies.timeline.add', ['garageCompany' => $garageCompany->id]),
                 'add_task' => route('crm.garage_companies.tasks.add', ['garageCompany' => $garageCompany->id]),
@@ -1264,6 +1281,206 @@ class GarageCompaniesController
         return back()->with('status', 'Mandaat status bijgewerkt.');
     }
 
+    public function updateIncassoSettings(Request $request, GarageCompany $garageCompany): RedirectResponse
+    {
+        $data = $request->validate([
+            'incasso_kenmerk_machtiging' => ['nullable', 'string', 'max:255'],
+            'incasso_formulier' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+            'remove_incasso_formulier' => ['nullable', 'boolean'],
+        ]);
+
+        $garageCompany->incasso_kenmerk_machtiging = filled($data['incasso_kenmerk_machtiging'] ?? null)
+            ? trim((string) $data['incasso_kenmerk_machtiging'])
+            : null;
+
+        if (($data['remove_incasso_formulier'] ?? false) && $garageCompany->incasso_formulier_path) {
+            Storage::disk('public')->delete($garageCompany->incasso_formulier_path);
+            $garageCompany->incasso_formulier_path = null;
+            $garageCompany->incasso_formulier_naam = null;
+            $garageCompany->incasso_formulier_uploaded_at = null;
+        }
+
+        if ($request->hasFile('incasso_formulier')) {
+            if ($garageCompany->incasso_formulier_path) {
+                Storage::disk('public')->delete($garageCompany->incasso_formulier_path);
+            }
+
+            $file = $request->file('incasso_formulier');
+            $storedPath = $file->store("incasso-formulieren/{$garageCompany->id}", 'public');
+            $garageCompany->incasso_formulier_path = $storedPath;
+            $garageCompany->incasso_formulier_naam = $file->getClientOriginalName();
+            $garageCompany->incasso_formulier_uploaded_at = now();
+        }
+
+        $garageCompany->save();
+
+        Activity::create([
+            'garage_company_id' => $garageCompany->id,
+            'type' => ActivityType::Mandate,
+            'titel' => 'Incasso instellingen bijgewerkt',
+            'inhoud' => null,
+            'created_by' => auth()->id(),
+        ]);
+
+        return back()->with('status', 'Incasso-instellingen opgeslagen.');
+    }
+
+    public function exportIncassoBatch(Request $request): BinaryFileResponse|RedirectResponse
+    {
+        $data = $request->validate([
+            'maand' => ['nullable', 'integer', 'min:1', 'max:12'],
+            'jaar' => ['nullable', 'integer', 'min:2020', 'max:2100'],
+            'uitvoerdatum' => ['nullable', 'date'],
+        ]);
+
+        $month = (int) ($data['maand'] ?? now()->month);
+        $year = (int) ($data['jaar'] ?? now()->year);
+        $executionDate = ! empty($data['uitvoerdatum'])
+            ? Carbon::parse((string) $data['uitvoerdatum'])->startOfDay()
+            : now()->startOfDay();
+
+        $overview = $this->incassoExportOverview($month, $year);
+        $records = $overview['eligible'];
+
+        if ($records === []) {
+            return back()->with(
+                'status',
+                'Geen export gemaakt: geen actieve klanten met complete SEPA + incasso-instellingen.'
+            );
+        }
+
+        $templatePath = storage_path('app/templates/ing-incasso-template.xlsx');
+        if (! is_file($templatePath)) {
+            return back()->with(
+                'status',
+                'Incasso-template ontbreekt: plaats bestand op storage/app/templates/ing-incasso-template.xlsx'
+            );
+        }
+
+        $tmpDir = storage_path('app/tmp');
+        if (! is_dir($tmpDir)) {
+            @mkdir($tmpDir, 0775, true);
+        }
+
+        $outputPath = $tmpDir.'/incasso_batch_'.$year.'_'.str_pad((string) $month, 2, '0', STR_PAD_LEFT).'_'.Str::uuid().'.xlsx';
+        copy($templatePath, $outputPath);
+
+        $zip = new ZipArchive;
+        if ($zip->open($outputPath) !== true) {
+            return back()->with('status', 'Kon incasso-exportbestand niet openen.');
+        }
+
+        $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
+        if (! is_string($sheetXml) || $sheetXml === '') {
+            $zip->close();
+
+            return back()->with('status', 'Kon worksheet in template niet lezen.');
+        }
+
+        $dom = new \DOMDocument('1.0', 'UTF-8');
+        $dom->preserveWhiteSpace = false;
+        $dom->formatOutput = false;
+        $dom->loadXML($sheetXml);
+
+        $xpath = new \DOMXPath($dom);
+        $xpath->registerNamespace('x', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
+
+        $clearCell = function (string $coord) use ($xpath): void {
+            $nodeList = $xpath->query("//x:c[@r='{$coord}']");
+            if (! $nodeList || $nodeList->length === 0) {
+                return;
+            }
+            /** @var \DOMElement $cell */
+            $cell = $nodeList->item(0);
+            while ($cell->firstChild) {
+                $cell->removeChild($cell->firstChild);
+            }
+            $cell->removeAttribute('t');
+        };
+
+        $setString = function (string $coord, string $value) use ($xpath, $dom): void {
+            $nodeList = $xpath->query("//x:c[@r='{$coord}']");
+            if (! $nodeList || $nodeList->length === 0) {
+                return;
+            }
+            /** @var \DOMElement $cell */
+            $cell = $nodeList->item(0);
+            while ($cell->firstChild) {
+                $cell->removeChild($cell->firstChild);
+            }
+            $cell->setAttribute('t', 'inlineStr');
+
+            $is = $dom->createElementNS('http://schemas.openxmlformats.org/spreadsheetml/2006/main', 'is');
+            $t = $dom->createElementNS('http://schemas.openxmlformats.org/spreadsheetml/2006/main', 't');
+            $t->appendChild($dom->createTextNode($value));
+            $is->appendChild($t);
+            $cell->appendChild($is);
+        };
+
+        $setNumber = function (string $coord, float|int $value) use ($xpath, $dom): void {
+            $nodeList = $xpath->query("//x:c[@r='{$coord}']");
+            if (! $nodeList || $nodeList->length === 0) {
+                return;
+            }
+            /** @var \DOMElement $cell */
+            $cell = $nodeList->item(0);
+            $formula = null;
+            foreach ($cell->childNodes as $childNode) {
+                if ($childNode instanceof \DOMElement && $childNode->localName === 'f') {
+                    $formula = $childNode->cloneNode(true);
+                    break;
+                }
+            }
+            while ($cell->firstChild) {
+                $cell->removeChild($cell->firstChild);
+            }
+            $cell->removeAttribute('t');
+            if ($formula) {
+                $cell->appendChild($formula);
+            }
+            $v = $dom->createElementNS('http://schemas.openxmlformats.org/spreadsheetml/2006/main', 'v', (string) $value);
+            $cell->appendChild($v);
+        };
+
+        for ($row = 12; $row <= 1011; $row++) {
+            foreach (['B', 'C', 'D', 'E', 'F', 'G'] as $col) {
+                $clearCell($col.$row);
+            }
+        }
+
+        $row = 12;
+        $count = 0;
+        $totalAmount = 0.0;
+        foreach ($records as $record) {
+            if ($row > 1011) {
+                break;
+            }
+
+            $setString('B'.$row, (string) $record['naam_debiteur']);
+            $setString('C'.$row, (string) $record['iban_debiteur']);
+            $setString('D'.$row, (string) $record['kenmerk_machtiging']);
+            $setNumber('E'.$row, (float) $record['bedrag']);
+            $setString('F'.$row, (string) $record['omschrijving']);
+            $setNumber('G'.$row, $this->excelDateSerial((string) $record['machtigingsdatum']));
+
+            $count++;
+            $totalAmount += (float) $record['bedrag'];
+            $row++;
+        }
+
+        $setNumber('C4', $this->excelDateSerial($executionDate->toDateString()));
+        $setNumber('C8', round($totalAmount, 2));
+        $setNumber('C9', $count);
+
+        $zip->deleteName('xl/worksheets/sheet1.xml');
+        $zip->addFromString('xl/worksheets/sheet1.xml', $dom->saveXML());
+        $zip->close();
+
+        $filename = 'ING_Incasso_'.Str::lower($this->dutchMonthName($month)).'_'.$year.'.xlsx';
+
+        return response()->download($outputPath, $filename)->deleteFileAfterSend(true);
+    }
+
     public function addTimelineNote(Request $request, GarageCompany $garageCompany): RedirectResponse
     {
         $data = $request->validate([
@@ -1772,6 +1989,138 @@ class GarageCompaniesController
     private function formatDateTime(?Carbon $date): ?string
     {
         return $date ? $date->format('Y-m-d\TH:i') : null;
+    }
+
+    /**
+     * @return array{0:bool,1:array<int,string>}
+     */
+    private function incassoCompleteness(GarageCompany $company, ?SepaMandate $activeMandate): array
+    {
+        $missing = [];
+
+        if (! filled($company->bedrijfsnaam)) {
+            $missing[] = 'Bedrijfsnaam ontbreekt';
+        }
+
+        if (! $activeMandate) {
+            $missing[] = 'Geen actief SEPA mandaat';
+        } else {
+            if (! filled($activeMandate->iban)) {
+                $missing[] = 'IBAN debiteur ontbreekt';
+            }
+            if (! $activeMandate->datum_van_tekenen) {
+                $missing[] = 'Machtigingsdatum ontbreekt';
+            }
+        }
+
+        if (! filled($company->incasso_kenmerk_machtiging)) {
+            $missing[] = 'Kenmerk machtiging ontbreekt';
+        }
+
+        $amountIncl = round((float) $company->active_mrr_incl, 2);
+        if ($amountIncl <= 0) {
+            $missing[] = 'Maandbedrag incl. btw ontbreekt of is 0';
+        }
+
+        return [$missing === [], $missing];
+    }
+
+    /**
+     * @return array{
+     *   eligible: array<int, array{
+     *      company_id:int,
+     *      company_name:string,
+     *      naam_debiteur:string,
+     *      iban_debiteur:string,
+     *      kenmerk_machtiging:string,
+     *      bedrag:float,
+     *      omschrijving:string,
+     *      machtigingsdatum:string
+     *   }>,
+     *   missing: array<int, array{
+     *      company_id:int,
+     *      company_name:string,
+     *      missing_fields:array<int,string>,
+     *      url:string
+     *   }>
+     * }
+     */
+    private function incassoExportOverview(int $month, int $year): array
+    {
+        $companies = GarageCompany::query()
+            ->where('status', GarageCompanyStatus::Actief->value)
+            ->with(['mandates' => fn ($q) => $q->orderByDesc('created_at')])
+            ->orderBy('bedrijfsnaam')
+            ->get();
+
+        $description = 'Kivii abonnement '.$this->dutchMonthName($month).' '.$year;
+
+        $eligible = [];
+        $missing = [];
+
+        /** @var GarageCompany $company */
+        foreach ($companies as $company) {
+            $activeMandate = $company->mandates->firstWhere('status', SepaMandateStatus::Actief);
+            [$isComplete, $missingFields] = $this->incassoCompleteness($company, $activeMandate);
+
+            if (! $isComplete || ! $activeMandate) {
+                $missing[] = [
+                    'company_id' => $company->id,
+                    'company_name' => (string) $company->bedrijfsnaam,
+                    'missing_fields' => $missingFields,
+                    'url' => route('crm.garage_companies.show', [
+                        'garageCompany' => $company->id,
+                        'tab' => 'incasso',
+                    ]),
+                ];
+                continue;
+            }
+
+            $eligible[] = [
+                'company_id' => $company->id,
+                'company_name' => (string) $company->bedrijfsnaam,
+                'naam_debiteur' => (string) $company->bedrijfsnaam,
+                'iban_debiteur' => (string) $activeMandate->iban,
+                'kenmerk_machtiging' => (string) $company->incasso_kenmerk_machtiging,
+                'bedrag' => round((float) $company->active_mrr_incl, 2),
+                'omschrijving' => $description,
+                'machtigingsdatum' => $activeMandate->datum_van_tekenen instanceof Carbon
+                    ? $activeMandate->datum_van_tekenen->toDateString()
+                    : (string) $activeMandate->datum_van_tekenen,
+            ];
+        }
+
+        return [
+            'eligible' => $eligible,
+            'missing' => $missing,
+        ];
+    }
+
+    private function excelDateSerial(string $date): int
+    {
+        $parsed = Carbon::parse($date)->startOfDay();
+        $base = Carbon::create(1899, 12, 30, 0, 0, 0, $parsed->timezone)->startOfDay();
+
+        return (int) $base->diffInDays($parsed, false);
+    }
+
+    private function dutchMonthName(int $month): string
+    {
+        return match ($month) {
+            1 => 'januari',
+            2 => 'februari',
+            3 => 'maart',
+            4 => 'april',
+            5 => 'mei',
+            6 => 'juni',
+            7 => 'juli',
+            8 => 'augustus',
+            9 => 'september',
+            10 => 'oktober',
+            11 => 'november',
+            12 => 'december',
+            default => 'onbekend',
+        };
     }
 
     /**

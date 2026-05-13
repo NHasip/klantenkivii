@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Crm;
 
 use App\Enums\ActivityType;
+use App\Enums\SepaMandateStatus;
 use App\Enums\TaskStatus;
 use App\Models\Activity;
 use App\Models\GarageCompany;
@@ -179,6 +180,48 @@ class DashboardController
                 ];
             });
 
+        $activeSepaIssues = GarageCompany::query()
+            ->where('status', 'actief')
+            ->with(['mandates' => fn ($q) => $q->orderByDesc('created_at')])
+            ->orderBy('bedrijfsnaam')
+            ->get(['id', 'bedrijfsnaam', 'incasso_kenmerk_machtiging'])
+            ->map(function (GarageCompany $company) {
+                $activeMandate = $company->mandates->firstWhere('status', SepaMandateStatus::Actief);
+                $missing = [];
+
+                if (! $activeMandate) {
+                    $missing[] = 'Geen actief SEPA mandaat';
+                } else {
+                    if (! filled($activeMandate->iban)) {
+                        $missing[] = 'IBAN ontbreekt';
+                    }
+                    if (! $activeMandate->datum_van_tekenen) {
+                        $missing[] = 'Machtigingsdatum ontbreekt';
+                    }
+                }
+
+                if (! filled($company->incasso_kenmerk_machtiging)) {
+                    $missing[] = 'Kenmerk machtiging ontbreekt';
+                }
+
+                if (round((float) $company->active_mrr_incl, 2) <= 0) {
+                    $missing[] = 'Maandbedrag incl. btw is 0';
+                }
+
+                if ($missing === []) {
+                    return null;
+                }
+
+                return [
+                    'id' => $company->id,
+                    'bedrijfsnaam' => $company->bedrijfsnaam,
+                    'url' => route('crm.garage_companies.show', ['garageCompany' => $company->id, 'tab' => 'incasso']),
+                    'missing' => $missing,
+                ];
+            })
+            ->filter()
+            ->values();
+
         return Inertia::render('Crm/Dashboard', [
             'kpis' => [
                 'companies_total' => $companiesTotal,
@@ -196,6 +239,7 @@ class DashboardController
                 'demo_customers' => $demoDurationRows->count(),
                 'demo_avg_days' => (int) round((float) ($demoDurationRows->avg('days') ?? 0)),
                 'active_avg_days' => (int) round((float) ($activeDurationRows->avg('days') ?? 0)),
+                'active_missing_sepa' => $activeSepaIssues->count(),
             ],
             'lists' => [
                 'tasks' => $taskItems,
@@ -207,6 +251,7 @@ class DashboardController
                     'demo' => $demoDurationRows->sortByDesc('days')->take(12)->values(),
                     'active' => $activeDurationRows->sortByDesc('days')->take(12)->values(),
                 ],
+                'active_missing_sepa' => $activeSepaIssues->take(12)->values(),
             ],
             'urls' => [
                 'tasks' => route('crm.tasks.index'),

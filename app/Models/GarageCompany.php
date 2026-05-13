@@ -31,6 +31,10 @@ class GarageCompany extends Model
         'hoofd_telefoon',
         'login_email',
         'login_password',
+        'incasso_kenmerk_machtiging',
+        'incasso_formulier_path',
+        'incasso_formulier_naam',
+        'incasso_formulier_uploaded_at',
         'status',
         'bron',
         'tags',
@@ -66,6 +70,7 @@ class GarageCompany extends Model
             'opgezegd_op' => 'datetime',
             'verloren_op' => 'datetime',
             'login_password' => 'encrypted',
+            'incasso_formulier_uploaded_at' => 'datetime',
             'deleted_at' => 'datetime',
         ];
     }
