@@ -184,7 +184,7 @@ class DashboardController
             ->where('status', 'actief')
             ->with(['mandates' => fn ($q) => $q->orderByDesc('created_at')])
             ->orderBy('bedrijfsnaam')
-            ->get(['id', 'bedrijfsnaam', 'incasso_kenmerk_machtiging'])
+            ->get(['id', 'bedrijfsnaam'])
             ->map(function (GarageCompany $company) {
                 $activeMandate = $company->mandates->firstWhere('status', SepaMandateStatus::Actief);
                 $missing = [];
