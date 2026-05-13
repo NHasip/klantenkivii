@@ -180,12 +180,14 @@ class DashboardController
                 ];
             });
 
+        $hasIncassoKenmerkColumn = DB::getSchemaBuilder()->hasColumn('garage_companies', 'incasso_kenmerk_machtiging');
+
         $activeSepaIssues = GarageCompany::query()
             ->where('status', 'actief')
             ->with(['mandates' => fn ($q) => $q->orderByDesc('created_at')])
             ->orderBy('bedrijfsnaam')
             ->get(['id', 'bedrijfsnaam'])
-            ->map(function (GarageCompany $company) {
+            ->map(function (GarageCompany $company) use ($hasIncassoKenmerkColumn) {
                 $activeMandate = $company->mandates->firstWhere('status', SepaMandateStatus::Actief);
                 $missing = [];
 
@@ -200,7 +202,9 @@ class DashboardController
                     }
                 }
 
-                if (! filled($company->incasso_kenmerk_machtiging)) {
+                if (! $hasIncassoKenmerkColumn) {
+                    $missing[] = 'Incasso velden nog niet gemigreerd';
+                } elseif (! filled($company->getAttribute('incasso_kenmerk_machtiging'))) {
                     $missing[] = 'Kenmerk machtiging ontbreekt';
                 }
 

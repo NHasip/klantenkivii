@@ -40,6 +40,8 @@ use ZipArchive;
 
 class GarageCompaniesController
 {
+    private static ?array $incassoColumns = null;
+
     public function index(Request $request): Response
     {
         $view = (string) $request->query('view', 'actief');
@@ -592,12 +594,12 @@ class GarageCompaniesController
                 'sent_at' => optional($welcomeEmail->sent_at)->toIso8601String(),
             ] : null,
             'incasso' => [
-                'kenmerk_machtiging' => $garageCompany->incasso_kenmerk_machtiging,
-                'formulier_naam' => $garageCompany->incasso_formulier_naam,
-                'formulier_url' => $garageCompany->incasso_formulier_path
-                    ? Storage::disk('public')->url($garageCompany->incasso_formulier_path)
+                'kenmerk_machtiging' => $this->companyIncassoValue($garageCompany, 'incasso_kenmerk_machtiging'),
+                'formulier_naam' => $this->companyIncassoValue($garageCompany, 'incasso_formulier_naam'),
+                'formulier_url' => $this->companyIncassoValue($garageCompany, 'incasso_formulier_path')
+                    ? Storage::disk('public')->url((string) $this->companyIncassoValue($garageCompany, 'incasso_formulier_path'))
                     : null,
-                'formulier_uploaded_at' => $garageCompany->incasso_formulier_uploaded_at?->toIso8601String(),
+                'formulier_uploaded_at' => $this->companyIncassoValue($garageCompany, 'incasso_formulier_uploaded_at')?->toIso8601String(),
                 'is_complete' => $incassoIsComplete,
                 'missing_fields' => $incassoMissingFields,
             ],
@@ -1283,6 +1285,10 @@ class GarageCompaniesController
 
     public function updateIncassoSettings(Request $request, GarageCompany $garageCompany): RedirectResponse
     {
+        if (! $this->hasIncassoColumns()) {
+            return back()->with('status', 'Incasso velden zijn nog niet beschikbaar. Draai eerst de nieuwste database migraties.');
+        }
+
         $data = $request->validate([
             'incasso_kenmerk_machtiging' => ['nullable', 'string', 'max:255'],
             'incasso_formulier' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
@@ -2013,7 +2019,8 @@ class GarageCompaniesController
             }
         }
 
-        if (! filled($company->incasso_kenmerk_machtiging)) {
+        $kenmerk = $this->companyIncassoValue($company, 'incasso_kenmerk_machtiging');
+        if (! filled($kenmerk)) {
             $missing[] = 'Kenmerk machtiging ontbreekt';
         }
 
@@ -2047,6 +2054,13 @@ class GarageCompaniesController
      */
     private function incassoExportOverview(int $month, int $year): array
     {
+        if (! $this->hasIncassoColumns()) {
+            return [
+                'eligible' => [],
+                'missing' => [],
+            ];
+        }
+
         $companies = GarageCompany::query()
             ->where('status', GarageCompanyStatus::Actief->value)
             ->with(['mandates' => fn ($q) => $q->orderByDesc('created_at')])
@@ -2081,7 +2095,7 @@ class GarageCompaniesController
                 'company_name' => (string) $company->bedrijfsnaam,
                 'naam_debiteur' => (string) $company->bedrijfsnaam,
                 'iban_debiteur' => (string) $activeMandate->iban,
-                'kenmerk_machtiging' => (string) $company->incasso_kenmerk_machtiging,
+                'kenmerk_machtiging' => (string) $this->companyIncassoValue($company, 'incasso_kenmerk_machtiging'),
                 'bedrag' => round((float) $company->active_mrr_incl, 2),
                 'omschrijving' => $description,
                 'machtigingsdatum' => $activeMandate->datum_van_tekenen instanceof Carbon
@@ -2121,6 +2135,46 @@ class GarageCompaniesController
             12 => 'december',
             default => 'onbekend',
         };
+    }
+
+    private function hasIncassoColumns(): bool
+    {
+        $columns = $this->incassoColumns();
+
+        return $columns['incasso_kenmerk_machtiging']
+            && $columns['incasso_formulier_path']
+            && $columns['incasso_formulier_naam']
+            && $columns['incasso_formulier_uploaded_at'];
+    }
+
+    /**
+     * @return array{incasso_kenmerk_machtiging:bool,incasso_formulier_path:bool,incasso_formulier_naam:bool,incasso_formulier_uploaded_at:bool}
+     */
+    private function incassoColumns(): array
+    {
+        if (self::$incassoColumns !== null) {
+            return self::$incassoColumns;
+        }
+
+        $table = 'garage_companies';
+        self::$incassoColumns = [
+            'incasso_kenmerk_machtiging' => Schema::hasColumn($table, 'incasso_kenmerk_machtiging'),
+            'incasso_formulier_path' => Schema::hasColumn($table, 'incasso_formulier_path'),
+            'incasso_formulier_naam' => Schema::hasColumn($table, 'incasso_formulier_naam'),
+            'incasso_formulier_uploaded_at' => Schema::hasColumn($table, 'incasso_formulier_uploaded_at'),
+        ];
+
+        return self::$incassoColumns;
+    }
+
+    private function companyIncassoValue(GarageCompany $company, string $field): mixed
+    {
+        $columns = $this->incassoColumns();
+        if (! ($columns[$field] ?? false)) {
+            return null;
+        }
+
+        return $company->getAttribute($field);
     }
 
     /**
