@@ -2119,7 +2119,10 @@ class GarageCompaniesController
 
         $companies = GarageCompany::query()
             ->where('status', GarageCompanyStatus::Actief->value)
-            ->with(['mandates' => fn ($q) => $q->orderByDesc('created_at')])
+            ->with([
+                'mandates' => fn ($q) => $q->orderByDesc('created_at'),
+                'modules',
+            ])
             ->orderBy('bedrijfsnaam')
             ->get();
 
@@ -2152,7 +2155,7 @@ class GarageCompaniesController
                 'naam_debiteur' => (string) $company->bedrijfsnaam,
                 'iban_debiteur' => (string) $activeMandate->iban,
                 'kenmerk_machtiging' => (string) $this->companyIncassoValue($company, 'incasso_kenmerk_machtiging'),
-                'bedrag' => round((float) $company->active_mrr_incl, 2),
+                'bedrag' => $this->incassoAmountInclForMonth($company, $month, $year),
                 'omschrijving' => $description,
                 'machtigingsdatum' => $activeMandate->datum_van_tekenen instanceof Carbon
                     ? $activeMandate->datum_van_tekenen->toDateString()
@@ -2164,6 +2167,60 @@ class GarageCompaniesController
             'eligible' => $eligible,
             'missing' => $missing,
         ];
+    }
+
+    private function incassoAmountInclForMonth(GarageCompany $company, int $month, int $year): float
+    {
+        $monthStart = Carbon::create($year, $month, 1)->startOfDay();
+        $monthEnd = $monthStart->copy()->endOfMonth();
+
+        $rows = $company->modules
+            ->filter(function (GarageCompanyModule $row) use ($monthStart, $monthEnd) {
+                if (! $row->actief) {
+                    return false;
+                }
+
+                $start = $row->startdatum ? Carbon::parse($row->startdatum)->startOfDay() : null;
+                $end = $row->einddatum ? Carbon::parse($row->einddatum)->endOfDay() : null;
+
+                if ($start && $start->gt($monthEnd)) {
+                    return false;
+                }
+                if ($end && $end->lt($monthStart)) {
+                    return false;
+                }
+
+                return true;
+            })
+            ->values();
+
+        $fullMonthIncl = 0.0;
+        foreach ($rows as $row) {
+            $aantal = GarageCompanyModule::hasAantalColumn() ? max(1, (int) ($row->aantal ?? 1)) : 1;
+            $excl = (float) $row->prijs_maand_excl * $aantal;
+            $btwFactor = 1 + ((float) $row->btw_percentage / 100);
+            $fullMonthIncl += $excl * $btwFactor;
+        }
+
+        // Pro-rata applies only in the first active month of the company.
+        if (! $company->actief_vanaf instanceof Carbon) {
+            return round($fullMonthIncl, 2);
+        }
+
+        $activeFrom = $company->actief_vanaf->copy()->startOfDay();
+        if ($activeFrom->year !== $year || $activeFrom->month !== $month) {
+            return round($fullMonthIncl, 2);
+        }
+
+        if ($activeFrom->gt($monthEnd)) {
+            return 0.0;
+        }
+
+        $daysInMonth = $monthStart->daysInMonth;
+        $activeDays = $monthEnd->diffInDays($activeFrom) + 1;
+        $ratio = $daysInMonth > 0 ? ($activeDays / $daysInMonth) : 1;
+
+        return round($fullMonthIncl * $ratio, 2);
     }
 
     private function excelDateSerial(string $date): int
