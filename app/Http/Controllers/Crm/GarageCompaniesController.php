@@ -2208,6 +2208,13 @@ class GarageCompaniesController
             $fullMonthIncl += $excl * $btwFactor;
         }
 
+        // Fallback: if module date windows cause 0 while the customer has a known active monthly total,
+        // use that known total as base to prevent unintended exclusion from export.
+        $knownMonthlyIncl = max(0.0, round((float) $company->active_mrr_incl, 2));
+        if ($fullMonthIncl <= 0 && $knownMonthlyIncl > 0) {
+            $fullMonthIncl = $knownMonthlyIncl;
+        }
+
         // Pro-rata applies only in the first active month of the company.
         if (! $company->actief_vanaf instanceof Carbon) {
             return round($fullMonthIncl, 2);
