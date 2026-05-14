@@ -10,16 +10,16 @@ return new class extends Migration
     {
         Schema::table('garage_companies', function (Blueprint $table) {
             if (! Schema::hasColumn('garage_companies', 'incasso_kenmerk_machtiging')) {
-                $table->string('incasso_kenmerk_machtiging', 255)->nullable()->after('login_password');
+                $table->string('incasso_kenmerk_machtiging', 255)->nullable();
             }
             if (! Schema::hasColumn('garage_companies', 'incasso_formulier_path')) {
-                $table->string('incasso_formulier_path', 1024)->nullable()->after('incasso_kenmerk_machtiging');
+                $table->string('incasso_formulier_path', 1024)->nullable();
             }
             if (! Schema::hasColumn('garage_companies', 'incasso_formulier_naam')) {
-                $table->string('incasso_formulier_naam', 255)->nullable()->after('incasso_formulier_path');
+                $table->string('incasso_formulier_naam', 255)->nullable();
             }
             if (! Schema::hasColumn('garage_companies', 'incasso_formulier_uploaded_at')) {
-                $table->dateTime('incasso_formulier_uploaded_at')->nullable()->after('incasso_formulier_naam');
+                $table->dateTime('incasso_formulier_uploaded_at')->nullable();
             }
         });
     }
@@ -45,4 +45,3 @@ return new class extends Migration
         });
     }
 };
-

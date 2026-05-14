@@ -601,6 +601,7 @@ class GarageCompaniesController
                     ? Storage::disk('public')->url((string) $this->companyIncassoValue($garageCompany, 'incasso_formulier_path'))
                     : null,
                 'formulier_uploaded_at' => $this->companyIncassoValue($garageCompany, 'incasso_formulier_uploaded_at')?->toIso8601String(),
+                'kenmerk_available' => (bool) ($this->incassoColumns()['incasso_kenmerk_machtiging'] ?? false),
                 'is_complete' => $incassoIsComplete,
                 'missing_fields' => $incassoMissingFields,
             ],
@@ -1253,9 +1254,19 @@ class GarageCompaniesController
         $hasUploadColumns = $this->hasIncassoUploadColumns();
 
         if ($hasKenmerkColumn && $hasIncassoKenmerkInput) {
-            $garageCompany->incasso_kenmerk_machtiging = filled($incassoKenmerk)
+            $normalizedKenmerk = filled($incassoKenmerk)
                 ? trim((string) $incassoKenmerk)
                 : null;
+
+            // Persist directly to avoid edge cases where model state is stale or casted unexpectedly.
+            DB::table('garage_companies')
+                ->where('id', $garageCompany->id)
+                ->update([
+                    'incasso_kenmerk_machtiging' => $normalizedKenmerk,
+                    'updated_at' => now(),
+                ]);
+
+            $garageCompany->setAttribute('incasso_kenmerk_machtiging', $normalizedKenmerk);
         }
 
         if ($incassoFile && $hasUploadColumns) {

@@ -1800,6 +1800,11 @@ export default function Show({
                                 Incomplete SEPA voor deze actieve klant: {(incasso?.missing_fields || []).join(', ')}
                             </div>
                         )}
+                        {incasso?.kenmerk_available === false && (
+                            <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-900">
+                                Kenmerk machtiging kan nog niet opgeslagen worden: database migratie ontbreekt.
+                            </div>
+                        )}
                     </div>
 
                     <div className="rounded-xl border border-zinc-200 bg-white p-4">
