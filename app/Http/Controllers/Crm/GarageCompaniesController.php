@@ -1286,8 +1286,9 @@ class GarageCompaniesController
 
     public function updateIncassoSettings(Request $request, GarageCompany $garageCompany): RedirectResponse
     {
-        if (! $this->hasIncassoColumns()) {
-            return back()->with('status', 'Incasso velden zijn nog niet beschikbaar. Draai eerst de nieuwste database migraties.');
+        $hasKenmerkColumn = $this->incassoColumns()['incasso_kenmerk_machtiging'] ?? false;
+        if (! $hasKenmerkColumn) {
+            return back()->with('status', 'Kenmerk machtiging is nog niet beschikbaar. Draai eerst de nieuwste database migraties.');
         }
 
         $data = $request->validate([
@@ -1300,14 +1301,14 @@ class GarageCompaniesController
             ? trim((string) $data['incasso_kenmerk_machtiging'])
             : null;
 
-        if (($data['remove_incasso_formulier'] ?? false) && $garageCompany->incasso_formulier_path) {
+        if (($data['remove_incasso_formulier'] ?? false) && $this->hasIncassoUploadColumns() && $garageCompany->incasso_formulier_path) {
             Storage::disk('public')->delete($garageCompany->incasso_formulier_path);
             $garageCompany->incasso_formulier_path = null;
             $garageCompany->incasso_formulier_naam = null;
             $garageCompany->incasso_formulier_uploaded_at = null;
         }
 
-        if ($request->hasFile('incasso_formulier')) {
+        if ($request->hasFile('incasso_formulier') && $this->hasIncassoUploadColumns()) {
             if ($garageCompany->incasso_formulier_path) {
                 Storage::disk('public')->delete($garageCompany->incasso_formulier_path);
             }
@@ -1317,6 +1318,8 @@ class GarageCompaniesController
             $garageCompany->incasso_formulier_path = $storedPath;
             $garageCompany->incasso_formulier_naam = $file->getClientOriginalName();
             $garageCompany->incasso_formulier_uploaded_at = now();
+        } elseif ($request->hasFile('incasso_formulier') && ! $this->hasIncassoUploadColumns()) {
+            return back()->with('status', 'Uploadformulier kan nog niet opgeslagen worden. Draai eerst de nieuwste database migraties.');
         }
 
         $garageCompany->save();
@@ -2142,8 +2145,14 @@ class GarageCompaniesController
     {
         $columns = $this->incassoColumns();
 
-        return $columns['incasso_kenmerk_machtiging']
-            && $columns['incasso_formulier_path']
+        return $columns['incasso_kenmerk_machtiging'];
+    }
+
+    private function hasIncassoUploadColumns(): bool
+    {
+        $columns = $this->incassoColumns();
+
+        return $columns['incasso_formulier_path']
             && $columns['incasso_formulier_naam']
             && $columns['incasso_formulier_uploaded_at'];
     }
