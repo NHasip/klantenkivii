@@ -1217,6 +1217,7 @@ class GarageCompaniesController
             'incasso_formulier' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
         ]);
 
+        $hasIncassoKenmerkInput = $request->exists('incasso_kenmerk_machtiging');
         $incassoKenmerk = $data['incasso_kenmerk_machtiging'] ?? null;
         unset($data['incasso_kenmerk_machtiging']);
         $incassoFile = $request->file('incasso_formulier');
@@ -1251,7 +1252,7 @@ class GarageCompaniesController
         $hasKenmerkColumn = $this->incassoColumns()['incasso_kenmerk_machtiging'] ?? false;
         $hasUploadColumns = $this->hasIncassoUploadColumns();
 
-        if ($hasKenmerkColumn) {
+        if ($hasKenmerkColumn && $hasIncassoKenmerkInput) {
             $garageCompany->incasso_kenmerk_machtiging = filled($incassoKenmerk)
                 ? trim((string) $incassoKenmerk)
                 : null;
@@ -1272,7 +1273,7 @@ class GarageCompaniesController
 
         if ($hasKenmerkColumn || ($incassoFile && $hasUploadColumns)) {
             $garageCompany->save();
-        } elseif (! $hasKenmerkColumn && filled($incassoKenmerk)) {
+        } elseif (! $hasKenmerkColumn && $hasIncassoKenmerkInput && filled($incassoKenmerk)) {
             $incassoStatusExtra = 'Kenmerk machtiging niet opgeslagen: database migratie ontbreekt nog.';
         }
 
