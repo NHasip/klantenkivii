@@ -22,6 +22,7 @@ use App\Models\SepaMandate;
 use App\Models\SmtpSetting;
 use App\Models\User;
 use App\Services\EmailTemplateRenderer;
+use App\Services\IncassoProrataCalculator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -2228,28 +2229,7 @@ class GarageCompaniesController
             $fullMonthIncl = $knownMonthlyIncl;
         }
 
-        // Pro-rata applies only in the first active month.
-        $activeFrom = $incassoActiveFrom instanceof Carbon
-            ? $incassoActiveFrom->copy()->startOfDay()
-            : null;
-        if (! $activeFrom) {
-            return round($fullMonthIncl, 2);
-        }
-
-        if ($activeFrom->year !== $year || $activeFrom->month !== $month) {
-            return round($fullMonthIncl, 2);
-        }
-
-        if ($activeFrom->gt($monthEnd)) {
-            return 0.0;
-        }
-
-        $daysInMonth = $monthStart->daysInMonth;
-        $activeDays = $monthEnd->diffInDays($activeFrom) + 1;
-        $ratio = $daysInMonth > 0 ? ($activeDays / $daysInMonth) : 1;
-        $ratio = min(1, max(0, $ratio));
-
-        return max(0.0, round($fullMonthIncl * $ratio, 2));
+        return IncassoProrataCalculator::calculateForMonth($fullMonthIncl, $incassoActiveFrom, $month, $year);
     }
 
     private function resolveIncassoActiveFrom(GarageCompany $company, ?SepaMandate $activeMandate): ?Carbon
