@@ -547,37 +547,6 @@ export default function Show({
         }
     })();
 
-    const incassoSettingsForm = useForm({
-        incasso_kenmerk_machtiging: incasso?.kenmerk_machtiging || '',
-        incasso_formulier: null,
-        remove_incasso_formulier: false,
-    });
-
-    useEffect(() => {
-        incassoSettingsForm.setData('incasso_kenmerk_machtiging', incasso?.kenmerk_machtiging || '');
-    }, [incasso?.kenmerk_machtiging]);
-
-    const submitIncassoSettings = (event) => {
-        event.preventDefault();
-        incassoSettingsForm.post(urls.save_incasso_settings, {
-            preserveScroll: true,
-            forceFormData: true,
-            onSuccess: () => {
-                incassoSettingsForm.setData('incasso_formulier', null);
-                incassoSettingsForm.setData('remove_incasso_formulier', false);
-            },
-        });
-    };
-
-    const removeIncassoFile = () => {
-        incassoSettingsForm.setData('remove_incasso_formulier', true);
-        incassoSettingsForm.post(urls.save_incasso_settings, {
-            preserveScroll: true,
-            forceFormData: true,
-            onFinish: () => incassoSettingsForm.setData('remove_incasso_formulier', false),
-        });
-    };
-
     const nowDate = new Date();
     const exportForm = useForm({
         maand: String(nowDate.getMonth() + 1),
@@ -1798,116 +1767,39 @@ export default function Show({
                         </button>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                        <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
-                            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Primair incasso overzicht</div>
-                            <dl className="mt-3 space-y-2 text-sm">
-                                <div className="flex items-start justify-between gap-3">
-                                    <dt className="text-zinc-500">Naam debiteur</dt>
-                                    <dd className="font-medium text-zinc-900">{garageCompany.bedrijfsnaam || '-'}</dd>
-                                </div>
-                                <div className="flex items-start justify-between gap-3">
-                                    <dt className="text-zinc-500">IBAN debiteur</dt>
-                                    <dd className="font-medium text-zinc-900">{activeMandate?.iban || '-'}</dd>
-                                </div>
-                                <div className="flex items-start justify-between gap-3">
-                                    <dt className="text-zinc-500">Kenmerk machtiging</dt>
-                                    <dd className="font-medium text-zinc-900">{incasso?.kenmerk_machtiging || '-'}</dd>
-                                </div>
-                                <div className="flex items-start justify-between gap-3">
-                                    <dt className="text-zinc-500">Bedrag</dt>
-                                    <dd className="font-medium text-zinc-900">{formatEuro(garageCompany.active_mrr_incl || 0)}</dd>
-                                </div>
-                                <div className="flex items-start justify-between gap-3">
-                                    <dt className="text-zinc-500">Omschrijving</dt>
-                                    <dd className="font-medium text-zinc-900">{incassoOmschrijvingPreview}</dd>
-                                </div>
-                                <div className="flex items-start justify-between gap-3">
-                                    <dt className="text-zinc-500">Machtigingsdatum</dt>
-                                    <dd className="font-medium text-zinc-900">{activeMandate?.datum_van_tekenen ? formatDate(activeMandate.datum_van_tekenen) : '-'}</dd>
-                                </div>
-                            </dl>
-                            {!incasso?.is_complete && (
-                                <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                                    Incomplete SEPA voor deze actieve klant: {(incasso?.missing_fields || []).join(', ')}
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="rounded-xl border border-zinc-200 bg-white p-4">
-                            <div className="text-sm font-semibold">Incasso instellingen</div>
-                            <div className="mt-1 text-xs text-zinc-500">
-                                Kenmerk machtiging vul je handmatig in en blijft daarna bewaard.
+                    <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Primair incasso overzicht</div>
+                        <dl className="mt-3 space-y-2 text-sm">
+                            <div className="flex items-start justify-between gap-3">
+                                <dt className="text-zinc-500">Naam debiteur</dt>
+                                <dd className="font-medium text-zinc-900">{garageCompany.bedrijfsnaam || '-'}</dd>
                             </div>
-
-                            <form onSubmit={submitIncassoSettings} className="mt-4 space-y-4">
-                                <div>
-                                    <label className="block text-xs font-medium text-zinc-600">Kenmerk machtiging *</label>
-                                    <input
-                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
-                                        value={incassoSettingsForm.data.incasso_kenmerk_machtiging}
-                                        onChange={(e) => incassoSettingsForm.setData('incasso_kenmerk_machtiging', e.target.value)}
-                                    />
-                                    {incassoSettingsForm.errors.incasso_kenmerk_machtiging && (
-                                        <div className="mt-1 text-xs text-rose-600">{incassoSettingsForm.errors.incasso_kenmerk_machtiging}</div>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-medium text-zinc-600">Upload getekend incassoformulier</label>
-                                    <input
-                                        type="file"
-                                        accept=".pdf,.jpg,.jpeg,.png"
-                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-2 file:text-xs file:font-semibold"
-                                        onChange={(e) => incassoSettingsForm.setData('incasso_formulier', e.target.files?.[0] || null)}
-                                    />
-                                    {incassoSettingsForm.errors.incasso_formulier && (
-                                        <div className="mt-1 text-xs text-rose-600">{incassoSettingsForm.errors.incasso_formulier}</div>
-                                    )}
-                                    <div className="mt-2 text-xs text-zinc-500">
-                                        Toegestaan: PDF/JPG/PNG, max 10MB.
-                                    </div>
-                                </div>
-
-                                {incasso?.formulier_naam && (
-                                    <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700">
-                                        <div>Huidig formulier: {incasso.formulier_naam}</div>
-                                        <div className="mt-1">
-                                            Upload datum: {incasso.formulier_uploaded_at ? formatDateTime(incasso.formulier_uploaded_at) : '-'}
-                                        </div>
-                                        <div className="mt-2 flex gap-2">
-                                            {incasso.formulier_url && (
-                                                <a
-                                                    href={incasso.formulier_url}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-semibold hover:bg-zinc-50"
-                                                >
-                                                    Bekijken
-                                                </a>
-                                            )}
-                                            <button
-                                                type="button"
-                                                onClick={removeIncassoFile}
-                                                className="rounded-md border border-rose-200 bg-white px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50"
-                                            >
-                                                Verwijder formulier
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="flex justify-end">
-                                    <button
-                                        type="submit"
-                                        className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
-                                        disabled={incassoSettingsForm.processing}
-                                    >
-                                        {incassoSettingsForm.processing ? 'Opslaan...' : 'Instellingen opslaan'}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
+                            <div className="flex items-start justify-between gap-3">
+                                <dt className="text-zinc-500">IBAN debiteur</dt>
+                                <dd className="font-medium text-zinc-900">{activeMandate?.iban || '-'}</dd>
+                            </div>
+                            <div className="flex items-start justify-between gap-3">
+                                <dt className="text-zinc-500">Kenmerk machtiging</dt>
+                                <dd className="font-medium text-zinc-900">{incasso?.kenmerk_machtiging || '-'}</dd>
+                            </div>
+                            <div className="flex items-start justify-between gap-3">
+                                <dt className="text-zinc-500">Bedrag</dt>
+                                <dd className="font-medium text-zinc-900">{formatEuro(garageCompany.active_mrr_incl || 0)}</dd>
+                            </div>
+                            <div className="flex items-start justify-between gap-3">
+                                <dt className="text-zinc-500">Omschrijving</dt>
+                                <dd className="font-medium text-zinc-900">{incassoOmschrijvingPreview}</dd>
+                            </div>
+                            <div className="flex items-start justify-between gap-3">
+                                <dt className="text-zinc-500">Machtigingsdatum</dt>
+                                <dd className="font-medium text-zinc-900">{activeMandate?.datum_van_tekenen ? formatDate(activeMandate.datum_van_tekenen) : '-'}</dd>
+                            </div>
+                        </dl>
+                        {!incasso?.is_complete && (
+                            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                                Incomplete SEPA voor deze actieve klant: {(incasso?.missing_fields || []).join(', ')}
+                            </div>
+                        )}
                     </div>
 
                     <div className="rounded-xl border border-zinc-200 bg-white p-4">
