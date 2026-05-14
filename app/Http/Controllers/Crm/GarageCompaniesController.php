@@ -2080,11 +2080,6 @@ class GarageCompaniesController
             $missing[] = 'Kenmerk machtiging ontbreekt';
         }
 
-        $amountIncl = round((float) $company->active_mrr_incl, 2);
-        if ($amountIncl <= 0) {
-            $missing[] = 'Maandbedrag incl. btw ontbreekt of is 0';
-        }
-
         return [$missing === [], $missing];
     }
 
@@ -2133,9 +2128,12 @@ class GarageCompaniesController
 
         /** @var GarageCompany $company */
         foreach ($companies as $company) {
-            $activeMandate = $company->mandates->firstWhere('status', SepaMandateStatus::Actief);
+            $activeMandate = $company->mandates->first(
+                fn (SepaMandate $mandate) => $mandate->status === SepaMandateStatus::Actief
+            );
             [$isComplete, $missingFields] = $this->incassoCompleteness($company, $activeMandate);
-            $amountForMonth = $this->incassoAmountInclForMonth($company, $month, $year);
+            $incassoActiveFrom = $this->resolveIncassoActiveFrom($company, $activeMandate);
+            $amountForMonth = $this->incassoAmountInclForMonth($company, $month, $year, $incassoActiveFrom);
 
             if ($amountForMonth <= 0) {
                 $isComplete = false;
@@ -2175,7 +2173,7 @@ class GarageCompaniesController
         ];
     }
 
-    private function incassoAmountInclForMonth(GarageCompany $company, int $month, int $year): float
+    private function incassoAmountInclForMonth(GarageCompany $company, int $month, int $year, ?Carbon $incassoActiveFrom = null): float
     {
         $monthStart = Carbon::create($year, $month, 1)->startOfDay();
         $monthEnd = $monthStart->copy()->endOfMonth();
@@ -2208,6 +2206,21 @@ class GarageCompaniesController
             $fullMonthIncl += $excl * $btwFactor;
         }
 
+        // Secondary fallback for historical exports:
+        // if nothing matched the month range but there are active module rows, use those as monthly base.
+        if ($fullMonthIncl <= 0) {
+            $allActiveRows = $company->modules
+                ->where('actief', true)
+                ->values();
+
+            foreach ($allActiveRows as $row) {
+                $aantal = GarageCompanyModule::hasAantalColumn() ? max(1, (int) ($row->aantal ?? 1)) : 1;
+                $excl = max(0.0, (float) $row->prijs_maand_excl) * $aantal;
+                $btwFactor = 1 + (max(0.0, (float) $row->btw_percentage) / 100);
+                $fullMonthIncl += $excl * $btwFactor;
+            }
+        }
+
         // Fallback: if module date windows cause 0 while the customer has a known active monthly total,
         // use that known total as base to prevent unintended exclusion from export.
         $knownMonthlyIncl = max(0.0, round((float) $company->active_mrr_incl, 2));
@@ -2215,12 +2228,14 @@ class GarageCompaniesController
             $fullMonthIncl = $knownMonthlyIncl;
         }
 
-        // Pro-rata applies only in the first active month of the company.
-        if (! $company->actief_vanaf instanceof Carbon) {
+        // Pro-rata applies only in the first active month.
+        $activeFrom = $incassoActiveFrom instanceof Carbon
+            ? $incassoActiveFrom->copy()->startOfDay()
+            : null;
+        if (! $activeFrom) {
             return round($fullMonthIncl, 2);
         }
 
-        $activeFrom = $company->actief_vanaf->copy()->startOfDay();
         if ($activeFrom->year !== $year || $activeFrom->month !== $month) {
             return round($fullMonthIncl, 2);
         }
@@ -2235,6 +2250,19 @@ class GarageCompaniesController
         $ratio = min(1, max(0, $ratio));
 
         return max(0.0, round($fullMonthIncl * $ratio, 2));
+    }
+
+    private function resolveIncassoActiveFrom(GarageCompany $company, ?SepaMandate $activeMandate): ?Carbon
+    {
+        if ($company->actief_vanaf instanceof Carbon) {
+            return $company->actief_vanaf->copy();
+        }
+
+        if ($activeMandate?->datum_van_tekenen instanceof Carbon) {
+            return $activeMandate->datum_van_tekenen->copy();
+        }
+
+        return null;
     }
 
     private function excelDateSerial(string $date): int
