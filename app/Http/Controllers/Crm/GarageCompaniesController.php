@@ -147,6 +147,7 @@ class GarageCompaniesController
                 'index' => route('crm.garage_companies.index'),
                 'create' => route('crm.garage_companies.create'),
                 'purge_trash' => route('crm.garage_companies.purge_trash'),
+                'export_incasso_batch' => route('crm.incasso.export'),
             ],
         ]);
     }

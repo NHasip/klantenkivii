@@ -73,6 +73,32 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
         perPage: safeFilters.perPage || safeCompanies.per_page || 15,
     });
     const isTrashView = data.view === 'prullenbak';
+    const nowDate = new Date();
+    const exportForm = useForm({
+        maand: String(nowDate.getMonth() + 1),
+        jaar: String(nowDate.getFullYear()),
+        uitvoerdatum: nowDate.toISOString().slice(0, 10),
+    });
+
+    const maandOpties = [
+        { value: '1', label: 'januari' },
+        { value: '2', label: 'februari' },
+        { value: '3', label: 'maart' },
+        { value: '4', label: 'april' },
+        { value: '5', label: 'mei' },
+        { value: '6', label: 'juni' },
+        { value: '7', label: 'juli' },
+        { value: '8', label: 'augustus' },
+        { value: '9', label: 'september' },
+        { value: '10', label: 'oktober' },
+        { value: '11', label: 'november' },
+        { value: '12', label: 'december' },
+    ];
+
+    const jaarOpties = [];
+    for (let i = nowDate.getFullYear() - 1; i <= nowDate.getFullYear() + 2; i += 1) {
+        jaarOpties.push(String(i));
+    }
 
     const deleteCompany = async (company) => {
         const ok = await confirm({
@@ -135,6 +161,16 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
         router.get(safeUrls.index, data, { preserveState: true, replace: true });
     };
 
+    const exportIncasso = () => {
+        if (!safeUrls.export_incasso_batch) return;
+        const query = new URLSearchParams({
+            maand: exportForm.data.maand,
+            jaar: exportForm.data.jaar,
+            uitvoerdatum: exportForm.data.uitvoerdatum,
+        });
+        window.location.href = `${safeUrls.export_incasso_batch}?${query.toString()}`;
+    };
+
     return (
         <div className="space-y-6">
             <Head title="Klanten" />
@@ -188,6 +224,61 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                     )}
                 </div>
             </div>
+
+            {!isTrashView && (
+                <div className="rounded-xl border border-zinc-200 bg-white p-4">
+                    <div className="flex flex-wrap items-end gap-3">
+                        <div className="min-w-56">
+                            <div className="text-sm font-semibold text-zinc-900">Exporteer ING incasso</div>
+                            <div className="mt-1 text-xs text-zinc-500">Exporteert alle klanten met status Actief en complete SEPA gegevens.</div>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-zinc-600">Maand</label>
+                            <select
+                                className="mt-1 rounded-md border-zinc-300 text-sm"
+                                value={exportForm.data.maand}
+                                onChange={(e) => exportForm.setData('maand', e.target.value)}
+                            >
+                                {maandOpties.map((optie) => (
+                                    <option key={optie.value} value={optie.value}>
+                                        {optie.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-zinc-600">Jaar</label>
+                            <select
+                                className="mt-1 rounded-md border-zinc-300 text-sm"
+                                value={exportForm.data.jaar}
+                                onChange={(e) => exportForm.setData('jaar', e.target.value)}
+                            >
+                                {jaarOpties.map((jaar) => (
+                                    <option key={jaar} value={jaar}>
+                                        {jaar}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-zinc-600">Uitvoerdatum</label>
+                            <input
+                                type="date"
+                                className="mt-1 rounded-md border-zinc-300 text-sm"
+                                value={exportForm.data.uitvoerdatum}
+                                onChange={(e) => exportForm.setData('uitvoerdatum', e.target.value)}
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            onClick={exportIncasso}
+                            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                        >
+                            Exporteer alle actieve klanten
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <form onSubmit={submit} className="rounded-xl border border-zinc-200 bg-white p-4">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
