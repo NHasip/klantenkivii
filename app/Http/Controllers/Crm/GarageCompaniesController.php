@@ -1213,7 +1213,13 @@ class GarageCompaniesController
             'akkoord_op' => ['nullable', 'date'],
             'status' => ['required', Rule::enum(SepaMandateStatus::class)],
             'ontvangen_op' => ['nullable', 'date'],
+            'incasso_kenmerk_machtiging' => ['nullable', 'string', 'max:255'],
+            'incasso_formulier' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
         ]);
+
+        $incassoKenmerk = $data['incasso_kenmerk_machtiging'] ?? null;
+        unset($data['incasso_kenmerk_machtiging']);
+        $incassoFile = $request->file('incasso_formulier');
 
         $mandateId = $data['mandate_id'] ?? null;
         unset($data['mandate_id']);
@@ -1241,6 +1247,35 @@ class GarageCompaniesController
             ],
         );
 
+        $incassoStatusExtra = null;
+        $hasKenmerkColumn = $this->incassoColumns()['incasso_kenmerk_machtiging'] ?? false;
+        $hasUploadColumns = $this->hasIncassoUploadColumns();
+
+        if ($hasKenmerkColumn) {
+            $garageCompany->incasso_kenmerk_machtiging = filled($incassoKenmerk)
+                ? trim((string) $incassoKenmerk)
+                : null;
+        }
+
+        if ($incassoFile && $hasUploadColumns) {
+            if ($garageCompany->incasso_formulier_path) {
+                Storage::disk('public')->delete($garageCompany->incasso_formulier_path);
+            }
+
+            $storedPath = $incassoFile->store("incasso-formulieren/{$garageCompany->id}", 'public');
+            $garageCompany->incasso_formulier_path = $storedPath;
+            $garageCompany->incasso_formulier_naam = $incassoFile->getClientOriginalName();
+            $garageCompany->incasso_formulier_uploaded_at = now();
+        } elseif ($incassoFile && ! $hasUploadColumns) {
+            $incassoStatusExtra = 'Uploadformulier niet opgeslagen: database migraties ontbreken nog voor upload.';
+        }
+
+        if ($hasKenmerkColumn || ($incassoFile && $hasUploadColumns)) {
+            $garageCompany->save();
+        } elseif (! $hasKenmerkColumn && filled($incassoKenmerk)) {
+            $incassoStatusExtra = 'Kenmerk machtiging niet opgeslagen: database migratie ontbreekt nog.';
+        }
+
         Activity::create([
             'garage_company_id' => $garageCompany->id,
             'type' => ActivityType::Mandate,
@@ -1249,7 +1284,12 @@ class GarageCompaniesController
             'created_by' => auth()->id(),
         ]);
 
-        return back()->with('status', 'Mandaat opgeslagen.');
+        $statusMessage = 'Mandaat opgeslagen.';
+        if ($incassoStatusExtra) {
+            $statusMessage .= ' '.$incassoStatusExtra;
+        }
+
+        return back()->with('status', $statusMessage);
     }
 
     public function setMandateStatus(Request $request, GarageCompany $garageCompany, SepaMandate $mandate): RedirectResponse

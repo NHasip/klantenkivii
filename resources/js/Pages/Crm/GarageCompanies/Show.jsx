@@ -474,6 +474,8 @@ export default function Show({
             akkoord_op: '',
             status: 'pending',
             ontvangen_op: new Date().toISOString().slice(0, 16),
+            incasso_kenmerk_machtiging: incasso?.kenmerk_machtiging || '',
+            incasso_formulier: null,
         };
     };
 
@@ -508,6 +510,8 @@ export default function Show({
             akkoord_op: mandate.akkoord_op || '',
             status: mandate.status || 'pending',
             ontvangen_op: mandate.ontvangen_op || '',
+            incasso_kenmerk_machtiging: incasso?.kenmerk_machtiging || '',
+            incasso_formulier: null,
         });
         mandateForm.clearErrors();
     };
@@ -522,6 +526,7 @@ export default function Show({
         event.preventDefault();
         mandateForm.post(urls.save_mandate, {
             preserveScroll: true,
+            forceFormData: true,
             onSuccess: () => setShowMandateForm(false),
         });
     };
@@ -2206,6 +2211,38 @@ export default function Show({
                                             </option>
                                         ))}
                                     </select>
+                                </div>
+
+                                <div className="sm:col-span-2 mt-2 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                                    <div className="text-sm font-semibold text-zinc-900">Incasso instellingen</div>
+                                    <div className="mt-1 text-xs text-zinc-500">Kenmerk machtiging vul je handmatig in en blijft daarna bewaard.</div>
+
+                                    <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                        <div className="sm:col-span-2">
+                                            <label className="block text-xs font-medium text-zinc-600">Kenmerk machtiging *</label>
+                                            <input
+                                                className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                                value={mandateForm.data.incasso_kenmerk_machtiging}
+                                                onChange={(e) => mandateForm.setData('incasso_kenmerk_machtiging', e.target.value)}
+                                            />
+                                            {mandateForm.errors.incasso_kenmerk_machtiging && (
+                                                <div className="mt-1 text-xs text-rose-600">{mandateForm.errors.incasso_kenmerk_machtiging}</div>
+                                            )}
+                                        </div>
+                                        <div className="sm:col-span-2">
+                                            <label className="block text-xs font-medium text-zinc-600">Upload getekend incassoformulier</label>
+                                            <input
+                                                type="file"
+                                                accept=".pdf,.jpg,.jpeg,.png"
+                                                className="mt-1 w-full rounded-md border-zinc-300 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-2 file:text-xs file:font-semibold"
+                                                onChange={(e) => mandateForm.setData('incasso_formulier', e.target.files?.[0] || null)}
+                                            />
+                                            {mandateForm.errors.incasso_formulier && (
+                                                <div className="mt-1 text-xs text-rose-600">{mandateForm.errors.incasso_formulier}</div>
+                                            )}
+                                            <div className="mt-1 text-xs text-zinc-500">Toegestaan: PDF/JPG/PNG, max 10MB.</div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div className="sm:col-span-2 flex justify-end gap-2">
