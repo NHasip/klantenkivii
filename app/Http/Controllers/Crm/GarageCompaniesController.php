@@ -2135,6 +2135,12 @@ class GarageCompaniesController
         foreach ($companies as $company) {
             $activeMandate = $company->mandates->firstWhere('status', SepaMandateStatus::Actief);
             [$isComplete, $missingFields] = $this->incassoCompleteness($company, $activeMandate);
+            $amountForMonth = $this->incassoAmountInclForMonth($company, $month, $year);
+
+            if ($amountForMonth <= 0) {
+                $isComplete = false;
+                $missingFields[] = 'Bedrag voor geselecteerde maand is 0 (of ongeldig)';
+            }
 
             if (! $isComplete || ! $activeMandate) {
                 $missing[] = [
@@ -2155,7 +2161,7 @@ class GarageCompaniesController
                 'naam_debiteur' => (string) $company->bedrijfsnaam,
                 'iban_debiteur' => (string) $activeMandate->iban,
                 'kenmerk_machtiging' => (string) $this->companyIncassoValue($company, 'incasso_kenmerk_machtiging'),
-                'bedrag' => $this->incassoAmountInclForMonth($company, $month, $year),
+                'bedrag' => $amountForMonth,
                 'omschrijving' => $description,
                 'machtigingsdatum' => $activeMandate->datum_van_tekenen instanceof Carbon
                     ? $activeMandate->datum_van_tekenen->toDateString()
@@ -2197,8 +2203,8 @@ class GarageCompaniesController
         $fullMonthIncl = 0.0;
         foreach ($rows as $row) {
             $aantal = GarageCompanyModule::hasAantalColumn() ? max(1, (int) ($row->aantal ?? 1)) : 1;
-            $excl = (float) $row->prijs_maand_excl * $aantal;
-            $btwFactor = 1 + ((float) $row->btw_percentage / 100);
+            $excl = max(0.0, (float) $row->prijs_maand_excl) * $aantal;
+            $btwFactor = 1 + (max(0.0, (float) $row->btw_percentage) / 100);
             $fullMonthIncl += $excl * $btwFactor;
         }
 
@@ -2219,8 +2225,9 @@ class GarageCompaniesController
         $daysInMonth = $monthStart->daysInMonth;
         $activeDays = $monthEnd->diffInDays($activeFrom) + 1;
         $ratio = $daysInMonth > 0 ? ($activeDays / $daysInMonth) : 1;
+        $ratio = min(1, max(0, $ratio));
 
-        return round($fullMonthIncl * $ratio, 2);
+        return max(0.0, round($fullMonthIncl * $ratio, 2));
     }
 
     private function excelDateSerial(string $date): int
