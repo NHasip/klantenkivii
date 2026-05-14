@@ -2114,7 +2114,15 @@ class GarageCompaniesController
         }
 
         $companies = GarageCompany::query()
-            ->where('status', GarageCompanyStatus::Actief->value)
+            ->where(function ($query) {
+                $query
+                    ->where('status', GarageCompanyStatus::Actief->value)
+                    // Safety net: include customers that already have an active mandate,
+                    // even if the company status field is temporarily out of sync.
+                    ->orWhereHas('mandates', function ($mandateQuery) {
+                        $mandateQuery->where('status', SepaMandateStatus::Actief->value);
+                    });
+            })
             ->with([
                 'mandates' => fn ($q) => $q->orderByDesc('created_at'),
                 'modules',
