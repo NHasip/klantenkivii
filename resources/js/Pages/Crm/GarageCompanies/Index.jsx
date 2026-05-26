@@ -175,20 +175,20 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
         <div className="space-y-6">
             <Head title="Klanten" />
 
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h1 className="text-xl font-semibold text-zinc-900">Klanten</h1>
                     <p className="mt-1 text-sm text-zinc-500">
                         {isTrashView ? 'Herstel verwijderde klanten vanuit de prullenbak.' : 'Overzicht van garagebedrijven en hun status.'}
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
-                    <div className="inline-flex rounded-md border border-zinc-200 bg-white p-1">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <div className="inline-flex w-full rounded-md border border-zinc-200 bg-white p-1 sm:w-auto">
                         <button
                             type="button"
                             onClick={() => switchView('actief')}
                             className={cx(
-                                'rounded px-3 py-1.5 text-sm font-semibold transition',
+                                'flex-1 rounded px-3 py-1.5 text-sm font-semibold transition sm:flex-none',
                                 !isTrashView ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-zinc-100'
                             )}
                         >
@@ -198,7 +198,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                             type="button"
                             onClick={() => switchView('prullenbak')}
                             className={cx(
-                                'rounded px-3 py-1.5 text-sm font-semibold transition',
+                                'flex-1 rounded px-3 py-1.5 text-sm font-semibold transition sm:flex-none',
                                 isTrashView ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-zinc-100'
                             )}
                         >
@@ -208,7 +208,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                     {!isTrashView && safeUrls.create && (
                         <Link
                             href={safeUrls.create}
-                            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                            className="w-full rounded-md bg-indigo-600 px-4 py-2 text-center text-sm font-semibold text-white hover:bg-indigo-700 sm:w-auto"
                         >
                             Nieuwe klant
                         </Link>
@@ -217,7 +217,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                         <button
                             type="button"
                             onClick={purgeTrash}
-                            className="rounded-md border border-rose-300 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100"
+                            className="w-full rounded-md border border-rose-300 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 sm:w-auto"
                         >
                             Prullenbak leegmaken
                         </button>
@@ -227,8 +227,8 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
 
             {!isTrashView && (
                 <div className="rounded-xl border border-zinc-200 bg-white p-4">
-                    <div className="flex flex-wrap items-end gap-3">
-                        <div className="min-w-56">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
+                        <div className="md:col-span-2">
                             <div className="text-sm font-semibold text-zinc-900">Exporteer ING incasso</div>
                             <div className="mt-1 text-xs text-zinc-500">Exporteert alle klanten met status Actief en complete SEPA gegevens.</div>
                         </div>
@@ -272,7 +272,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                         <button
                             type="button"
                             onClick={exportIncasso}
-                            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 md:self-end"
                         >
                             Exporteer alle actieve klanten
                         </button>
@@ -341,7 +341,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                             ))}
                         </select>
                     </div>
-                    <div className="flex items-end justify-between gap-3">
+                    <div className="flex items-end justify-between gap-3 md:col-span-1">
                         <div className="text-xs text-zinc-500">Totaal: {safeCompanies.total} bedrijven</div>
                         <button
                             type="submit"
@@ -353,7 +353,80 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                 </div>
             </form>
 
-            <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+            <div className="space-y-3 md:hidden">
+                {safeCompanies.data.length === 0 && (
+                    <div className="rounded-xl border border-zinc-200 bg-white px-4 py-10 text-center text-sm text-zinc-500">
+                        {isTrashView ? 'Prullenbak is leeg.' : 'Geen klanten gevonden.'}
+                    </div>
+                )}
+                {safeCompanies.data.map((company) => (
+                    <div key={company.id} className="rounded-xl border border-zinc-200 bg-white p-4">
+                        <div className="flex items-start justify-between gap-3">
+                            <div>
+                                <div className="text-sm font-semibold text-zinc-900">{company.bedrijfsnaam}</div>
+                                <div className="text-xs text-zinc-500">{company.plaats || '—'}</div>
+                            </div>
+                            <span className="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+                                {safeStatusLabels[company.status] || company.status}
+                            </span>
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                            <div className="text-zinc-500">Contact</div>
+                            <div className="text-right text-zinc-700">{company.hoofd_email || '—'}</div>
+                            <div className="text-zinc-500">Telefoon</div>
+                            <div className="text-right text-zinc-700">{company.hoofd_telefoon || '—'}</div>
+                            <div className="text-zinc-500">Gebruikers</div>
+                            <div className="text-right text-zinc-700">{company.actieve_seats}</div>
+                            <div className="text-zinc-500">Omzet excl.</div>
+                            <div className="text-right text-zinc-700">{formatEuro(company.omzet_excl)}</div>
+                            <div className="text-zinc-500">{isTrashView ? 'Verwijderd op' : 'Laatst bijgewerkt'}</div>
+                            <div className="text-right text-zinc-700">
+                                {isTrashView ? formatDateTime(company.deleted_at) : formatDateTime(company.updated_at)}
+                            </div>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                            {company.show_url && (
+                                <Link
+                                    href={company.show_url}
+                                    className="rounded-md border border-zinc-200 px-2.5 py-1.5 text-xs hover:bg-zinc-50"
+                                >
+                                    Open
+                                </Link>
+                            )}
+                            {isTrashView ? (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={() => restoreCompany(company)}
+                                        className="rounded-md border border-emerald-200 px-2.5 py-1.5 text-xs text-emerald-700 hover:bg-emerald-50"
+                                    >
+                                        Herstel
+                                    </button>
+                                    {company.force_delete_url && (
+                                        <button
+                                            type="button"
+                                            onClick={() => forceDeleteCompany(company)}
+                                            className="rounded-md border border-rose-200 px-2.5 py-1.5 text-xs text-rose-600 hover:bg-rose-50"
+                                        >
+                                            Definitief verwijderen
+                                        </button>
+                                    )}
+                                </>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => deleteCompany(company)}
+                                    className="rounded-md border border-rose-200 px-2.5 py-1.5 text-xs text-rose-600 hover:bg-rose-50"
+                                >
+                                    Verwijder
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            <div className="hidden overflow-hidden rounded-xl border border-zinc-200 bg-white md:block">
                 <table className="min-w-full divide-y divide-zinc-100">
                     <thead className="bg-zinc-50">
                         <tr>
