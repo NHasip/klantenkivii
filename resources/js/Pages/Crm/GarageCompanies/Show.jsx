@@ -766,43 +766,45 @@ export default function Show({
         <div className="space-y-6">
             <Head title={garageCompany.bedrijfsnaam} />
 
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h1 className="text-xl font-semibold text-zinc-900">{garageCompany.bedrijfsnaam}</h1>
                     <p className="mt-1 text-sm text-zinc-500">Klantdossier en modules</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <Link
                         href={urls.index}
-                        className="rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
+                        className="w-full rounded-md border border-zinc-200 px-3 py-2 text-center text-sm font-semibold hover:bg-zinc-50 sm:w-auto"
                     >
                         Terug naar overzicht
                     </Link>
                     <button
                         type="button"
                         onClick={deleteCompany}
-                        className="rounded-md border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
+                        className="w-full rounded-md border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50 sm:w-auto"
                     >
                         Verwijder klant
                     </button>
                 </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-                {TABS.map((item) => (
-                    <Link
-                        key={item.key}
-                        href={`${urls.show}?tab=${item.key}`}
-                        className={cx(
-                            'rounded-md border px-3 py-2 text-sm font-semibold',
-                            activeTab === item.key
-                                ? 'border-zinc-900 bg-zinc-900 text-white'
-                                : 'border-zinc-200 text-zinc-700 hover:bg-zinc-50'
-                        )}
-                    >
-                        {item.label}
-                    </Link>
-                ))}
+            <div className="-mx-1 overflow-x-auto pb-1">
+                <div className="flex min-w-max gap-2 px-1">
+                    {TABS.map((item) => (
+                        <Link
+                            key={item.key}
+                            href={`${urls.show}?tab=${item.key}`}
+                            className={cx(
+                                'whitespace-nowrap rounded-md border px-3 py-2 text-sm font-semibold',
+                                activeTab === item.key
+                                    ? 'border-zinc-900 bg-zinc-900 text-white'
+                                    : 'border-zinc-200 text-zinc-700 hover:bg-zinc-50'
+                            )}
+                        >
+                            {item.label}
+                        </Link>
+                    ))}
+                </div>
             </div>
 
             {activeTab === 'overzicht' && (
@@ -825,10 +827,10 @@ export default function Show({
                         </div>
                     </div>
 
-                    <div className="flex justify-end">
+                    <div className="flex justify-stretch sm:justify-end">
                         <Link
                             href={`${urls.show}?tab=modules`}
-                            className="rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
+                            className="w-full rounded-md border border-zinc-200 px-3 py-2 text-center text-sm font-semibold hover:bg-zinc-50 sm:w-auto"
                         >
                             Modules & prijzen wijzigen
                         </Link>
@@ -1405,22 +1407,22 @@ export default function Show({
 
             {activeTab === 'klantpersonen' && (
                 <div className="space-y-6">
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <div className="text-sm font-semibold">Contactpersonen</div>
                             <div className="text-xs text-zinc-500">Meerdere contactpersonen per klant.</div>
                         </div>
                         <button
                             type="button"
-                            className="rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
+                            className="w-full rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold hover:bg-zinc-50 sm:w-auto"
                             onClick={startPersonCreate}
                         >
                             Nieuwe contactpersoon
                         </button>
                     </div>
 
-                    <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
-                        <table className="min-w-full divide-y divide-zinc-100">
+                    <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
+                        <table className="min-w-[760px] divide-y divide-zinc-100">
                             <thead className="bg-zinc-50">
                                 <tr>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Naam</th>
@@ -1753,14 +1755,14 @@ export default function Show({
 
             {activeTab === 'incasso' && (
                 <div className="space-y-6">
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <div className="text-sm font-semibold">Incasso</div>
                             <div className="mt-1 text-xs text-zinc-500">Beheer de 6 incasso velden en SEPA-mandaten voor deze klant.</div>
                         </div>
                         <button
                             type="button"
-                            className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                            className="w-full rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 sm:w-auto"
                             onClick={startMandateNew}
                         >
                             Nieuw mandaat
@@ -1808,7 +1810,7 @@ export default function Show({
                     </div>
 
                     <div className="rounded-xl border border-zinc-200 bg-white p-4">
-                        <div className="flex flex-wrap items-end gap-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                             <div>
                                 <label className="block text-xs font-medium text-zinc-600">Maand</label>
                                 <select
@@ -1849,22 +1851,22 @@ export default function Show({
                             <button
                                 type="button"
                                 onClick={exportIncasso}
-                                className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                                className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 lg:self-end"
                             >
                                 Exporteer ING incasso
                             </button>
                         </div>
                     </div>
 
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <div className="text-sm font-semibold">SEPA mandaten</div>
                             <div className="mt-1 text-xs text-zinc-500">0 of 1 actief mandaat per klant, historie blijft behouden.</div>
                         </div>
                     </div>
 
-                    <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
-                        <table className="min-w-full divide-y divide-zinc-100">
+                    <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
+                        <table className="min-w-[760px] divide-y divide-zinc-100">
                             <thead className="bg-zinc-50">
                                 <tr>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Mandaat</th>
@@ -2166,14 +2168,14 @@ export default function Show({
 
             {activeTab === 'modules' && (
                 <div className="space-y-6">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <div className="text-sm font-semibold">Modules & prijzen</div>
                             <div className="mt-1 text-xs text-zinc-500">Aantallen, prijzen en btw per module.</div>
                         </div>
                         <button
                             type="button"
-                            className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                            className="w-full rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 sm:w-auto"
                             onClick={submitModules}
                             disabled={moduleForm.processing}
                         >
@@ -2207,8 +2209,8 @@ export default function Show({
                         {formatEuro(moduleTotalsLive.totaalIncl)} incl. btw
                     </div>
 
-                    <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
-                        <table className="min-w-full divide-y divide-zinc-100">
+                    <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
+                        <table className="min-w-[900px] divide-y divide-zinc-100">
                             <thead className="bg-zinc-50">
                                 <tr>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Actief</th>
@@ -2283,22 +2285,22 @@ export default function Show({
 
             {activeTab === 'gebruikers' && (
                 <div className="space-y-6">
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <div className="text-sm font-semibold">Gebruikers</div>
                             <div className="mt-1 text-xs text-zinc-500">Accounts binnen deze garage.</div>
                         </div>
                         <button
                             type="button"
-                            className="rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
+                            className="w-full rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold hover:bg-zinc-50 sm:w-auto"
                             onClick={startSeatCreate}
                         >
                             Nieuwe gebruiker
                         </button>
                     </div>
 
-                    <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
-                        <table className="min-w-full divide-y divide-zinc-100">
+                    <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
+                        <table className="min-w-[820px] divide-y divide-zinc-100">
                             <thead className="bg-zinc-50">
                                 <tr>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Naam</th>
