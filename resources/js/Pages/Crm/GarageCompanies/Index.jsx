@@ -100,18 +100,6 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
         jaarOpties.push(String(i));
     }
 
-    const deleteCompany = async (company) => {
-        const ok = await confirm({
-            title: 'Naar prullenbak',
-            message: `Weet je zeker dat je "${company.bedrijfsnaam}" naar de prullenbak wilt verplaatsen?`,
-            confirmText: 'Verplaats',
-            cancelText: 'Annuleren',
-            tone: 'danger',
-        });
-        if (!ok) return;
-        router.delete(company.delete_url, { preserveScroll: true });
-    };
-
     const restoreCompany = async (company) => {
         const ok = await confirm({
             title: 'Klant herstellen',
@@ -412,15 +400,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                                         </button>
                                     )}
                                 </>
-                            ) : (
-                                <button
-                                    type="button"
-                                    onClick={() => deleteCompany(company)}
-                                    className="rounded-md border border-rose-200 px-2.5 py-1.5 text-xs text-rose-600 hover:bg-rose-50"
-                                >
-                                    Verwijder
-                                </button>
-                            )}
+                            ) : null}
                         </div>
                     </div>
                 ))}
@@ -498,15 +478,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                                                     </button>
                                                 )}
                                             </>
-                                        ) : (
-                                            <button
-                                                type="button"
-                                                onClick={() => deleteCompany(company)}
-                                                className="rounded-md border border-rose-200 px-2 py-1 text-xs text-rose-600 hover:bg-rose-50"
-                                            >
-                                                Verwijder
-                                            </button>
-                                        )}
+                                        ) : null}
                                     </div>
                                 </td>
                             </tr>

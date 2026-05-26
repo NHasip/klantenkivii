@@ -2657,8 +2657,7 @@ export default function Show({
             <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <div className="text-sm font-semibold text-rose-900">Gevaarzone</div>
-                        <div className="mt-1 text-xs text-rose-700">
+                        <div className="text-xs text-rose-700">
                             Verwijder deze klant en verplaats naar de prullenbak.
                         </div>
                     </div>
