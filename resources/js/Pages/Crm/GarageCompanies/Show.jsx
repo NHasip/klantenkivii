@@ -778,13 +778,6 @@ export default function Show({
                     >
                         Terug naar overzicht
                     </Link>
-                    <button
-                        type="button"
-                        onClick={deleteCompany}
-                        className="w-full rounded-md border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50 sm:w-auto"
-                    >
-                        Verwijder klant
-                    </button>
                 </div>
             </div>
 
@@ -2660,6 +2653,24 @@ export default function Show({
                     </div>
                 </div>
             )}
+
+            <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <div className="text-sm font-semibold text-rose-900">Gevaarzone</div>
+                        <div className="mt-1 text-xs text-rose-700">
+                            Verwijder deze klant en verplaats naar de prullenbak.
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={deleteCompany}
+                        className="w-full rounded-md border border-rose-300 bg-white px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 sm:w-auto"
+                    >
+                        Verwijder klant
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }
