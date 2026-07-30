@@ -1879,21 +1879,27 @@ class GarageCompaniesController
     {
         $modules = Module::query()->get();
         $fallbackByModuleId = $this->modulePricingFallbacks();
+        $hasAantalColumn = GarageCompanyModule::hasAantalColumn();
 
         foreach ($modules as $module) {
             $resolvedDefaults = $this->resolveModulePricingDefaults($module, $fallbackByModuleId);
+
+            $defaults = [
+                'actief' => false,
+                'prijs_maand_excl' => $resolvedDefaults['prijs_maand_excl'],
+                'btw_percentage' => $resolvedDefaults['btw_percentage'],
+            ];
+
+            if ($hasAantalColumn) {
+                $defaults['aantal'] = 1;
+            }
 
             GarageCompanyModule::firstOrCreate(
                 [
                     'garage_company_id' => $garageCompanyId,
                     'module_id' => $module->id,
                 ],
-                [
-                    'aantal' => 1,
-                    'actief' => false,
-                    'prijs_maand_excl' => $resolvedDefaults['prijs_maand_excl'],
-                    'btw_percentage' => $resolvedDefaults['btw_percentage'],
-                ],
+                $defaults,
             );
         }
     }
