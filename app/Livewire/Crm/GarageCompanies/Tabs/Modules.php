@@ -95,68 +95,44 @@ class Modules extends Component
 
     private function ensureAssignmentsExist(): void
     {
-        $fallbackByModuleId = $this->modulePricingFallbacks();
         $modules = Module::query()->get();
+        $hasAantalColumn = GarageCompanyModule::hasAantalColumn();
 
         foreach ($modules as $module) {
-            $resolvedDefaults = $this->resolveModulePricingDefaults($module, $fallbackByModuleId);
+            $resolvedDefaults = $this->resolveModulePricingDefaults($module);
+
+            $defaults = [
+                'actief' => false,
+                'prijs_maand_excl' => $resolvedDefaults['prijs_maand_excl'],
+                'btw_percentage' => $resolvedDefaults['btw_percentage'],
+            ];
+
+            if ($hasAantalColumn) {
+                $defaults['aantal'] = 1;
+            }
 
             GarageCompanyModule::firstOrCreate(
                 [
                     'garage_company_id' => $this->garageCompanyId,
                     'module_id' => $module->id,
                 ],
-                [
-                    'aantal' => 1,
-                    'actief' => false,
-                    'prijs_maand_excl' => $resolvedDefaults['prijs_maand_excl'],
-                    'btw_percentage' => $resolvedDefaults['btw_percentage'],
-                ],
+                $defaults,
             );
         }
     }
 
     /**
-     * @return array<int, array{prijs_maand_excl: float, btw_percentage: float}>
-     */
-    private function modulePricingFallbacks(): array
-    {
-        return GarageCompanyModule::query()
-            ->select(['module_id', 'prijs_maand_excl', 'btw_percentage'])
-            ->whereIn('id', function ($query) {
-                $query->from('garage_company_modules')
-                    ->selectRaw('MAX(id)')
-                    ->where('prijs_maand_excl', '>', 0)
-                    ->groupBy('module_id');
-            })
-            ->get()
-            ->mapWithKeys(fn (GarageCompanyModule $row) => [
-                (int) $row->module_id => [
-                    'prijs_maand_excl' => (float) $row->prijs_maand_excl,
-                    'btw_percentage' => (float) $row->btw_percentage,
-                ],
-            ])
-            ->all();
-    }
-
-    /**
-     * @param array<int, array{prijs_maand_excl: float, btw_percentage: float}> $fallbackByModuleId
+     * Default pricing comes ONLY from the module's own default_* fields (managed on
+     * /modules), so /modules is the single leading source. Per-customer prices on
+     * garage_company_modules must never leak into another customer's defaults.
+     *
      * @return array{prijs_maand_excl: float, btw_percentage: float}
      */
-    private function resolveModulePricingDefaults(Module $module, array $fallbackByModuleId): array
+    private function resolveModulePricingDefaults(Module $module): array
     {
-        $fallback = $fallbackByModuleId[(int) $module->id] ?? null;
-
         $price = (float) ($module->default_prijs_maand_excl ?? 0);
-        if ($price <= 0 && $fallback) {
-            $price = (float) $fallback['prijs_maand_excl'];
-        }
 
         $vat = (float) ($module->default_btw_percentage ?? 0);
-        if ($vat <= 0 && $fallback) {
-            $vat = (float) $fallback['btw_percentage'];
-        }
-
         if ($vat <= 0) {
             $vat = 21.0;
         }
