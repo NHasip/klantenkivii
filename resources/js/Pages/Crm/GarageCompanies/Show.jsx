@@ -1,4 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { EditorContent, useEditor } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import LinkExtension from '@tiptap/extension-link';
+import Placeholder from '@tiptap/extension-placeholder';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useConfirm } from '../../../components/ConfirmProvider';
 
@@ -47,6 +51,23 @@ function cx(...parts) {
     return parts.filter(Boolean).join(' ');
 }
 
+function ToolbarButton({ active, disabled, onClick, children, title }) {
+    return (
+        <button
+            type="button"
+            title={title}
+            onClick={onClick}
+            disabled={disabled}
+            className={cx(
+                'rounded-md px-2 py-1 text-xs font-semibold transition',
+                active ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-zinc-100',
+                disabled && 'cursor-not-allowed opacity-40'
+            )}
+        >
+            {children}
+        </button>
+    );
+}
 
 function Pagination({ links }) {
     if (!links || links.length <= 1) return null;
@@ -100,10 +121,19 @@ export default function Show({
     reminderChannels,
     hasActiveMandate,
     statusErrors,
+    welcomeEmail,
+    emailTemplates,
+    smtpConfigured,
     incasso,
     urls,
 }) {
-    const activeTab = tab || 'overzicht';
+    const welcomeEmailSent = Boolean(welcomeEmail && (welcomeEmail.status === 'sent' || welcomeEmail.sent_at));
+    // Welkomstmail is a one-time onboarding action: show the tab until it has been
+    // sent, then hide it for existing customers.
+    const showWelcomeTab = !welcomeEmailSent;
+    const requestedTab = tab || 'overzicht';
+    const activeTab = requestedTab === 'welkomst' && !showWelcomeTab ? 'overzicht' : requestedTab;
+    const visibleTabs = showWelcomeTab ? [...TABS, { key: 'welkomst', label: 'Welkomstmail' }] : TABS;
     const confirm = useConfirm();
     const safeStatusLabels = statusLabels && typeof statusLabels === 'object' ? statusLabels : {};
     const normalizeStatus = (value) => {
@@ -594,6 +624,149 @@ export default function Show({
         router.patch(urls.mark_task_done.replace('__ACTIVITY__', activityId), {}, { preserveScroll: true });
     };
 
+    const welcomeForm = useForm({
+        subject: welcomeEmail?.subject || '',
+        body_html: welcomeEmail?.body_html || '',
+        to_email: welcomeEmail?.to_email || '',
+        template_id: welcomeEmail?.template_id || null,
+    });
+
+    useEffect(() => {
+        welcomeForm.setData({
+            subject: welcomeEmail?.subject || '',
+            body_html: welcomeEmail?.body_html || '',
+            to_email: welcomeEmail?.to_email || '',
+            template_id: welcomeEmail?.template_id || null,
+        });
+    }, [
+        welcomeEmail?.id,
+        welcomeEmail?.subject,
+        welcomeEmail?.body_html,
+        welcomeEmail?.to_email,
+        welcomeEmail?.template_id,
+    ]);
+
+    useEffect(() => {
+        if (welcomeEmail?.template_id) {
+            setSelectedTemplateId(welcomeEmail.template_id);
+        }
+    }, [welcomeEmail?.template_id]);
+
+    const templates = emailTemplates ?? [];
+    const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+    const [selectedTemplateId, setSelectedTemplateId] = useState(welcomeEmail?.template_id ?? null);
+    const [pendingSend, setPendingSend] = useState(false);
+
+    const selectedTemplate = templates.find((item) => item.id === selectedTemplateId) || null;
+
+    const welcomeEditor = useEditor({
+        extensions: [
+            StarterKit.configure({
+                heading: { levels: [2, 3] },
+            }),
+            LinkExtension.configure({
+                openOnClick: false,
+                autolink: true,
+                defaultProtocol: 'https',
+            }),
+            Placeholder.configure({
+                placeholder: 'Typ hier je welkomstmail...',
+            }),
+        ],
+        content: welcomeForm.data.body_html || '<p></p>',
+        onUpdate: ({ editor }) => {
+            welcomeForm.setData('body_html', editor.getHTML());
+        },
+    });
+
+    useEffect(() => {
+        if (!welcomeEditor) return;
+        const nextHtml = welcomeForm.data.body_html?.trim() ? welcomeForm.data.body_html : '<p></p>';
+        if (welcomeEditor.getHTML() !== nextHtml) {
+            welcomeEditor.commands.setContent(nextHtml, false);
+        }
+    }, [welcomeEditor, welcomeForm.data.body_html]);
+
+    const refreshWelcome = () => {
+        router.post(urls.refresh_welcome_email, {}, { preserveScroll: true });
+    };
+
+    const saveWelcome = () => {
+        welcomeForm.post(urls.update_welcome_email, { preserveScroll: true });
+    };
+
+    const welcomeStatus = welcomeEmail?.status || 'concept';
+    const welcomeStatusClass = {
+        draft: 'bg-amber-50 text-amber-700',
+        concept: 'bg-amber-50 text-amber-700',
+        sent: 'bg-emerald-50 text-emerald-700',
+        failed: 'bg-rose-50 text-rose-700',
+    }[welcomeStatus] || 'bg-zinc-100 text-zinc-700';
+
+    const confirmSendWelcome = async (draftOverride = null) => {
+        if (!welcomeEmail) return;
+        if (!smtpConfigured) {
+            await confirm({
+                title: 'SMTP ontbreekt',
+                message: 'SMTP instellingen ontbreken. Voeg deze toe via profiel > systeem-instellingen.',
+                confirmText: 'Sluiten',
+                showCancel: false,
+                tone: 'primary',
+            });
+            return;
+        }
+        const ok = await confirm({
+            title: 'Welkomstmail versturen',
+            message: 'Weet je zeker dat je de welkomstmail wilt versturen?',
+            confirmText: 'Verstuur',
+            cancelText: 'Annuleren',
+            tone: 'success',
+        });
+        if (!ok) return;
+        const payload = draftOverride || {
+            subject: welcomeForm.data.subject,
+            body_html: welcomeForm.data.body_html,
+            to_email: welcomeForm.data.to_email,
+            template_id: welcomeForm.data.template_id,
+        };
+        router.post(urls.update_welcome_email, payload, {
+            preserveScroll: true,
+            onSuccess: () => {
+                router.post(urls.send_welcome_email, {}, { preserveScroll: true });
+            },
+        });
+    };
+
+    const applyTemplate = (template, { close = true, send = false } = {}) => {
+        if (!template) return;
+        welcomeForm.setData('subject', template.subject);
+        welcomeForm.setData('body_html', template.body_html);
+        welcomeForm.setData('template_id', template.id);
+        if (welcomeEditor) {
+            welcomeEditor.commands.setContent(template.body_html || '<p></p>', false);
+        }
+        setSelectedTemplateId(template.id);
+        if (close) setTemplatePickerOpen(false);
+        if (send) {
+            confirmSendWelcome({
+                subject: template.subject || '',
+                body_html: template.body_html || '',
+                to_email: welcomeForm.data.to_email,
+                template_id: template.id,
+            });
+        }
+    };
+
+    const openTemplatePicker = (sendAfter = false) => {
+        if (!templates.length) {
+            if (sendAfter) {
+                confirmSendWelcome();
+            }
+            return;
+        }
+        setPendingSend(sendAfter);
+        setTemplatePickerOpen(true);
+    };
 
     return (
         <div className="space-y-6">
@@ -616,7 +789,7 @@ export default function Show({
 
             <div className="-mx-1 overflow-x-auto pb-1">
                 <div className="flex min-w-max gap-2 px-1">
-                    {TABS.map((item) => (
+                    {visibleTabs.map((item) => (
                         <Link
                             key={item.key}
                             href={`${urls.show}?tab=${item.key}`}
@@ -933,7 +1106,305 @@ export default function Show({
                             </button>
                         </div>
                     </form>
+                </div>
+            )}
 
+            {activeTab === 'welkomst' && (
+                <div className="space-y-6">
+                    <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+                        <div className="flex flex-wrap items-start justify-between gap-4">
+                            <div>
+                                <div className="text-sm font-semibold">Welkomstmail</div>
+                                <div className="mt-1 text-xs text-zinc-500">
+                                    Concept op basis van template. Controleer, pas aan en verstuur handmatig.
+                                </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm font-semibold hover:bg-zinc-50"
+                                    onClick={refreshWelcome}
+                                    disabled={!welcomeEmail}
+                                >
+                                    Concept vernieuwen
+                                </button>
+                                <button
+                                    type="button"
+                                    className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm font-semibold hover:bg-zinc-50"
+                                    onClick={() => openTemplatePicker(false)}
+                                    disabled={!welcomeEmail || !templates.length}
+                                >
+                                    Template kiezen
+                                </button>
+                                <button
+                                    type="button"
+                                    className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm font-semibold hover:bg-zinc-50"
+                                    onClick={saveWelcome}
+                                    disabled={!welcomeEmail}
+                                >
+                                    Concept opslaan
+                                </button>
+                                <button
+                                    type="button"
+                                    className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                                    onClick={() => openTemplatePicker(true)}
+                                    disabled={!welcomeEmail}
+                                >
+                                    Verstuur welkomstmail
+                                </button>
+                            </div>
+                        </div>
+
+                        {!welcomeEmail && (
+                            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                                Welkomstmail is nog niet beschikbaar. Draai migraties en refresh deze pagina.
+                            </div>
+                        )}
+
+                        {welcomeEmail && (
+                            <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-12">
+                                <div className="space-y-4 lg:col-span-4">
+                                    <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+                                        <div className="text-xs font-medium text-zinc-500">Status</div>
+                                        <div className="mt-2">
+                                            <span
+                                                className={cx(
+                                                    'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold',
+                                                    welcomeStatusClass
+                                                )}
+                                            >
+                                                {welcomeStatus}
+                                            </span>
+                                        </div>
+                                        {welcomeEmail?.sent_at && (
+                                            <div className="mt-2 text-xs text-zinc-500">
+                                                Laatst verstuurd: {formatDateTime(welcomeEmail.sent_at)}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="rounded-xl border border-zinc-200 bg-white p-4">
+                                        <div className="text-xs font-semibold text-zinc-500">Ontvanger</div>
+                                        <input
+                                            type="email"
+                                            className="mt-2 w-full rounded-md border-zinc-300 text-sm"
+                                            value={welcomeForm.data.to_email}
+                                            onChange={(e) => welcomeForm.setData('to_email', e.target.value)}
+                                            placeholder="klant@voorbeeld.nl"
+                                        />
+                                        {welcomeForm.errors.to_email && (
+                                            <div className="mt-1 text-xs text-rose-600">{welcomeForm.errors.to_email}</div>
+                                        )}
+                                        <div className="mt-4 text-xs font-semibold text-zinc-500">Beschikbare velden</div>
+                                        <div className="mt-2 space-y-1 text-xs text-zinc-600">
+                                            {['{{ naam }}', '{{ bedrijfsnaam }}', '{{ loginnaam }}', '{{ activatielink }}', '{{ reset_link }}', '{{ weblink }}'].map((token) => (
+                                                <div key={token} className="rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1 font-mono">
+                                                    {token}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {!smtpConfigured && (
+                                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                                            SMTP instellingen ontbreken. Voeg deze toe via profiel &gt; systeem-instellingen.
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="space-y-4 lg:col-span-8">
+                                    <div className="rounded-xl border border-zinc-200 bg-white p-4">
+                                        <div className="text-xs font-semibold text-zinc-500">Onderwerp</div>
+                                        <input
+                                            className="mt-2 w-full rounded-md border-zinc-300 text-sm"
+                                            value={welcomeForm.data.subject}
+                                            onChange={(e) => welcomeForm.setData('subject', e.target.value)}
+                                        />
+                                        {welcomeForm.errors.subject && (
+                                            <div className="mt-1 text-xs text-rose-600">{welcomeForm.errors.subject}</div>
+                                        )}
+                                    </div>
+
+                                    <div className="rounded-xl border border-zinc-200 bg-white p-4">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div className="text-xs font-semibold text-zinc-500">Welkomstmail</div>
+                                            {selectedTemplate && (
+                                                <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11px] font-semibold text-zinc-700">
+                                                    Template: {selectedTemplate.name}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="mt-2 rounded-lg border border-zinc-200">
+                                            <div className="flex flex-wrap items-center gap-1 border-b border-zinc-100 bg-zinc-50 px-2 py-2">
+                                                <ToolbarButton
+                                                    title="Vet"
+                                                    active={welcomeEditor?.isActive('bold')}
+                                                    disabled={!welcomeEditor}
+                                                    onClick={() => welcomeEditor?.chain().focus().toggleBold().run()}
+                                                >
+                                                    Vet
+                                                </ToolbarButton>
+                                                <ToolbarButton
+                                                    title="Cursief"
+                                                    active={welcomeEditor?.isActive('italic')}
+                                                    disabled={!welcomeEditor}
+                                                    onClick={() => welcomeEditor?.chain().focus().toggleItalic().run()}
+                                                >
+                                                    Cursief
+                                                </ToolbarButton>
+                                                <ToolbarButton
+                                                    title="Opsomming"
+                                                    active={welcomeEditor?.isActive('bulletList')}
+                                                    disabled={!welcomeEditor}
+                                                    onClick={() => welcomeEditor?.chain().focus().toggleBulletList().run()}
+                                                >
+                                                    Lijst
+                                                </ToolbarButton>
+                                                <ToolbarButton
+                                                    title="Genummerde lijst"
+                                                    active={welcomeEditor?.isActive('orderedList')}
+                                                    disabled={!welcomeEditor}
+                                                    onClick={() => welcomeEditor?.chain().focus().toggleOrderedList().run()}
+                                                >
+                                                    Nummering
+                                                </ToolbarButton>
+                                                <ToolbarButton
+                                                    title="Link"
+                                                    active={welcomeEditor?.isActive('link')}
+                                                    disabled={!welcomeEditor}
+                                                    onClick={() => {
+                                                        if (!welcomeEditor) return;
+                                                        const previousUrl = welcomeEditor.getAttributes('link').href || '';
+                                                        const url = window.prompt('Link URL', previousUrl);
+                                                        if (url === null) return;
+                                                        if (url === '') {
+                                                            welcomeEditor.chain().focus().unsetLink().run();
+                                                            return;
+                                                        }
+                                                        welcomeEditor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+                                                    }}
+                                                >
+                                                    Link
+                                                </ToolbarButton>
+                                                <ToolbarButton
+                                                    title="Opmaak wissen"
+                                                    disabled={!welcomeEditor}
+                                                    onClick={() => welcomeEditor?.chain().focus().clearNodes().unsetAllMarks().run()}
+                                                >
+                                                    Wissen
+                                                </ToolbarButton>
+                                                <ToolbarButton
+                                                    title="Ongedaan maken"
+                                                    disabled={!welcomeEditor}
+                                                    onClick={() => welcomeEditor?.chain().focus().undo().run()}
+                                                >
+                                                    Undo
+                                                </ToolbarButton>
+                                                <ToolbarButton
+                                                    title="Opnieuw"
+                                                    disabled={!welcomeEditor}
+                                                    onClick={() => welcomeEditor?.chain().focus().redo().run()}
+                                                >
+                                                    Redo
+                                                </ToolbarButton>
+                                            </div>
+                                            <EditorContent editor={welcomeEditor} className="tiptap px-3 py-2 text-sm" />
+                                        </div>
+                                        <div className="mt-2 text-xs text-zinc-500">
+                                            {`Gebruik variabelen zoals {{ naam }}, {{ loginnaam }}, {{ activatielink }}, {{ reset_link }}, {{ weblink }}.`}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {templatePickerOpen && (
+                            <div
+                                className="fixed inset-0 z-40 flex items-center justify-center bg-zinc-950/30 px-4 py-8 backdrop-blur-sm"
+                                onClick={(event) => {
+                                    if (event.target === event.currentTarget) {
+                                        setTemplatePickerOpen(false);
+                                        setPendingSend(false);
+                                    }
+                                }}
+                            >
+                                <div className="w-full max-w-lg rounded-2xl border border-zinc-200/70 bg-white/95 shadow-2xl">
+                                    <div className="border-b border-zinc-100 px-5 py-4">
+                                        <div className="text-sm font-semibold text-zinc-900">Kies een e-mail template</div>
+                                        <div className="mt-1 text-xs text-zinc-500">
+                                            Selecteer een template om het concept te vullen. Je kunt daarna nog aanpassen.
+                                        </div>
+                                    </div>
+                                    <div className="max-h-64 space-y-2 overflow-y-auto px-5 py-4">
+                                        {templates.map((template) => (
+                                            <button
+                                                key={template.id}
+                                                type="button"
+                                                onClick={() => setSelectedTemplateId(template.id)}
+                                                className={cx(
+                                                    'w-full rounded-xl border px-4 py-3 text-left transition',
+                                                    selectedTemplateId === template.id
+                                                        ? 'border-zinc-900 bg-zinc-900 text-white'
+                                                        : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
+                                                )}
+                                            >
+                                                <div className="text-sm font-semibold">{template.name}</div>
+                                                <div className={cx('mt-1 text-xs', selectedTemplateId === template.id ? 'text-zinc-200' : 'text-zinc-500')}>
+                                                    {template.subject || 'Geen onderwerp'}
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="border-t border-zinc-100 px-5 py-4">
+                                        {selectedTemplate ? (
+                                            <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700">
+                                                <div className="font-semibold">{selectedTemplate.subject || 'Geen onderwerp'}</div>
+                                                <div className="mt-1 text-zinc-500">{selectedTemplate.preview || 'Geen voorbeeld'}</div>
+                                            </div>
+                                        ) : (
+                                            <div className="text-xs text-zinc-500">Kies een template om een voorbeeld te zien.</div>
+                                        )}
+                                        <div className="mt-4 flex flex-wrap justify-end gap-2">
+                                            <button
+                                                type="button"
+                                                className="rounded-full border border-zinc-200 px-3 py-1.5 text-[11px] font-semibold text-zinc-700 hover:bg-zinc-50"
+                                                onClick={() => {
+                                                    setTemplatePickerOpen(false);
+                                                    setPendingSend(false);
+                                                }}
+                                            >
+                                                Annuleren
+                                            </button>
+                                            {pendingSend && (
+                                                <button
+                                                    type="button"
+                                                    className="rounded-full border border-zinc-200 px-3 py-1.5 text-[11px] font-semibold text-zinc-700 hover:bg-zinc-50"
+                                                    onClick={() => {
+                                                        setTemplatePickerOpen(false);
+                                                        setPendingSend(false);
+                                                        confirmSendWelcome();
+                                                    }}
+                                                >
+                                                    Verstuur huidige
+                                                </button>
+                                            )}
+                                            <button
+                                                type="button"
+                                                className="rounded-full bg-zinc-900 px-3.5 py-1.5 text-[11px] font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+                                                disabled={!selectedTemplate}
+                                                onClick={() => {
+                                                    applyTemplate(selectedTemplate, { close: true, send: pendingSend });
+                                                    setPendingSend(false);
+                                                }}
+                                            >
+                                                {pendingSend ? 'Gebruik & verstuur' : 'Gebruik template'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
 
