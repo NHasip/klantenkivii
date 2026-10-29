@@ -72,7 +72,7 @@ class EmailTemplatesController
             'subject' => ['required', 'string', 'max:255'],
             'body_html' => ['nullable', 'string'],
             'is_active' => ['nullable', 'boolean'],
-        ]);
+        ], $this->validationMessages(), $this->validationAttributes());
 
         $key = $this->makeKey($data['name']);
         $bodyHtml = $data['body_html'] ?? '';
@@ -107,7 +107,7 @@ class EmailTemplatesController
             'subject' => ['required', 'string', 'max:255'],
             'body_html' => ['nullable', 'string'],
             'is_active' => ['nullable', 'boolean'],
-        ]);
+        ], $this->validationMessages(), $this->validationAttributes());
 
         $bodyHtml = $data['body_html'] ?? '';
         $payload = [
@@ -195,6 +195,36 @@ class EmailTemplatesController
                 $create
             );
         }
+    }
+
+    /**
+     * Nederlandstalige validatieberichten (de app heeft geen lang/nl bestanden).
+     *
+     * @return array<string, mixed>
+     */
+    private function validationMessages(): array
+    {
+        return [
+            'required' => ':Attribute is verplicht.',
+            'string' => ':Attribute moet tekst zijn.',
+            'boolean' => ':Attribute moet aan of uit zijn.',
+            'max' => [
+                'string' => ':Attribute mag niet langer zijn dan :max tekens.',
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function validationAttributes(): array
+    {
+        return [
+            'name' => 'naam',
+            'subject' => 'onderwerp',
+            'body_html' => 'inhoud',
+            'is_active' => 'actief',
+        ];
     }
 
     private function makeKey(string $name): string

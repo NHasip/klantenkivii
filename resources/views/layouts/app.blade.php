@@ -35,6 +35,17 @@
                 </header>
             @endif
 
+            @if (session('status'))
+                <div class="max-w-7xl mx-auto px-4 pt-6 sm:px-6 lg:px-8">
+                    <div x-data="{ show: true }" x-show="show" role="status" class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>{{ session('status') }}</div>
+                            <button type="button" class="text-emerald-700 hover:text-emerald-900" @click="show = false">Sluiten</button>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <!-- Page Content -->
             <main>
                 {{ $slot }}

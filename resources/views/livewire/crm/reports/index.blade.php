@@ -11,8 +11,8 @@
             <div class="w-full xl:max-w-3xl">
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-6 sm:items-end">
                     <div class="sm:col-span-2">
-                        <label class="block text-xs font-medium text-zinc-600">Periode</label>
-                        <select class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model.live="preset">
+                        <label for="report_preset" class="block text-xs font-medium text-zinc-600">Periode</label>
+                        <select id="report_preset" class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model.live="preset">
                             @foreach($this->presetOptions() as $key => $label)
                                 <option value="{{ $key }}">{{ $label }}</option>
                             @endforeach
@@ -21,12 +21,12 @@
 
                     @if($preset === 'custom')
                         <div class="sm:col-span-2">
-                            <label class="block text-xs font-medium text-zinc-600">Van</label>
-                            <input type="date" class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model.live="from" />
+                            <label for="report_from" class="block text-xs font-medium text-zinc-600">Van</label>
+                            <input id="report_from" type="date" class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model="from" />
                         </div>
                         <div class="sm:col-span-2">
-                            <label class="block text-xs font-medium text-zinc-600">Tot</label>
-                            <input type="date" class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model.live="to" />
+                            <label for="report_to" class="block text-xs font-medium text-zinc-600">Tot</label>
+                            <input id="report_to" type="date" class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model="to" />
                         </div>
                     @else
                         <div class="sm:col-span-4 hidden sm:block">
@@ -40,13 +40,14 @@
                     @endif
 
                     <div class="sm:col-span-6 flex items-center justify-between gap-3">
-                        <div class="text-xs text-rose-600">
+                        <div class="text-xs text-rose-600" role="alert">
                             @error('from') {{ $message }} @enderror
                             @error('to') {{ $message }} @enderror
                             @error('preset') {{ $message }} @enderror
                         </div>
-                        <button type="button" class="rounded-md bg-zinc-900 px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-700" wire:click="applyFilters">
-                            Toepassen
+                        <button type="button" class="rounded-md bg-zinc-900 px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-700 disabled:opacity-60" wire:click="applyFilters" wire:loading.attr="disabled" wire:target="applyFilters">
+                            <span wire:loading.remove wire:target="applyFilters">Toepassen</span>
+                            <span wire:loading wire:target="applyFilters">Laden...</span>
                         </button>
                     </div>
                 </div>
@@ -138,7 +139,7 @@
             <div class="text-sm font-semibold">{{ number_format($kpis['mandates_active'], 0, ',', '.') }}</div>
         </div>
         <div class="h-full rounded-xl border border-zinc-200 bg-white px-3 py-2">
-            <div class="text-xs text-zinc-500">Mandaten pending</div>
+            <div class="text-xs text-zinc-500">Mandaten in afwachting</div>
             <div class="text-sm font-semibold">{{ number_format($kpis['mandates_pending'], 0, ',', '.') }}</div>
         </div>
         <div class="h-full rounded-xl border border-zinc-200 bg-white px-3 py-2">
@@ -207,7 +208,7 @@
                 </div>
             </div>
 
-            <div class="mt-4 flex-1 overflow-hidden rounded-lg border border-zinc-200">
+            <div class="mt-4 flex-1 overflow-x-auto rounded-lg border border-zinc-200">
                 <table class="min-w-full divide-y divide-zinc-100">
                     <thead class="bg-zinc-50">
                         <tr>
@@ -254,7 +255,7 @@
                 <div class="text-sm font-semibold">Top 10 klanten op MRR</div>
                 <div class="text-xs text-zinc-500">Actieve module-omzet</div>
             </div>
-            <div class="mt-4 overflow-hidden rounded-lg border border-zinc-200">
+            <div class="mt-4 overflow-x-auto rounded-lg border border-zinc-200">
                 <table class="min-w-full divide-y divide-zinc-100">
                     <thead class="bg-zinc-50">
                         <tr>

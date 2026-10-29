@@ -62,6 +62,14 @@ class GarageCompaniesController
             'perPage' => (int) $request->query('perPage', 15),
         ];
 
+        // Alleen de waarden uit de keuzelijst toestaan; voorkomt lege of extreem grote pagina's.
+        if (! in_array($filters['perPage'], [10, 15, 25, 50], true)) {
+            $filters['perPage'] = 15;
+        }
+        if (! in_array($filters['sort'], ['updated_desc', 'actief_vanaf_desc', 'omzet_desc'], true)) {
+            $filters['sort'] = 'updated_desc';
+        }
+
         $perPage = $filters['perPage'];
 
         $baseQuery = $view === 'prullenbak'
@@ -203,6 +211,8 @@ class GarageCompaniesController
             'opzegreden' => ['nullable', 'string', 'max:255'],
             'login_email' => ['nullable', 'email', 'max:255', 'unique:users,email'],
             'login_password' => ['nullable', 'string', 'min:8'],
+        ], [
+            'voor_en_achternaam.regex' => 'Vul zowel voor- als achternaam in, gescheiden door een spatie.',
         ]);
 
         $data['login_email'] = $data['login_email'] ?: null;
@@ -395,7 +405,7 @@ class GarageCompaniesController
             ->with('status', 'Klant aangemaakt.');
     }
 
-    public function show(Request $request, GarageCompany $garageCompany): Response
+    public function show(Request $request, GarageCompany $garageCompany): Response|RedirectResponse
     {
         $tab = (string) $request->query('tab', 'overzicht');
         if ($tab == 'seats') {

@@ -1,4 +1,4 @@
-<nav x-data="{ open: false }" class="bg-white border-b border-gray-100">
+<nav x-data="{ open: false }" class="bg-white border-b border-gray-100" aria-label="Hoofdmenu">
     <!-- Primary Navigation Menu -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
@@ -15,6 +15,23 @@
                     <x-nav-link href="{{ route('dashboard') }}" :active="request()->routeIs('dashboard')">
                         {{ __('Dashboard') }}
                     </x-nav-link>
+                    <x-nav-link href="{{ route('crm.tasks.index') }}" :active="request()->routeIs('crm.tasks.*')">
+                        Taken
+                    </x-nav-link>
+                    <x-nav-link href="{{ route('crm.garage_companies.index') }}" :active="request()->routeIs('crm.garage_companies.*')">
+                        Klanten
+                    </x-nav-link>
+                    <x-nav-link href="{{ route('crm.reports.index') }}" :active="request()->routeIs('crm.reports.*')">
+                        Rapportages
+                    </x-nav-link>
+                    @if (Auth::user()?->isAdmin())
+                        <x-nav-link href="{{ route('crm.users.index') }}" :active="request()->routeIs('crm.users.*')">
+                            Gebruikers
+                        </x-nav-link>
+                        <x-nav-link href="{{ route('crm.modules.index') }}" :active="request()->routeIs('crm.modules.*')">
+                            Modules
+                        </x-nav-link>
+                    @endif
                 </div>
             </div>
 
@@ -71,6 +88,8 @@
                     </div>
                 @endif
 
+                @livewire('crm.reminders.bell')
+
                 <!-- Settings Dropdown -->
                 <div class="ms-3 relative">
                     <x-dropdown align="right" width="48">
@@ -99,8 +118,14 @@
                             </div>
 
                             <x-dropdown-link href="{{ route('profile.show') }}">
-                                {{ __('Profile') }}
+                                Profiel &amp; 2FA
                             </x-dropdown-link>
+
+                            @if (Auth::user()?->isAdmin())
+                                <x-dropdown-link href="{{ route('crm.email_templates.index') }}">
+                                    E-mail templates
+                                </x-dropdown-link>
+                            @endif
 
                             @if (Laravel\Jetstream\Jetstream::hasApiFeatures())
                                 <x-dropdown-link href="{{ route('api-tokens.index') }}">
@@ -126,7 +151,7 @@
 
             <!-- Hamburger -->
             <div class="-me-2 flex items-center sm:hidden">
-                <button @click="open = ! open" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 focus:text-gray-500 transition duration-150 ease-in-out">
+                <button type="button" @click="open = ! open" :aria-expanded="open.toString()" aria-label="Menu openen of sluiten" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 focus:text-gray-500 transition duration-150 ease-in-out">
                     <svg class="size-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
                         <path :class="{'hidden': open, 'inline-flex': ! open }" class="inline-flex" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                         <path :class="{'hidden': ! open, 'inline-flex': open }" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -142,6 +167,23 @@
             <x-responsive-nav-link href="{{ route('dashboard') }}" :active="request()->routeIs('dashboard')">
                 {{ __('Dashboard') }}
             </x-responsive-nav-link>
+            <x-responsive-nav-link href="{{ route('crm.tasks.index') }}" :active="request()->routeIs('crm.tasks.*')">
+                Taken
+            </x-responsive-nav-link>
+            <x-responsive-nav-link href="{{ route('crm.garage_companies.index') }}" :active="request()->routeIs('crm.garage_companies.*')">
+                Klanten
+            </x-responsive-nav-link>
+            <x-responsive-nav-link href="{{ route('crm.reports.index') }}" :active="request()->routeIs('crm.reports.*')">
+                Rapportages
+            </x-responsive-nav-link>
+            @if (Auth::user()?->isAdmin())
+                <x-responsive-nav-link href="{{ route('crm.users.index') }}" :active="request()->routeIs('crm.users.*')">
+                    Gebruikers
+                </x-responsive-nav-link>
+                <x-responsive-nav-link href="{{ route('crm.modules.index') }}" :active="request()->routeIs('crm.modules.*')">
+                    Modules
+                </x-responsive-nav-link>
+            @endif
         </div>
 
         <!-- Responsive Settings Options -->
@@ -162,8 +204,14 @@
             <div class="mt-3 space-y-1">
                 <!-- Account Management -->
                 <x-responsive-nav-link href="{{ route('profile.show') }}" :active="request()->routeIs('profile.show')">
-                    {{ __('Profile') }}
+                    Profiel &amp; 2FA
                 </x-responsive-nav-link>
+
+                @if (Auth::user()?->isAdmin())
+                    <x-responsive-nav-link href="{{ route('crm.email_templates.index') }}">
+                        E-mail templates
+                    </x-responsive-nav-link>
+                @endif
 
                 @if (Laravel\Jetstream\Jetstream::hasApiFeatures())
                     <x-responsive-nav-link href="{{ route('api-tokens.index') }}" :active="request()->routeIs('api-tokens.index')">

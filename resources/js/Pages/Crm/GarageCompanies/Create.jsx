@@ -22,6 +22,14 @@ function toLocalDateInput(date) {
     return `${year}-${month}-${day}`;
 }
 
+const SOURCE_LABELS = {
+    website_formulier: 'Websiteformulier',
+    telefoon: 'Telefoon',
+    email: 'E-mail',
+    referral: 'Doorverwijzing',
+    anders: 'Anders',
+};
+
 function generatePassword(length = 12) {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
     const values = new Uint32Array(length);
@@ -39,7 +47,10 @@ function generatePassword(length = 12) {
     return result.join('');
 }
 
-export default function Create({ statusOptions, statusLabels, sourceOptions, moduleRows, defaults, urls }) {
+export default function Create({ statusOptions: rawStatusOptions, statusLabels, sourceOptions: rawSourceOptions, moduleRows, defaults: rawDefaults, urls }) {
+    const statusOptions = Array.isArray(rawStatusOptions) ? rawStatusOptions : [];
+    const sourceOptions = Array.isArray(rawSourceOptions) ? rawSourceOptions : [];
+    const defaults = rawDefaults && typeof rawDefaults === 'object' ? rawDefaults : {};
     const [showPassword, setShowPassword] = useState(false);
     const { data, setData, post, processing, errors } = useForm({
         bedrijfsnaam: '',
@@ -124,6 +135,17 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
         post(urls.store, { preserveScroll: true });
     };
 
+    const hasErrors = Object.keys(errors || {}).length > 0;
+
+    const handleStatusChange = (value) => {
+        setData((prev) => ({
+            ...prev,
+            status: value,
+            // Opzeg-velden zijn alleen zichtbaar bij status opgezegd; voorkom dat verborgen waarden worden opgeslagen.
+            ...(value === 'opgezegd' ? {} : { opgezegd_op: '', opzegreden: '' }),
+        }));
+    };
+
     return (
         <div className="space-y-6">
             <Head title="Nieuwe klant" />
@@ -148,8 +170,9 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                     <div className="text-sm font-semibold">Bedrijf</div>
                     <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="sm:col-span-2">
-                            <label className="block text-xs font-medium text-zinc-600">Bedrijfsnaam *</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-bedrijfsnaam">Bedrijfsnaam *</label>
                             <input
+                                id="gc-bedrijfsnaam"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={data.bedrijfsnaam}
                                 onChange={(e) => setData('bedrijfsnaam', e.target.value)}
@@ -158,8 +181,9 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                         </div>
 
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">KVK nummer</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-kvk-nummer">KVK nummer</label>
                             <input
+                                id="gc-kvk-nummer"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={data.kvk_nummer}
                                 onChange={(e) => setData('kvk_nummer', e.target.value)}
@@ -167,12 +191,14 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                             {errors.kvk_nummer && <div className="mt-1 text-xs text-rose-600">{errors.kvk_nummer}</div>}
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">Land *</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-land">Land *</label>
                             <input
+                                id="gc-land"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={data.land}
                                 onChange={(e) => setData('land', e.target.value)}
                             />
+                            {errors.land && <div className="mt-1 text-xs text-rose-600">{errors.land}</div>}
                         </div>
                     </div>
                 </div>
@@ -181,8 +207,9 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                     <div className="text-sm font-semibold">Contactpersoon</div>
                     <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="sm:col-span-2">
-                            <label className="block text-xs font-medium text-zinc-600">Volledige naam *</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-voor-en-achternaam">Volledige naam *</label>
                             <input
+                                id="gc-voor-en-achternaam"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={data.voor_en_achternaam}
                                 onChange={(e) => setData('voor_en_achternaam', e.target.value)}
@@ -192,8 +219,9 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                             )}
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">E-mail *</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-email">E-mail *</label>
                             <input
+                                id="gc-email"
                                 type="email"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={data.email}
@@ -202,8 +230,9 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                             {errors.email && <div className="mt-1 text-xs text-rose-600">{errors.email}</div>}
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">Telefoon *</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-telefoonnummer">Telefoon *</label>
                             <input
+                                id="gc-telefoonnummer"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={data.telefoonnummer}
                                 onChange={(e) => setData('telefoonnummer', e.target.value)}
@@ -219,8 +248,9 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                     <div className="text-sm font-semibold">Adres</div>
                     <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="sm:col-span-2">
-                            <label className="block text-xs font-medium text-zinc-600">Straat + nummer *</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-straatnaam-en-nummer">Straat + nummer *</label>
                             <input
+                                id="gc-straatnaam-en-nummer"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={data.straatnaam_en_nummer}
                                 onChange={(e) => setData('straatnaam_en_nummer', e.target.value)}
@@ -230,8 +260,9 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                             )}
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">Postcode *</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-postcode">Postcode *</label>
                             <input
+                                id="gc-postcode"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={data.postcode}
                                 onChange={(e) => setData('postcode', e.target.value)}
@@ -239,8 +270,9 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                             {errors.postcode && <div className="mt-1 text-xs text-rose-600">{errors.postcode}</div>}
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">Plaats *</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-plaats">Plaats *</label>
                             <input
+                                id="gc-plaats"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={data.plaats}
                                 onChange={(e) => setData('plaats', e.target.value)}
@@ -254,8 +286,9 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                     <div className="text-sm font-semibold">Incasso (SEPA)</div>
                     <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">IBAN</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-iban">IBAN</label>
                             <input
+                                id="gc-iban"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={data.iban}
                                 onChange={(e) => setData('iban', e.target.value)}
@@ -263,16 +296,19 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                             {errors.iban && <div className="mt-1 text-xs text-rose-600">{errors.iban}</div>}
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">BIC</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-bic">BIC</label>
                             <input
+                                id="gc-bic"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={data.bic}
                                 onChange={(e) => setData('bic', e.target.value)}
                             />
+                            {errors.bic && <div className="mt-1 text-xs text-rose-600">{errors.bic}</div>}
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">Plaats van tekenen</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-plaats-van-tekenen">Plaats van tekenen</label>
                             <input
+                                id="gc-plaats-van-tekenen"
                                 autoComplete="off"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={data.plaats_van_tekenen}
@@ -283,8 +319,9 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                             )}
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">Datum van tekenen</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-datum-van-tekenen">Datum van tekenen</label>
                             <input
+                                id="gc-datum-van-tekenen"
                                 type="date"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={data.datum_van_tekenen}
@@ -301,11 +338,12 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                     <div className="text-sm font-semibold">CRM</div>
                     <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">Status</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-status">Status</label>
                             <select
+                                id="gc-status"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={data.status}
-                                onChange={(e) => setData('status', e.target.value)}
+                                onChange={(e) => handleStatusChange(e.target.value)}
                             >
                                 {statusOptions.map((status) => (
                                     <option key={status} value={status}>
@@ -316,8 +354,9 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                             {errors.status && <div className="mt-1 text-xs text-rose-600">{errors.status}</div>}
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">Demo start</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-proefperiode-start">Demo start</label>
                             <input
+                                id="gc-proefperiode-start"
                                 type="date"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={data.proefperiode_start}
@@ -328,8 +367,9 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                             )}
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">Actief vanaf</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-actief-vanaf">Actief vanaf</label>
                             <input
+                                id="gc-actief-vanaf"
                                 type="date"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={data.actief_vanaf}
@@ -342,8 +382,9 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                         {data.status === 'opgezegd' && (
                             <>
                                 <div>
-                                    <label className="block text-xs font-medium text-zinc-600">Opgezegd op</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-opgezegd-op">Opgezegd op</label>
                                     <input
+                                        id="gc-opgezegd-op"
                                         type="datetime-local"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={data.opgezegd_op}
@@ -354,8 +395,9 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                                     )}
                                 </div>
                                 <div className="sm:col-span-2">
-                                    <label className="block text-xs font-medium text-zinc-600">Opzegreden</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-opzegreden">Opzegreden</label>
                                     <input
+                                        id="gc-opzegreden"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={data.opzegreden}
                                         onChange={(e) => setData('opzegreden', e.target.value)}
@@ -367,27 +409,31 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                             </>
                         )}
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">Bron</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-bron">Bron</label>
                             <select
+                                id="gc-bron"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={data.bron}
                                 onChange={(e) => setData('bron', e.target.value)}
                             >
                                 {sourceOptions.map((source) => (
                                     <option key={source} value={source}>
-                                        {source}
+                                        {SOURCE_LABELS[source] || source}
                                     </option>
                                 ))}
                             </select>
+                            {errors.bron && <div className="mt-1 text-xs text-rose-600">{errors.bron}</div>}
                         </div>
                         <div className="sm:col-span-2">
-                            <label className="block text-xs font-medium text-zinc-600">Tags</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-tags">Tags</label>
                             <textarea
+                                id="gc-tags"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 rows={2}
                                 value={data.tags}
                                 onChange={(e) => setData('tags', e.target.value)}
                             />
+                            {errors.tags && <div className="mt-1 text-xs text-rose-600">{errors.tags}</div>}
                         </div>
                     </div>
                 </div>
@@ -396,8 +442,9 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                     <div className="text-sm font-semibold">Login gegevens</div>
                     <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">Login e-mail</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-login-email">Login e-mail</label>
                             <input
+                                id="gc-login-email"
                                 type="email"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={data.login_email}
@@ -408,9 +455,10 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                             )}
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">Wachtwoord</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-login-password">Wachtwoord</label>
                             <div className="mt-1 flex gap-2">
                                 <input
+                                    id="gc-login-password"
                                     type={showPassword ? 'text' : 'password'}
                                     className="w-full rounded-md border-zinc-300 text-sm"
                                     value={data.login_password}
@@ -419,6 +467,8 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                                 <button
                                     type="button"
                                     className="rounded-md border border-zinc-200 px-3 text-xs font-semibold hover:bg-zinc-50"
+                                    aria-pressed={showPassword}
+                                    aria-controls="gc-login-password"
                                     onClick={() => setShowPassword((prev) => !prev)}
                                 >
                                     {showPassword ? 'Verberg' : 'Toon'}
@@ -470,7 +520,7 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                         </div>
                     </div>
 
-                    <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+                    <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
                         <table className="min-w-full divide-y divide-zinc-100">
                             <thead className="bg-zinc-50">
                                 <tr>
@@ -482,14 +532,22 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-100">
+                                {data.moduleRows.length === 0 && (
+                                    <tr>
+                                        <td colSpan={5} className="px-4 py-8 text-center text-sm text-zinc-500">
+                                            Er zijn nog geen modules beschikbaar.
+                                        </td>
+                                    </tr>
+                                )}
                                 {data.moduleRows.map((row, index) => (
                                     <tr key={row.module_id} className="hover:bg-zinc-50">
                                         <td className="px-4 py-3">
                                             <input
                                                 type="checkbox"
                                                 className="rounded border-zinc-300"
-                                                checked={row.actief}
+                                                checked={!!row.actief}
                                                 onChange={() => toggleModule(index)}
+                                                aria-label={`${row.naam} actief`}
                                             />
                                         </td>
                                         <td className="px-4 py-3 text-sm font-semibold">{row.naam}</td>
@@ -499,8 +557,9 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                                                 min="0"
                                                 max="999"
                                                 className="w-24 rounded-md border-zinc-300 text-sm"
-                                                value={row.aantal}
+                                                value={row.aantal ?? ''}
                                                 onChange={(e) => updateModuleRow(index, 'aantal', e.target.value)}
+                                                aria-label={`Aantal ${row.naam}`}
                                             />
                                             {errors[`moduleRows.${index}.aantal`] && (
                                                 <div className="mt-1 text-xs text-rose-600">
@@ -514,8 +573,9 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                                                 step="0.01"
                                                 min="0"
                                                 className="w-40 rounded-md border-zinc-300 text-sm"
-                                                value={row.prijs_maand_excl}
+                                                value={row.prijs_maand_excl ?? ''}
                                                 onChange={(e) => updateModuleRow(index, 'prijs_maand_excl', e.target.value)}
+                                                aria-label={`Prijs per maand excl. btw ${row.naam}`}
                                             />
                                             {errors[`moduleRows.${index}.prijs_maand_excl`] && (
                                                 <div className="mt-1 text-xs text-rose-600">
@@ -530,8 +590,9 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                                                 min="0"
                                                 max="100"
                                                 className="w-24 rounded-md border-zinc-300 text-sm"
-                                                value={row.btw_percentage}
+                                                value={row.btw_percentage ?? ''}
                                                 onChange={(e) => updateModuleRow(index, 'btw_percentage', e.target.value)}
+                                                aria-label={`BTW percentage ${row.naam}`}
                                             />
                                             {errors[`moduleRows.${index}.btw_percentage`] && (
                                                 <div className="mt-1 text-xs text-rose-600">
@@ -546,10 +607,15 @@ export default function Create({ statusOptions, statusLabels, sourceOptions, mod
                     </div>
                 </div>
 
-                <div className="flex justify-end">
+                <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
+                    {hasErrors && !processing && (
+                        <div role="alert" className="text-sm text-rose-600">
+                            Niet alle velden zijn juist ingevuld. Controleer de rood gemarkeerde velden hierboven.
+                        </div>
+                    )}
                     <button
                         type="submit"
-                        className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                        className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                         disabled={processing}
                     >
                         {processing ? 'Opslaan...' : 'Klant opslaan'}

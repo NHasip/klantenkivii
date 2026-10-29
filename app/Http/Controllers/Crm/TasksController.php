@@ -82,7 +82,7 @@ class TasksController
             'omschrijving' => ['nullable', 'string', 'max:2000'],
             'deadline' => ['nullable', 'date'],
             'kleur' => ['nullable', 'string', 'max:20'],
-        ]);
+        ], $this->validationMessages(), $this->validationAttributes());
 
         $project = TaskProject::create([
             'naam' => $data['naam'],
@@ -115,7 +115,7 @@ class TasksController
             'assignees' => ['array'],
             'assignees.*' => ['integer', 'exists:users,id'],
             'attachments.*' => $this->attachmentValidationRules(),
-        ]);
+        ], $this->validationMessages(), $this->validationAttributes());
 
         $sortOrder = $this->nextSortOrder(
             taskProjectId: $data['task_project_id'] ?? null,
@@ -156,10 +156,9 @@ class TasksController
     {
         $data = $request->validate([
             'status' => ['required', Rule::enum(TaskStatus::class)],
-        ]);
+        ], $this->validationMessages(), $this->validationAttributes());
 
-        $task->status = TaskStatus::from($data['status']);
-        $task->afgerond_op = $task->status === TaskStatus::Afgerond ? now() : null;
+        $this->applyStatus($task, TaskStatus::from($data['status']));
         $task->save();
         $task->loadCount(['comments', 'attachments']);
 
@@ -181,7 +180,7 @@ class TasksController
             'assignees' => ['nullable', 'array'],
             'assignees.*' => ['integer', 'exists:users,id'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
-        ]);
+        ], $this->validationMessages(), $this->validationAttributes());
 
         if (array_key_exists('titel', $data) && $data['titel'] !== null) {
             $task->titel = $data['titel'];
@@ -208,8 +207,7 @@ class TasksController
         }
 
         if (array_key_exists('status', $data) && $data['status'] !== null) {
-            $task->status = TaskStatus::from($data['status']);
-            $task->afgerond_op = $task->status === TaskStatus::Afgerond ? now() : null;
+            $this->applyStatus($task, TaskStatus::from($data['status']));
         }
 
         if (array_key_exists('sort_order', $data) && $data['sort_order'] !== null) {
@@ -243,7 +241,7 @@ class TasksController
             'changes.*.task_project_id' => ['nullable', 'integer', 'exists:task_projects,id'],
             'changes.*.status' => ['nullable', Rule::enum(TaskStatus::class)],
             'changes.*.sort_order' => ['required', 'integer', 'min:0'],
-        ]);
+        ], $this->validationMessages(), $this->validationAttributes());
 
         DB::transaction(function () use ($data) {
             foreach ($data['changes'] as $row) {
@@ -254,8 +252,7 @@ class TasksController
 
                 $task->task_project_id = $row['task_project_id'] ?? null;
                 if (! empty($row['status'])) {
-                    $task->status = TaskStatus::from($row['status']);
-                    $task->afgerond_op = $task->status === TaskStatus::Afgerond ? now() : null;
+                    $this->applyStatus($task, TaskStatus::from($row['status']));
                 }
                 $task->sort_order = (int) $row['sort_order'];
                 $task->save();
@@ -269,7 +266,7 @@ class TasksController
     {
         $data = $request->validate([
             'file' => ['required', ...$this->attachmentValidationRules()],
-        ]);
+        ], $this->validationMessages(), $this->validationAttributes());
 
         /** @var \Illuminate\Http\UploadedFile $file */
         $file = $data['file'];
@@ -309,7 +306,7 @@ class TasksController
     {
         $data = $request->validate([
             'body' => ['required', 'string', 'max:5000'],
-        ]);
+        ], $this->validationMessages(), $this->validationAttributes());
 
         $comment = TaskComment::create([
             'task_id' => $task->id,
@@ -518,6 +515,85 @@ class TasksController
                     'url' => route('crm.tasks.attachments.download', ['attachment' => $file->id]),
                 ])
                 ->values(),
+        ];
+    }
+
+    /**
+     * Zet de status en werkt afgerond_op alleen bij als de status echt wijzigt,
+     * zodat slepen/herordenen de afrond-datum niet overschrijft.
+     */
+    private function applyStatus(Task $task, TaskStatus $status): void
+    {
+        $previous = $task->status;
+        $task->status = $status;
+
+        if ($previous === $status && ($status !== TaskStatus::Afgerond || $task->afgerond_op !== null)) {
+            return;
+        }
+
+        $task->afgerond_op = $status === TaskStatus::Afgerond ? now() : null;
+    }
+
+    /**
+     * Nederlandstalige validatieberichten (de app heeft geen lang/nl bestanden).
+     *
+     * @return array<string, mixed>
+     */
+    private function validationMessages(): array
+    {
+        return [
+            'required' => ':Attribute is verplicht.',
+            'string' => ':Attribute moet tekst zijn.',
+            'integer' => ':Attribute moet een geheel getal zijn.',
+            'array' => ':Attribute is ongeldig.',
+            'date' => ':Attribute is geen geldige datum.',
+            'exists' => 'De gekozen waarde voor :attribute bestaat niet (meer).',
+            'enum' => 'De gekozen waarde voor :attribute is ongeldig.',
+            'file' => ':Attribute moet een bestand zijn.',
+            'uploaded' => ':Attribute kon niet worden geüpload. Mogelijk is het bestand te groot.',
+            'mimes' => ':Attribute heeft een niet toegestaan bestandstype. Toegestaan: :values.',
+            'mimetypes' => ':Attribute heeft een niet toegestaan bestandstype.',
+            'min' => [
+                'numeric' => ':Attribute moet minimaal :min zijn.',
+                'array' => ':Attribute moet minimaal :min item(s) bevatten.',
+                'string' => ':Attribute moet minimaal :min tekens bevatten.',
+                'file' => ':Attribute moet minimaal :min KB zijn.',
+            ],
+            'max' => [
+                'numeric' => ':Attribute mag niet groter zijn dan :max.',
+                'array' => ':Attribute mag niet meer dan :max items bevatten.',
+                'string' => ':Attribute mag niet langer zijn dan :max tekens.',
+                'file' => ':Attribute mag niet groter zijn dan 10 MB.',
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function validationAttributes(): array
+    {
+        return [
+            'naam' => 'naam',
+            'omschrijving' => 'omschrijving',
+            'deadline' => 'deadline',
+            'kleur' => 'kleur',
+            'titel' => 'titel',
+            'task_project_id' => 'project',
+            'status' => 'status',
+            'prioriteit' => 'prioriteit',
+            'labels' => 'labels',
+            'assignees' => 'toegewezen personen',
+            'assignees.*' => 'toegewezen persoon',
+            'attachments.*' => 'bijlage',
+            'file' => 'bestand',
+            'body' => 'reactie',
+            'sort_order' => 'volgorde',
+            'changes' => 'wijzigingen',
+            'changes.*.id' => 'taak',
+            'changes.*.task_project_id' => 'project',
+            'changes.*.status' => 'status',
+            'changes.*.sort_order' => 'volgorde',
         ];
     }
 

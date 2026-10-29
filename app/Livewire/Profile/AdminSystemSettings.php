@@ -191,14 +191,22 @@ class AdminSystemSettings extends Component
             EmailTemplateRenderer::sampleData()
         );
 
-        Mail::to($this->testEmail)->send(new TemplateMail(
-            'Kivii CRM SMTP test',
-            '<p>'.$rendered.'</p>',
-            $rendered,
-            $this->smtp['from_address'] ?? null,
-            $this->smtp['from_name'] ?? null
-        ));
+        try {
+            Mail::to($this->testEmail)->send(new TemplateMail(
+                'Kivii CRM SMTP test',
+                '<p>'.$rendered.'</p>',
+                $rendered,
+                $this->smtp['from_address'] ?? null,
+                $this->smtp['from_name'] ?? null
+            ));
+        } catch (\Throwable $e) {
+            report($e);
+            $this->addError('testEmail', 'Testmail versturen mislukt. Controleer de SMTP instellingen.');
 
+            return;
+        }
+
+        $this->dispatch('test-mail-sent');
         $this->dispatch('notify', message: 'Testmail verstuurd.');
     }
 

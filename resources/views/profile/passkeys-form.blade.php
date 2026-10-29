@@ -36,7 +36,7 @@
                                 @endif
                             </div>
                         </div>
-                        <form method="POST" action="{{ route('profile.passkeys.destroy', ['passkey' => $passkey->id]) }}">
+                        <form method="POST" action="{{ route('profile.passkeys.destroy', ['passkey' => $passkey->id]) }}" onsubmit="return confirm('Weet je zeker dat je deze passkey wilt verwijderen?')">
                             @csrf
                             @method('DELETE')
                             <x-danger-button>
@@ -55,7 +55,7 @@
                 <x-button id="passkey-register-button" type="button">
                     {{ __('Passkey toevoegen') }}
                 </x-button>
-                <span id="passkey-register-status" class="text-sm text-gray-600"></span>
+                <span id="passkey-register-status" class="text-sm text-gray-600" role="status" aria-live="polite"></span>
             </div>
         @else
             <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">

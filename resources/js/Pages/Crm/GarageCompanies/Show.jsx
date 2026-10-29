@@ -42,6 +42,69 @@ function formatDate(isoString) {
     }
 }
 
+function pad2(value) {
+    return String(value).padStart(2, '0');
+}
+
+// Lokale datum/tijd voor date/datetime-local inputs (toISOString geeft UTC en verschuift de tijd).
+function toLocalDateInput(date) {
+    return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function toLocalDateTimeInput(date) {
+    return `${toLocalDateInput(date)}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+}
+
+const SOURCE_LABELS = {
+    website_formulier: 'Websiteformulier',
+    telefoon: 'Telefoon',
+    email: 'E-mail',
+    referral: 'Doorverwijzing',
+    anders: 'Anders',
+};
+
+const MANDATE_STATUS_LABELS = {
+    pending: 'In afwachting',
+    actief: 'Actief',
+    ingetrokken: 'Ingetrokken',
+};
+
+const MANDATE_STATUS_CLASSES = {
+    pending: 'bg-amber-50 text-amber-700',
+    actief: 'bg-emerald-50 text-emerald-700',
+    ingetrokken: 'bg-zinc-100 text-zinc-700',
+};
+
+const WELCOME_STATUS_LABELS = {
+    draft: 'Concept',
+    concept: 'Concept',
+    sent: 'Verstuurd',
+    failed: 'Mislukt',
+};
+
+const CHANNEL_LABELS = {
+    popup: 'Pop-up',
+    email: 'E-mail',
+    beide: 'Pop-up en e-mail',
+};
+
+const ACTIVITY_TYPE_LABELS = {
+    status_wijziging: 'Statuswijziging',
+    notitie: 'Notitie',
+    taak: 'Taak',
+    afspraak: 'Afspraak',
+    demo: 'Demo',
+    mandate: 'Mandaat',
+    module: 'Module',
+    systeem: 'Systeem',
+};
+
+function scrollToForm(id) {
+    window.requestAnimationFrame(() => {
+        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+}
+
 function numberValue(value) {
     const parsed = Number(String(value).replace(',', '.'));
     return Number.isFinite(parsed) ? parsed : 0;
@@ -73,23 +136,32 @@ function Pagination({ links }) {
     if (!links || links.length <= 1) return null;
 
     return (
-        <div className="mt-6 flex flex-wrap gap-2">
-            {links.map((link, idx) => (
-                <Link
-                    key={`${link.label}-${idx}`}
-                    href={link.url || '#'}
-                    className={cx(
-                        'rounded-md border px-3 py-1.5 text-sm',
-                        link.active
-                            ? 'border-indigo-600 bg-indigo-600 text-white'
-                            : 'border-zinc-200 text-zinc-700 hover:bg-zinc-50',
-                        !link.url && 'cursor-not-allowed opacity-50'
-                    )}
-                    preserveScroll
-                    dangerouslySetInnerHTML={{ __html: link.label }}
-                />
-            ))}
-        </div>
+        <nav aria-label="Paginering" className="mt-6 flex flex-wrap gap-2">
+            {links.map((link, idx) =>
+                link.url ? (
+                    <Link
+                        key={`${link.label}-${idx}`}
+                        href={link.url}
+                        aria-current={link.active ? 'page' : undefined}
+                        className={cx(
+                            'rounded-md border px-3 py-1.5 text-sm',
+                            link.active
+                                ? 'border-indigo-600 bg-indigo-600 text-white'
+                                : 'border-zinc-200 text-zinc-700 hover:bg-zinc-50'
+                        )}
+                        preserveScroll
+                        dangerouslySetInnerHTML={{ __html: link.label }}
+                    />
+                ) : (
+                    <span
+                        key={`${link.label}-${idx}`}
+                        aria-disabled="true"
+                        className="cursor-not-allowed rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-700 opacity-50"
+                        dangerouslySetInnerHTML={{ __html: link.label }}
+                    />
+                )
+            )}
+        </nav>
     );
 }
 
@@ -187,10 +259,10 @@ export default function Show({
     const handleStatusChange = (value) => {
         overviewForm.setData('status', value);
         if (value === 'demo_aangevraagd' && !overviewForm.data.demo_aangevraagd_op) {
-            overviewForm.setData('demo_aangevraagd_op', new Date().toISOString().slice(0, 16));
+            overviewForm.setData('demo_aangevraagd_op', toLocalDateTimeInput(new Date()));
         }
         if (value === 'actief' && !overviewForm.data.actief_vanaf) {
-            overviewForm.setData('actief_vanaf', new Date().toISOString().slice(0, 16));
+            overviewForm.setData('actief_vanaf', toLocalDateTimeInput(new Date()));
         }
     };
 
@@ -206,7 +278,10 @@ export default function Show({
             });
             if (!ok) return;
         }
-        overviewForm.patch(urls.update_overview, { preserveScroll: true });
+        overviewForm.patch(urls.update_overview, {
+            preserveScroll: true,
+            onSuccess: () => overviewForm.reset('login_password'),
+        });
     };
 
     const [showPersonForm, setShowPersonForm] = useState(false);
@@ -235,6 +310,7 @@ export default function Show({
             active: true,
         });
         personForm.clearErrors();
+        scrollToForm('person-form');
     };
 
     const startPersonEdit = (person) => {
@@ -250,6 +326,7 @@ export default function Show({
             active: !!person.active,
         });
         personForm.clearErrors();
+        scrollToForm('person-form');
     };
 
     const cancelPerson = () => {
@@ -262,9 +339,9 @@ export default function Show({
         event.preventDefault();
         if (editingPersonId) {
             const url = urls.update_person.replace('__PERSON__', editingPersonId);
-            personForm.patch(url, { preserveScroll: true });
+            personForm.patch(url, { preserveScroll: true, onSuccess: cancelPerson });
         } else {
-            personForm.post(urls.store_person, { preserveScroll: true });
+            personForm.post(urls.store_person, { preserveScroll: true, onSuccess: cancelPerson });
         }
     };
 
@@ -348,6 +425,7 @@ export default function Show({
         setShowSeatForm(true);
         seatForm.setData({ naam: '', email: '', rol_in_kivii: '', actief: true, aangemaakt_op: '' });
         seatForm.clearErrors();
+        scrollToForm('seat-form');
     };
 
     const startSeatEdit = (seat) => {
@@ -361,6 +439,7 @@ export default function Show({
             aangemaakt_op: seat.aangemaakt_op || '',
         });
         seatForm.clearErrors();
+        scrollToForm('seat-form');
     };
 
     const cancelSeat = () => {
@@ -372,9 +451,9 @@ export default function Show({
     const submitSeat = (event) => {
         event.preventDefault();
         if (editingSeatId) {
-            seatForm.patch(urls.update_seat.replace('__SEAT__', editingSeatId), { preserveScroll: true });
+            seatForm.patch(urls.update_seat.replace('__SEAT__', editingSeatId), { preserveScroll: true, onSuccess: cancelSeat });
         } else {
-            seatForm.post(urls.store_seat, { preserveScroll: true });
+            seatForm.post(urls.store_seat, { preserveScroll: true, onSuccess: cancelSeat });
         }
     };
 
@@ -403,7 +482,7 @@ export default function Show({
             const date = new Date(demoForm.data.demo_aangevraagd_op);
             if (!Number.isNaN(date.getTime())) {
                 date.setDate(date.getDate() + Number(demoForm.data.demo_duur_dagen));
-                return date.toISOString().slice(0, 16);
+                return toLocalDateTimeInput(date);
             }
         }
         return garageCompany.demo_eind_op || '';
@@ -446,8 +525,18 @@ export default function Show({
         );
     };
 
-    const submitDemoStatus = (event) => {
+    const submitDemoStatus = async (event) => {
         event.preventDefault();
+        if (['opgezegd', 'verloren'].includes(statusForm.data.status)) {
+            const ok = await confirm({
+                title: 'Status wijzigen',
+                message: 'Weet je het zeker? Dit wordt gelogd in de timeline.',
+                confirmText: 'Doorgaan',
+                cancelText: 'Annuleren',
+                tone: 'danger',
+            });
+            if (!ok) return;
+        }
         statusForm.patch(urls.set_demo_status, {
             preserveScroll: true,
             preserveState: false,
@@ -474,12 +563,12 @@ export default function Show({
             email: garageCompany.hoofd_email || '',
             telefoonnummer: garageCompany.hoofd_telefoon || '',
             plaats_van_tekenen: garageCompany.plaats || '',
-            datum_van_tekenen: new Date().toISOString().slice(0, 10),
+            datum_van_tekenen: toLocalDateInput(new Date()),
             ondertekenaar_naam: '',
             akkoord_checkbox: false,
             akkoord_op: '',
             status: 'pending',
-            ontvangen_op: new Date().toISOString().slice(0, 16),
+            ontvangen_op: toLocalDateTimeInput(new Date()),
             incasso_kenmerk_machtiging: incasso?.kenmerk_machtiging || '',
             incasso_formulier: null,
         };
@@ -492,6 +581,7 @@ export default function Show({
         setShowMandateForm(true);
         mandateForm.setData(blankMandate());
         mandateForm.clearErrors();
+        scrollToForm('mandate-form');
     };
 
     const startMandateEdit = (mandate) => {
@@ -520,6 +610,7 @@ export default function Show({
             incasso_formulier: null,
         });
         mandateForm.clearErrors();
+        scrollToForm('mandate-form');
     };
 
     const cancelMandate = () => {
@@ -537,7 +628,17 @@ export default function Show({
         });
     };
 
-    const setMandateStatus = (mandateId, status) => {
+    const setMandateStatus = async (mandateId, status) => {
+        if (status === 'ingetrokken') {
+            const ok = await confirm({
+                title: 'Mandaat intrekken',
+                message: 'Weet je zeker dat je dit SEPA mandaat wilt intrekken? Er wordt dan niet meer op dit mandaat geïncasseerd.',
+                confirmText: 'Intrekken',
+                cancelText: 'Annuleren',
+                tone: 'danger',
+            });
+            if (!ok) return;
+        }
         router.patch(urls.set_mandate_status.replace('__MANDATE__', mandateId), { status }, { preserveScroll: true });
     };
 
@@ -557,7 +658,7 @@ export default function Show({
     const exportForm = useForm({
         maand: String(nowDate.getMonth() + 1),
         jaar: String(nowDate.getFullYear()),
-        uitvoerdatum: nowDate.toISOString().slice(0, 10),
+        uitvoerdatum: toLocalDateInput(nowDate),
     });
 
     const maandOpties = [
@@ -729,8 +830,10 @@ export default function Show({
             to_email: welcomeForm.data.to_email,
             template_id: welcomeForm.data.template_id,
         };
+        welcomeForm.clearErrors();
         router.post(urls.update_welcome_email, payload, {
             preserveScroll: true,
+            onError: (errors) => welcomeForm.setError(errors),
             onSuccess: () => {
                 router.post(urls.send_welcome_email, {}, { preserveScroll: true });
             },
@@ -756,6 +859,18 @@ export default function Show({
             });
         }
     };
+
+    useEffect(() => {
+        if (!templatePickerOpen) return undefined;
+        const onKeyDown = (event) => {
+            if (event.key === 'Escape') {
+                setTemplatePickerOpen(false);
+                setPendingSend(false);
+            }
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [templatePickerOpen]);
 
     const openTemplatePicker = (sendAfter = false) => {
         if (!templates.length) {
@@ -793,6 +908,7 @@ export default function Show({
                         <Link
                             key={item.key}
                             href={`${urls.show}?tab=${item.key}`}
+                            aria-current={activeTab === item.key ? 'page' : undefined}
                             className={cx(
                                 'whitespace-nowrap rounded-md border px-3 py-2 text-sm font-semibold',
                                 activeTab === item.key
@@ -849,8 +965,9 @@ export default function Show({
                     <form onSubmit={submitOverview} className="space-y-5">
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div className="sm:col-span-2">
-                                <label className="block text-xs font-medium text-zinc-600">Bedrijfsnaam *</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-bedrijfsnaam">Bedrijfsnaam *</label>
                                 <input
+                                    id="overviewForm-bedrijfsnaam"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                     value={overviewForm.data.bedrijfsnaam}
                                     onChange={(e) => overviewForm.setData('bedrijfsnaam', e.target.value)}
@@ -861,8 +978,9 @@ export default function Show({
                             </div>
 
                             <div>
-                                <label className="block text-xs font-medium text-zinc-600">Voornaam *</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-primary-voornaam">Voornaam *</label>
                                 <input
+                                    id="overviewForm-primary-voornaam"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                     value={overviewForm.data.primary_voornaam}
                                     onChange={(e) => overviewForm.setData('primary_voornaam', e.target.value)}
@@ -872,8 +990,9 @@ export default function Show({
                                 )}
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-zinc-600">Achternaam *</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-primary-achternaam">Achternaam *</label>
                                 <input
+                                    id="overviewForm-primary-achternaam"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                     value={overviewForm.data.primary_achternaam}
                                     onChange={(e) => overviewForm.setData('primary_achternaam', e.target.value)}
@@ -884,8 +1003,9 @@ export default function Show({
                             </div>
 
                             <div>
-                                <label className="block text-xs font-medium text-zinc-600">Status</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-status">Status</label>
                                 <select
+                                    id="overviewForm-status"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                     value={overviewForm.data.status}
                                     onChange={(e) => handleStatusChange(e.target.value)}
@@ -898,23 +1018,26 @@ export default function Show({
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-zinc-600">Bron</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-bron">Bron</label>
                                 <select
+                                    id="overviewForm-bron"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                     value={overviewForm.data.bron}
                                     onChange={(e) => overviewForm.setData('bron', e.target.value)}
                                 >
                                     {sourceOptions.map((source) => (
                                         <option key={source} value={source}>
-                                            {source}
+                                            {SOURCE_LABELS[source] || source}
                                         </option>
                                     ))}
                                 </select>
+                                {overviewForm.errors.bron && <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.bron}</div>}
                             </div>
 
                             <div>
-                                <label className="block text-xs font-medium text-zinc-600">Hoofd e-mail *</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-hoofd-email">Hoofd e-mail *</label>
                                 <input
+                                    id="overviewForm-hoofd-email"
                                     type="email"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                     value={overviewForm.data.hoofd_email}
@@ -925,8 +1048,9 @@ export default function Show({
                                 )}
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-zinc-600">Hoofd telefoon *</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-hoofd-telefoon">Hoofd telefoon *</label>
                                 <input
+                                    id="overviewForm-hoofd-telefoon"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                     value={overviewForm.data.hoofd_telefoon}
                                     onChange={(e) => overviewForm.setData('hoofd_telefoon', e.target.value)}
@@ -937,8 +1061,9 @@ export default function Show({
                             </div>
 
                             <div>
-                                <label className="block text-xs font-medium text-zinc-600">Login e-mail</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-login-email">Login e-mail</label>
                                 <input
+                                    id="overviewForm-login-email"
                                     type="email"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                     value={overviewForm.data.login_email}
@@ -949,8 +1074,9 @@ export default function Show({
                                 )}
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-zinc-600">Nieuw login wachtwoord</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-login-password">Nieuw login wachtwoord</label>
                                 <input
+                                    id="overviewForm-login-password"
                                     type="password"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                     value={overviewForm.data.login_password}
@@ -965,24 +1091,29 @@ export default function Show({
                             </div>
 
                             <div className="sm:col-span-2">
-                                <label className="block text-xs font-medium text-zinc-600">Adres</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-adres-straat-nummer">Adres</label>
                                 <input
+                                    id="overviewForm-adres-straat-nummer"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                     value={overviewForm.data.adres_straat_nummer}
                                     onChange={(e) => overviewForm.setData('adres_straat_nummer', e.target.value)}
                                 />
+                                {overviewForm.errors.adres_straat_nummer && <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.adres_straat_nummer}</div>}
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-zinc-600">Postcode</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-postcode">Postcode</label>
                                 <input
+                                    id="overviewForm-postcode"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                     value={overviewForm.data.postcode}
                                     onChange={(e) => overviewForm.setData('postcode', e.target.value)}
                                 />
+                                {overviewForm.errors.postcode && <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.postcode}</div>}
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-zinc-600">Plaats *</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-plaats">Plaats *</label>
                                 <input
+                                    id="overviewForm-plaats"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                     value={overviewForm.data.plaats}
                                     onChange={(e) => overviewForm.setData('plaats', e.target.value)}
@@ -993,113 +1124,161 @@ export default function Show({
                             </div>
 
                             <div>
-                                <label className="block text-xs font-medium text-zinc-600">Land</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-land">Land</label>
                                 <input
+                                    id="overviewForm-land"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                     value={overviewForm.data.land}
                                     onChange={(e) => overviewForm.setData('land', e.target.value)}
                                 />
+                                {overviewForm.errors.land && <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.land}</div>}
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-zinc-600">Website</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-website">Website</label>
                                 <input
+                                    id="overviewForm-website"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                     value={overviewForm.data.website}
                                     onChange={(e) => overviewForm.setData('website', e.target.value)}
                                 />
+                                {overviewForm.errors.website && <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.website}</div>}
                             </div>
 
                             <div>
-                                <label className="block text-xs font-medium text-zinc-600">Demo aangevraagd op</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-kvk-nummer">KVK nummer</label>
                                 <input
+                                    id="overviewForm-kvk-nummer"
+                                    className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                    value={overviewForm.data.kvk_nummer}
+                                    onChange={(e) => overviewForm.setData('kvk_nummer', e.target.value)}
+                                />
+                                {overviewForm.errors.kvk_nummer && <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.kvk_nummer}</div>}
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-btw-nummer">BTW nummer</label>
+                                <input
+                                    id="overviewForm-btw-nummer"
+                                    className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                    value={overviewForm.data.btw_nummer}
+                                    onChange={(e) => overviewForm.setData('btw_nummer', e.target.value)}
+                                />
+                                {overviewForm.errors.btw_nummer && <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.btw_nummer}</div>}
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-demo-aangevraagd-op">Demo aangevraagd op</label>
+                                <input
+                                    id="overviewForm-demo-aangevraagd-op"
                                     type="datetime-local"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                     value={overviewForm.data.demo_aangevraagd_op}
                                     onChange={(e) => overviewForm.setData('demo_aangevraagd_op', e.target.value)}
                                 />
+                                {overviewForm.errors.demo_aangevraagd_op && <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.demo_aangevraagd_op}</div>}
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-zinc-600">Demo gepland op</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-demo-gepland-op">Demo gepland op</label>
                                 <input
+                                    id="overviewForm-demo-gepland-op"
                                     type="datetime-local"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                     value={overviewForm.data.demo_gepland_op}
                                     onChange={(e) => overviewForm.setData('demo_gepland_op', e.target.value)}
                                 />
+                                {overviewForm.errors.demo_gepland_op && <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.demo_gepland_op}</div>}
                             </div>
 
                             <div>
-                                <label className="block text-xs font-medium text-zinc-600">Demo start</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-proefperiode-start">Demo start</label>
                                 <input
+                                    id="overviewForm-proefperiode-start"
                                     type="datetime-local"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                     value={overviewForm.data.proefperiode_start}
                                     onChange={(e) => overviewForm.setData('proefperiode_start', e.target.value)}
                                 />
+                                {overviewForm.errors.proefperiode_start && <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.proefperiode_start}</div>}
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-zinc-600">Actief vanaf</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-actief-vanaf">Actief vanaf</label>
                                 <input
+                                    id="overviewForm-actief-vanaf"
                                     type="datetime-local"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                     value={overviewForm.data.actief_vanaf}
                                     onChange={(e) => overviewForm.setData('actief_vanaf', e.target.value)}
                                 />
+                                {overviewForm.errors.actief_vanaf && <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.actief_vanaf}</div>}
                             </div>
 
                             <div>
-                                <label className="block text-xs font-medium text-zinc-600">Opgezegd op</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-opgezegd-op">Opgezegd op</label>
                                 <input
+                                    id="overviewForm-opgezegd-op"
                                     type="datetime-local"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                     value={overviewForm.data.opgezegd_op}
                                     onChange={(e) => overviewForm.setData('opgezegd_op', e.target.value)}
                                 />
+                                {overviewForm.errors.opgezegd_op && <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.opgezegd_op}</div>}
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-zinc-600">Verloren op</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-verloren-op">Verloren op</label>
                                 <input
+                                    id="overviewForm-verloren-op"
                                     type="datetime-local"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                     value={overviewForm.data.verloren_op}
                                     onChange={(e) => overviewForm.setData('verloren_op', e.target.value)}
                                 />
+                                {overviewForm.errors.verloren_op && <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.verloren_op}</div>}
                             </div>
 
                             <div className="sm:col-span-2">
-                                <label className="block text-xs font-medium text-zinc-600">Opzegreden</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-opzegreden">Opzegreden</label>
                                 <textarea
+                                    id="overviewForm-opzegreden"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                     rows={2}
                                     value={overviewForm.data.opzegreden}
                                     onChange={(e) => overviewForm.setData('opzegreden', e.target.value)}
                                 />
+                                {overviewForm.errors.opzegreden && <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.opzegreden}</div>}
                             </div>
                             <div className="sm:col-span-2">
-                                <label className="block text-xs font-medium text-zinc-600">Verloren reden</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-verloren-reden">Verloren reden</label>
                                 <textarea
+                                    id="overviewForm-verloren-reden"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                     rows={2}
                                     value={overviewForm.data.verloren_reden}
                                     onChange={(e) => overviewForm.setData('verloren_reden', e.target.value)}
                                 />
+                                {overviewForm.errors.verloren_reden && <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.verloren_reden}</div>}
                             </div>
 
                             <div className="sm:col-span-2">
-                                <label className="block text-xs font-medium text-zinc-600">Tags</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-tags">Tags</label>
                                 <textarea
+                                    id="overviewForm-tags"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                     rows={2}
                                     value={overviewForm.data.tags}
                                     onChange={(e) => overviewForm.setData('tags', e.target.value)}
                                 />
+                                {overviewForm.errors.tags && <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.tags}</div>}
                             </div>
                         </div>
 
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
+                            {Object.keys(overviewForm.errors).length > 0 && !overviewForm.processing && (
+                                <div role="alert" className="text-sm text-rose-600">
+                                    Niet alle velden zijn juist ingevuld. Controleer de rood gemarkeerde velden hierboven.
+                                </div>
+                            )}
                             <button
                                 type="submit"
-                                className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                                className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                                 disabled={overviewForm.processing}
                             >
                                 {overviewForm.processing ? 'Opslaan...' : 'Opslaan'}
@@ -1122,7 +1301,7 @@ export default function Show({
                             <div className="flex flex-wrap gap-2">
                                 <button
                                     type="button"
-                                    className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm font-semibold hover:bg-zinc-50"
+                                    className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm font-semibold hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
                                     onClick={refreshWelcome}
                                     disabled={!welcomeEmail}
                                 >
@@ -1138,7 +1317,7 @@ export default function Show({
                                 </button>
                                 <button
                                     type="button"
-                                    className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm font-semibold hover:bg-zinc-50"
+                                    className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm font-semibold hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
                                     onClick={saveWelcome}
                                     disabled={!welcomeEmail}
                                 >
@@ -1173,7 +1352,7 @@ export default function Show({
                                                     welcomeStatusClass
                                                 )}
                                             >
-                                                {welcomeStatus}
+                                                {WELCOME_STATUS_LABELS[welcomeStatus] || welcomeStatus}
                                             </span>
                                         </div>
                                         {welcomeEmail?.sent_at && (
@@ -1184,8 +1363,9 @@ export default function Show({
                                     </div>
 
                                     <div className="rounded-xl border border-zinc-200 bg-white p-4">
-                                        <div className="text-xs font-semibold text-zinc-500">Ontvanger</div>
+                                        <label htmlFor="welcome-to-email" className="block text-xs font-semibold text-zinc-500">Ontvanger</label>
                                         <input
+                                            id="welcome-to-email"
                                             type="email"
                                             className="mt-2 w-full rounded-md border-zinc-300 text-sm"
                                             value={welcomeForm.data.to_email}
@@ -1214,8 +1394,9 @@ export default function Show({
 
                                 <div className="space-y-4 lg:col-span-8">
                                     <div className="rounded-xl border border-zinc-200 bg-white p-4">
-                                        <div className="text-xs font-semibold text-zinc-500">Onderwerp</div>
+                                        <label htmlFor="welcome-subject" className="block text-xs font-semibold text-zinc-500">Onderwerp</label>
                                         <input
+                                            id="welcome-subject"
                                             className="mt-2 w-full rounded-md border-zinc-300 text-sm"
                                             value={welcomeForm.data.subject}
                                             onChange={(e) => welcomeForm.setData('subject', e.target.value)}
@@ -1298,14 +1479,14 @@ export default function Show({
                                                     disabled={!welcomeEditor}
                                                     onClick={() => welcomeEditor?.chain().focus().undo().run()}
                                                 >
-                                                    Undo
+                                                    Ongedaan
                                                 </ToolbarButton>
                                                 <ToolbarButton
                                                     title="Opnieuw"
                                                     disabled={!welcomeEditor}
                                                     onClick={() => welcomeEditor?.chain().focus().redo().run()}
                                                 >
-                                                    Redo
+                                                    Opnieuw
                                                 </ToolbarButton>
                                             </div>
                                             <EditorContent editor={welcomeEditor} className="tiptap px-3 py-2 text-sm" />
@@ -1321,6 +1502,9 @@ export default function Show({
                         {templatePickerOpen && (
                             <div
                                 className="fixed inset-0 z-40 flex items-center justify-center bg-zinc-950/30 px-4 py-8 backdrop-blur-sm"
+                                role="dialog"
+                                aria-modal="true"
+                                aria-labelledby="template-picker-title"
                                 onClick={(event) => {
                                     if (event.target === event.currentTarget) {
                                         setTemplatePickerOpen(false);
@@ -1330,7 +1514,7 @@ export default function Show({
                             >
                                 <div className="w-full max-w-lg rounded-2xl border border-zinc-200/70 bg-white/95 shadow-2xl">
                                     <div className="border-b border-zinc-100 px-5 py-4">
-                                        <div className="text-sm font-semibold text-zinc-900">Kies een e-mail template</div>
+                                        <div id="template-picker-title" className="text-sm font-semibold text-zinc-900">Kies een e-mail template</div>
                                         <div className="mt-1 text-xs text-zinc-500">
                                             Selecteer een template om het concept te vullen. Je kunt daarna nog aanpassen.
                                         </div>
@@ -1341,6 +1525,7 @@ export default function Show({
                                                 key={template.id}
                                                 type="button"
                                                 onClick={() => setSelectedTemplateId(template.id)}
+                                                aria-pressed={selectedTemplateId === template.id}
                                                 className={cx(
                                                     'w-full rounded-xl border px-4 py-3 text-left transition',
                                                     selectedTemplateId === template.id
@@ -1484,7 +1669,7 @@ export default function Show({
                     </div>
 
                     {showPersonForm && (
-                        <div className="rounded-xl border border-zinc-200 bg-white p-5">
+                        <div id="person-form" className="scroll-mt-4 rounded-xl border border-zinc-200 bg-white p-5">
                             <div className="flex items-center justify-between gap-3">
                                 <div className="text-sm font-semibold">
                                     {editingPersonId ? 'Contactpersoon bewerken' : 'Contactpersoon toevoegen'}
@@ -1500,8 +1685,9 @@ export default function Show({
 
                             <form onSubmit={submitPerson} className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div>
-                                    <label className="block text-xs font-medium text-zinc-600">Voornaam *</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="personForm-voornaam">Voornaam *</label>
                                     <input
+                                        id="personForm-voornaam"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={personForm.data.voornaam}
                                         onChange={(e) => personForm.setData('voornaam', e.target.value)}
@@ -1511,8 +1697,9 @@ export default function Show({
                                     )}
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-zinc-600">Achternaam *</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="personForm-achternaam">Achternaam *</label>
                                     <input
+                                        id="personForm-achternaam"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={personForm.data.achternaam}
                                         onChange={(e) => personForm.setData('achternaam', e.target.value)}
@@ -1522,8 +1709,9 @@ export default function Show({
                                     )}
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-zinc-600">E-mail *</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="personForm-email">E-mail *</label>
                                     <input
+                                        id="personForm-email"
                                         type="email"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={personForm.data.email}
@@ -1534,21 +1722,25 @@ export default function Show({
                                     )}
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-zinc-600">Telefoon</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="personForm-telefoon">Telefoon</label>
                                     <input
+                                        id="personForm-telefoon"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={personForm.data.telefoon}
                                         onChange={(e) => personForm.setData('telefoon', e.target.value)}
                                     />
+                                    {personForm.errors.telefoon && <div className="mt-1 text-xs text-rose-600">{personForm.errors.telefoon}</div>}
                                 </div>
                                 <div className="sm:col-span-2">
-                                    <label className="block text-xs font-medium text-zinc-600">Rol</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="personForm-rol">Rol</label>
                                     <input
+                                        id="personForm-rol"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={personForm.data.rol}
                                         onChange={(e) => personForm.setData('rol', e.target.value)}
                                         placeholder="bijv. eigenaar, administratie, monteur"
                                     />
+                                    {personForm.errors.rol && <div className="mt-1 text-xs text-rose-600">{personForm.errors.rol}</div>}
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <input
@@ -1571,7 +1763,7 @@ export default function Show({
                                 <div className="sm:col-span-2 flex justify-end">
                                     <button
                                         type="submit"
-                                        className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                                        className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                                         disabled={personForm.processing}
                                     >
                                         {personForm.processing ? 'Opslaan...' : 'Opslaan'}
@@ -1599,8 +1791,9 @@ export default function Show({
                             <div className="flex flex-col gap-3">
                                 <form className="flex flex-wrap items-end gap-2" onSubmit={submitDemoStatus}>
                                     <div>
-                                        <label className="block text-xs font-medium text-zinc-600">Nieuwe status</label>
+                                        <label className="block text-xs font-medium text-zinc-600" htmlFor="statusForm-status">Nieuwe status</label>
                                         <select
+                                            id="statusForm-status"
                                             className="mt-1 min-w-44 rounded-md border-zinc-300 text-sm"
                                             value={statusForm.data.status}
                                             onChange={(e) => statusForm.setData('status', e.target.value)}
@@ -1611,10 +1804,11 @@ export default function Show({
                                                 </option>
                                             ))}
                                         </select>
+                                        {statusForm.errors.status && <div className="mt-1 text-xs text-rose-600">{statusForm.errors.status}</div>}
                                     </div>
                                     <button
                                         type="submit"
-                                        className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
+                                        className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
                                         disabled={statusForm.processing}
                                     >
                                         {statusForm.processing ? 'Opslaan...' : 'Status opslaan'}
@@ -1624,22 +1818,25 @@ export default function Show({
                                 <div className="flex flex-wrap gap-2">
                                     <button
                                         type="button"
-                                        className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
+                                        className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
                                         onClick={() => setDemoStatus('demo_aangevraagd')}
+                                        disabled={normalizedCompanyStatus === 'demo_aangevraagd'}
                                     >
                                         Naar demo aangevraagd
                                     </button>
                                     <button
                                         type="button"
-                                        className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
+                                        className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
                                         onClick={() => setDemoStatus('proefperiode')}
+                                        disabled={normalizedCompanyStatus === 'proefperiode'}
                                     >
                                         Naar demo
                                     </button>
                                     <button
                                         type="button"
-                                        className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
+                                        className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
                                         onClick={() => setDemoStatus('actief')}
+                                        disabled={normalizedCompanyStatus === 'actief'}
                                     >
                                         Actief
                                     </button>
@@ -1651,37 +1848,44 @@ export default function Show({
 
                     <form onSubmit={submitDemoDates} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">Demo aangevraagd op</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="demoForm-demo-aangevraagd-op">Demo aangevraagd op</label>
                             <input
+                                id="demoForm-demo-aangevraagd-op"
                                 type="datetime-local"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={demoForm.data.demo_aangevraagd_op}
                                 onChange={(e) => demoForm.setData('demo_aangevraagd_op', e.target.value)}
                             />
+                            {demoForm.errors.demo_aangevraagd_op && <div className="mt-1 text-xs text-rose-600">{demoForm.errors.demo_aangevraagd_op}</div>}
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">Demo gepland op</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="demoForm-demo-gepland-op">Demo gepland op</label>
                             <input
+                                id="demoForm-demo-gepland-op"
                                 type="datetime-local"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={demoForm.data.demo_gepland_op}
                                 onChange={(e) => demoForm.setData('demo_gepland_op', e.target.value)}
                             />
+                            {demoForm.errors.demo_gepland_op && <div className="mt-1 text-xs text-rose-600">{demoForm.errors.demo_gepland_op}</div>}
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">Demo duur (dagen)</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="demoForm-demo-duur-dagen">Demo duur (dagen)</label>
                             <input
+                                id="demoForm-demo-duur-dagen"
                                 type="number"
                                 min="1"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={demoForm.data.demo_duur_dagen}
                                 onChange={(e) => demoForm.setData('demo_duur_dagen', e.target.value)}
                             />
+                            {demoForm.errors.demo_duur_dagen && <div className="mt-1 text-xs text-rose-600">{demoForm.errors.demo_duur_dagen}</div>}
                             <div className="mt-1 text-xs text-zinc-500">Einddatum wordt automatisch berekend.</div>
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">Demo einddatum</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="demo-eind-op">Demo einddatum</label>
                             <input
+                                id="demo-eind-op"
                                 type="datetime-local"
                                 className="mt-1 w-full rounded-md border-zinc-200 bg-zinc-50 text-sm"
                                 value={demoEndPreview}
@@ -1689,27 +1893,31 @@ export default function Show({
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">Demo start</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="demoForm-proefperiode-start">Demo start</label>
                             <input
+                                id="demoForm-proefperiode-start"
                                 type="datetime-local"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={demoForm.data.proefperiode_start}
                                 onChange={(e) => demoForm.setData('proefperiode_start', e.target.value)}
                             />
+                            {demoForm.errors.proefperiode_start && <div className="mt-1 text-xs text-rose-600">{demoForm.errors.proefperiode_start}</div>}
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">Actief vanaf</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="demoForm-actief-vanaf">Actief vanaf</label>
                             <input
+                                id="demoForm-actief-vanaf"
                                 type="datetime-local"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={demoForm.data.actief_vanaf}
                                 onChange={(e) => demoForm.setData('actief_vanaf', e.target.value)}
                             />
+                            {demoForm.errors.actief_vanaf && <div className="mt-1 text-xs text-rose-600">{demoForm.errors.actief_vanaf}</div>}
                         </div>
                         <div className="sm:col-span-2 flex justify-end">
                             <button
                                 type="submit"
-                                className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                                className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                                 disabled={demoForm.processing}
                             >
                                 {demoForm.processing ? 'Opslaan...' : 'Datums opslaan'}
@@ -1721,8 +1929,9 @@ export default function Show({
                         <div className="text-sm font-semibold">Demo verlengen</div>
                         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div>
-                                <label className="block text-xs font-medium text-zinc-600">Verleng met (dagen)</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="extendForm-demo-verleng-dagen">Verleng met (dagen)</label>
                                 <input
+                                    id="extendForm-demo-verleng-dagen"
                                     type="number"
                                     min="1"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
@@ -1734,19 +1943,21 @@ export default function Show({
                                 )}
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-zinc-600">Notitie (optioneel)</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="extendForm-demo-verleng-notitie">Notitie (optioneel)</label>
                                 <input
+                                    id="extendForm-demo-verleng-notitie"
                                     type="text"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                     value={extendForm.data.demo_verleng_notitie}
                                     onChange={(e) => extendForm.setData('demo_verleng_notitie', e.target.value)}
                                 />
+                                {extendForm.errors.demo_verleng_notitie && <div className="mt-1 text-xs text-rose-600">{extendForm.errors.demo_verleng_notitie}</div>}
                             </div>
                         </div>
                         <div className="mt-3 flex justify-end">
                             <button
                                 type="submit"
-                                className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
+                                className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
                                 disabled={extendForm.processing}
                             >
                                 {extendForm.processing ? 'Bezig...' : 'Verleng demo'}
@@ -1802,7 +2013,7 @@ export default function Show({
                         </dl>
                         {!incasso?.is_complete && (
                             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                                Incomplete SEPA voor deze actieve klant: {(incasso?.missing_fields || []).join(', ')}
+                                SEPA-gegevens onvolledig: {(incasso?.missing_fields || []).join(', ')}
                             </div>
                         )}
                         {incasso?.kenmerk_available === false && (
@@ -1815,8 +2026,9 @@ export default function Show({
                     <div className="rounded-xl border border-zinc-200 bg-white p-4">
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                             <div>
-                                <label className="block text-xs font-medium text-zinc-600">Maand</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="exportForm-maand">Maand</label>
                                 <select
+                                    id="exportForm-maand"
                                     className="mt-1 rounded-md border-zinc-300 text-sm"
                                     value={exportForm.data.maand}
                                     onChange={(e) => exportForm.setData('maand', e.target.value)}
@@ -1829,8 +2041,9 @@ export default function Show({
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-zinc-600">Jaar</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="exportForm-jaar">Jaar</label>
                                 <select
+                                    id="exportForm-jaar"
                                     className="mt-1 rounded-md border-zinc-300 text-sm"
                                     value={exportForm.data.jaar}
                                     onChange={(e) => exportForm.setData('jaar', e.target.value)}
@@ -1843,8 +2056,9 @@ export default function Show({
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-zinc-600">Uitvoerdatum</label>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="exportForm-uitvoerdatum">Uitvoerdatum</label>
                                 <input
+                                    id="exportForm-uitvoerdatum"
                                     type="date"
                                     className="mt-1 rounded-md border-zinc-300 text-sm"
                                     value={exportForm.data.uitvoerdatum}
@@ -1895,8 +2109,13 @@ export default function Show({
                                         </td>
                                         <td className="px-4 py-3 text-sm">{mandate.iban}</td>
                                         <td className="px-4 py-3 text-sm">
-                                            <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-700">
-                                                {mandate.status}
+                                            <span
+                                                className={cx(
+                                                    'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold',
+                                                    MANDATE_STATUS_CLASSES[mandate.status] || 'bg-zinc-100 text-zinc-700'
+                                                )}
+                                            >
+                                                {MANDATE_STATUS_LABELS[mandate.status] || mandate.status}
                                             </span>
                                         </td>
                                         <td className="px-4 py-3 text-sm text-zinc-600">
@@ -1913,22 +2132,25 @@ export default function Show({
                                             <div className="mt-2 flex justify-end gap-2">
                                                 <button
                                                     type="button"
-                                                    className="rounded-md border border-zinc-200 px-2 py-1 text-xs hover:bg-zinc-50"
+                                                    className="rounded-md border border-zinc-200 px-2 py-1 text-xs hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
                                                     onClick={() => setMandateStatus(mandate.id, 'pending')}
+                                                    disabled={mandate.status === 'pending'}
                                                 >
-                                                    Pending
+                                                    In afwachting
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    className="rounded-md border border-emerald-200 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50"
+                                                    className="rounded-md border border-emerald-200 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
                                                     onClick={() => setMandateStatus(mandate.id, 'actief')}
+                                                    disabled={mandate.status === 'actief'}
                                                 >
                                                     Actief
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    className="rounded-md border border-zinc-200 px-2 py-1 text-xs hover:bg-zinc-50"
+                                                    className="rounded-md border border-zinc-200 px-2 py-1 text-xs hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
                                                     onClick={() => setMandateStatus(mandate.id, 'ingetrokken')}
+                                                    disabled={mandate.status === 'ingetrokken'}
                                                 >
                                                     Ingetrokken
                                                 </button>
@@ -1941,7 +2163,7 @@ export default function Show({
                     </div>
 
                     {showMandateForm && (
-                        <div className="rounded-xl border border-zinc-200 bg-white p-5">
+                        <div id="mandate-form" className="scroll-mt-4 rounded-xl border border-zinc-200 bg-white p-5">
                             <div className="flex items-center justify-between gap-3">
                                 <div className="text-sm font-semibold">
                                     {editingMandateId ? 'Mandaat bewerken' : 'Nieuw mandaat'}
@@ -1958,8 +2180,9 @@ export default function Show({
                             <form onSubmit={submitMandate} className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <input type="hidden" value={mandateForm.data.mandate_id || ''} />
                                 <div className="sm:col-span-2">
-                                    <label className="block text-xs font-medium text-zinc-600">Bedrijfsnaam *</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="mandateForm-bedrijfsnaam">Bedrijfsnaam *</label>
                                     <input
+                                        id="mandateForm-bedrijfsnaam"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={mandateForm.data.bedrijfsnaam}
                                         onChange={(e) => mandateForm.setData('bedrijfsnaam', e.target.value)}
@@ -1969,48 +2192,59 @@ export default function Show({
                                     )}
                                 </div>
                                 <div className="sm:col-span-2">
-                                    <label className="block text-xs font-medium text-zinc-600">Volledige naam *</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="mandateForm-voor-en-achternaam">Volledige naam *</label>
                                     <input
+                                        id="mandateForm-voor-en-achternaam"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={mandateForm.data.voor_en_achternaam}
                                         onChange={(e) => mandateForm.setData('voor_en_achternaam', e.target.value)}
                                     />
+                                    {mandateForm.errors.voor_en_achternaam && <div className="mt-1 text-xs text-rose-600">{mandateForm.errors.voor_en_achternaam}</div>}
                                 </div>
                                 <div className="sm:col-span-2">
-                                    <label className="block text-xs font-medium text-zinc-600">Straat + nummer *</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="mandateForm-straatnaam-en-nummer">Straat + nummer *</label>
                                     <input
+                                        id="mandateForm-straatnaam-en-nummer"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={mandateForm.data.straatnaam_en_nummer}
                                         onChange={(e) => mandateForm.setData('straatnaam_en_nummer', e.target.value)}
                                     />
+                                    {mandateForm.errors.straatnaam_en_nummer && <div className="mt-1 text-xs text-rose-600">{mandateForm.errors.straatnaam_en_nummer}</div>}
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-zinc-600">Postcode *</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="mandateForm-postcode">Postcode *</label>
                                     <input
+                                        id="mandateForm-postcode"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={mandateForm.data.postcode}
                                         onChange={(e) => mandateForm.setData('postcode', e.target.value)}
                                     />
+                                    {mandateForm.errors.postcode && <div className="mt-1 text-xs text-rose-600">{mandateForm.errors.postcode}</div>}
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-zinc-600">Plaats *</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="mandateForm-plaats">Plaats *</label>
                                     <input
+                                        id="mandateForm-plaats"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={mandateForm.data.plaats}
                                         onChange={(e) => mandateForm.setData('plaats', e.target.value)}
                                     />
+                                    {mandateForm.errors.plaats && <div className="mt-1 text-xs text-rose-600">{mandateForm.errors.plaats}</div>}
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-zinc-600">Land</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="mandateForm-land">Land</label>
                                     <input
+                                        id="mandateForm-land"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={mandateForm.data.land}
                                         onChange={(e) => mandateForm.setData('land', e.target.value)}
                                     />
+                                    {mandateForm.errors.land && <div className="mt-1 text-xs text-rose-600">{mandateForm.errors.land}</div>}
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-zinc-600">IBAN *</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="mandateForm-iban">IBAN *</label>
                                     <input
+                                        id="mandateForm-iban"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={mandateForm.data.iban}
                                         onChange={(e) => mandateForm.setData('iban', e.target.value)}
@@ -2020,58 +2254,70 @@ export default function Show({
                                     )}
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-zinc-600">BIC</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="mandateForm-bic">BIC</label>
                                     <input
+                                        id="mandateForm-bic"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={mandateForm.data.bic}
                                         onChange={(e) => mandateForm.setData('bic', e.target.value)}
                                     />
+                                    {mandateForm.errors.bic && <div className="mt-1 text-xs text-rose-600">{mandateForm.errors.bic}</div>}
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-zinc-600">E-mail *</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="mandateForm-email">E-mail *</label>
                                     <input
+                                        id="mandateForm-email"
                                         type="email"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={mandateForm.data.email}
                                         onChange={(e) => mandateForm.setData('email', e.target.value)}
                                     />
+                                    {mandateForm.errors.email && <div className="mt-1 text-xs text-rose-600">{mandateForm.errors.email}</div>}
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-zinc-600">Telefoon *</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="mandateForm-telefoonnummer">Telefoon *</label>
                                     <input
+                                        id="mandateForm-telefoonnummer"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={mandateForm.data.telefoonnummer}
                                         onChange={(e) => mandateForm.setData('telefoonnummer', e.target.value)}
                                     />
+                                    {mandateForm.errors.telefoonnummer && <div className="mt-1 text-xs text-rose-600">{mandateForm.errors.telefoonnummer}</div>}
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-zinc-600">Plaats van tekenen *</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="mandateForm-plaats-van-tekenen">Plaats van tekenen *</label>
                                     <input
+                                        id="mandateForm-plaats-van-tekenen"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={mandateForm.data.plaats_van_tekenen}
                                         onChange={(e) => mandateForm.setData('plaats_van_tekenen', e.target.value)}
                                     />
+                                    {mandateForm.errors.plaats_van_tekenen && <div className="mt-1 text-xs text-rose-600">{mandateForm.errors.plaats_van_tekenen}</div>}
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-zinc-600">Datum van tekenen *</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="mandateForm-datum-van-tekenen">Datum van tekenen *</label>
                                     <input
+                                        id="mandateForm-datum-van-tekenen"
                                         type="date"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={mandateForm.data.datum_van_tekenen}
                                         onChange={(e) => mandateForm.setData('datum_van_tekenen', e.target.value)}
                                     />
+                                    {mandateForm.errors.datum_van_tekenen && <div className="mt-1 text-xs text-rose-600">{mandateForm.errors.datum_van_tekenen}</div>}
                                 </div>
 
                                 <div className="sm:col-span-2">
                                     <div className="text-xs font-semibold text-zinc-500">Ondertekening (typed naam)</div>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-zinc-600">Ondertekenaar naam</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="mandateForm-ondertekenaar-naam">Ondertekenaar naam</label>
                                     <input
+                                        id="mandateForm-ondertekenaar-naam"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={mandateForm.data.ondertekenaar_naam}
                                         onChange={(e) => mandateForm.setData('ondertekenaar_naam', e.target.value)}
                                     />
+                                    {mandateForm.errors.ondertekenaar_naam && <div className="mt-1 text-xs text-rose-600">{mandateForm.errors.ondertekenaar_naam}</div>}
                                 </div>
                                 <div className="flex items-center gap-2 pt-6">
                                     <input
@@ -2083,36 +2329,42 @@ export default function Show({
                                     <span className="text-sm">Akkoord</span>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-zinc-600">Akkoord op</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="mandateForm-akkoord-op">Akkoord op</label>
                                     <input
+                                        id="mandateForm-akkoord-op"
                                         type="datetime-local"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={mandateForm.data.akkoord_op}
                                         onChange={(e) => mandateForm.setData('akkoord_op', e.target.value)}
                                     />
+                                    {mandateForm.errors.akkoord_op && <div className="mt-1 text-xs text-rose-600">{mandateForm.errors.akkoord_op}</div>}
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-zinc-600">Ontvangen op</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="mandateForm-ontvangen-op">Ontvangen op</label>
                                     <input
+                                        id="mandateForm-ontvangen-op"
                                         type="datetime-local"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={mandateForm.data.ontvangen_op}
                                         onChange={(e) => mandateForm.setData('ontvangen_op', e.target.value)}
                                     />
+                                    {mandateForm.errors.ontvangen_op && <div className="mt-1 text-xs text-rose-600">{mandateForm.errors.ontvangen_op}</div>}
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-zinc-600">Status</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="mandateForm-status">Status</label>
                                     <select
+                                        id="mandateForm-status"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={mandateForm.data.status}
                                         onChange={(e) => mandateForm.setData('status', e.target.value)}
                                     >
                                         {['pending', 'actief', 'ingetrokken'].map((value) => (
                                             <option key={value} value={value}>
-                                                {value}
+                                                {MANDATE_STATUS_LABELS[value] || value}
                                             </option>
                                         ))}
                                     </select>
+                                    {mandateForm.errors.status && <div className="mt-1 text-xs text-rose-600">{mandateForm.errors.status}</div>}
                                 </div>
 
                                 <div className="sm:col-span-2 mt-2 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
@@ -2121,8 +2373,9 @@ export default function Show({
 
                                     <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
                                         <div className="sm:col-span-2">
-                                            <label className="block text-xs font-medium text-zinc-600">Kenmerk machtiging *</label>
+                                            <label className="block text-xs font-medium text-zinc-600" htmlFor="mandateForm-incasso-kenmerk-machtiging">Kenmerk machtiging *</label>
                                             <input
+                                                id="mandateForm-incasso-kenmerk-machtiging"
                                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                                 value={mandateForm.data.incasso_kenmerk_machtiging}
                                                 onChange={(e) => mandateForm.setData('incasso_kenmerk_machtiging', e.target.value)}
@@ -2132,8 +2385,9 @@ export default function Show({
                                             )}
                                         </div>
                                         <div className="sm:col-span-2">
-                                            <label className="block text-xs font-medium text-zinc-600">Upload getekend incassoformulier</label>
+                                            <label className="block text-xs font-medium text-zinc-600" htmlFor="mandate-incasso-formulier">Upload getekend incassoformulier</label>
                                             <input
+                                                id="mandate-incasso-formulier"
                                                 type="file"
                                                 accept=".pdf,.jpg,.jpeg,.png"
                                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-2 file:text-xs file:font-semibold"
@@ -2157,7 +2411,7 @@ export default function Show({
                                     </button>
                                     <button
                                         type="submit"
-                                        className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                                        className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                                         disabled={mandateForm.processing}
                                     >
                                         {mandateForm.processing ? 'Opslaan...' : 'Opslaan'}
@@ -2178,7 +2432,7 @@ export default function Show({
                         </div>
                         <button
                             type="button"
-                            className="w-full rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 sm:w-auto"
+                            className="w-full rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 sm:w-auto disabled:cursor-not-allowed disabled:opacity-60"
                             onClick={submitModules}
                             disabled={moduleForm.processing}
                         >
@@ -2225,6 +2479,13 @@ export default function Show({
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-100">
+                                {moduleForm.data.rows.length === 0 && (
+                                    <tr>
+                                        <td colSpan={6} className="px-4 py-10 text-center text-sm text-zinc-600">
+                                            Er zijn nog geen modules beschikbaar.
+                                        </td>
+                                    </tr>
+                                )}
                                 {moduleForm.data.rows.map((row, index) => {
                                     const effectiveAantal = Math.max(1, Number(row.aantal || 1));
                                     const subtotal = numberValue(row.prijs_maand_excl) * effectiveAantal;
@@ -2240,6 +2501,7 @@ export default function Show({
                                                     className="rounded border-zinc-300"
                                                     checked={!!row.actief}
                                                     onChange={() => toggleModule(index)}
+                                                    aria-label={`${row.naam} actief`}
                                                 />
                                             </td>
                                             <td className="px-4 py-3 text-sm font-semibold text-zinc-900">{row.naam}</td>
@@ -2248,8 +2510,9 @@ export default function Show({
                                                     type="number"
                                                     min="0"
                                                     className="w-24 rounded-md border-zinc-300 text-sm"
-                                                    value={row.aantal}
+                                                    value={row.aantal ?? ''}
                                                     onChange={(e) => updateModuleRow(index, 'aantal', e.target.value)}
+                                                    aria-label={`Aantal ${row.naam}`}
                                                 />
                                                 {aantalError && <div className="mt-1 text-xs text-rose-600">{aantalError}</div>}
                                             </td>
@@ -2259,8 +2522,9 @@ export default function Show({
                                                     min="0"
                                                     step="0.01"
                                                     className="w-28 rounded-md border-zinc-300 text-sm"
-                                                    value={row.prijs_maand_excl}
+                                                    value={row.prijs_maand_excl ?? ''}
                                                     onChange={(e) => updateModuleRow(index, 'prijs_maand_excl', e.target.value)}
+                                                    aria-label={`Prijs per maand excl. btw ${row.naam}`}
                                                 />
                                                 {prijsError && <div className="mt-1 text-xs text-rose-600">{prijsError}</div>}
                                             </td>
@@ -2271,8 +2535,9 @@ export default function Show({
                                                     max="100"
                                                     step="0.1"
                                                     className="w-20 rounded-md border-zinc-300 text-sm"
-                                                    value={row.btw_percentage}
+                                                    value={row.btw_percentage ?? ''}
                                                     onChange={(e) => updateModuleRow(index, 'btw_percentage', e.target.value)}
+                                                    aria-label={`BTW percentage ${row.naam}`}
                                                 />
                                                 {btwError && <div className="mt-1 text-xs text-rose-600">{btwError}</div>}
                                             </td>
@@ -2352,7 +2617,7 @@ export default function Show({
                     </div>
 
                     {showSeatForm && (
-                        <div className="rounded-xl border border-zinc-200 bg-white p-5">
+                        <div id="seat-form" className="scroll-mt-4 rounded-xl border border-zinc-200 bg-white p-5">
                             <div className="flex items-center justify-between gap-3">
                                 <div className="text-sm font-semibold">
                                     {editingSeatId ? 'Gebruiker bewerken' : 'Gebruiker toevoegen'}
@@ -2368,8 +2633,9 @@ export default function Show({
 
                             <form onSubmit={submitSeat} className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div>
-                                    <label className="block text-xs font-medium text-zinc-600">Naam *</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="seatForm-naam">Naam *</label>
                                     <input
+                                        id="seatForm-naam"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={seatForm.data.naam}
                                         onChange={(e) => seatForm.setData('naam', e.target.value)}
@@ -2377,8 +2643,9 @@ export default function Show({
                                     {seatForm.errors.naam && <div className="mt-1 text-xs text-rose-600">{seatForm.errors.naam}</div>}
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-zinc-600">E-mail *</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="seatForm-email">E-mail *</label>
                                     <input
+                                        id="seatForm-email"
                                         type="email"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={seatForm.data.email}
@@ -2387,21 +2654,25 @@ export default function Show({
                                     {seatForm.errors.email && <div className="mt-1 text-xs text-rose-600">{seatForm.errors.email}</div>}
                                 </div>
                                 <div className="sm:col-span-2">
-                                    <label className="block text-xs font-medium text-zinc-600">Rol</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="seatForm-rol-in-kivii">Rol</label>
                                     <input
+                                        id="seatForm-rol-in-kivii"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={seatForm.data.rol_in_kivii}
                                         onChange={(e) => seatForm.setData('rol_in_kivii', e.target.value)}
                                     />
+                                    {seatForm.errors.rol_in_kivii && <div className="mt-1 text-xs text-rose-600">{seatForm.errors.rol_in_kivii}</div>}
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-zinc-600">Aangemaakt op</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="seatForm-aangemaakt-op">Aangemaakt op</label>
                                     <input
+                                        id="seatForm-aangemaakt-op"
                                         type="date"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={seatForm.data.aangemaakt_op}
                                         onChange={(e) => seatForm.setData('aangemaakt_op', e.target.value)}
                                     />
+                                    {seatForm.errors.aangemaakt_op && <div className="mt-1 text-xs text-rose-600">{seatForm.errors.aangemaakt_op}</div>}
                                 </div>
                                 <div className="flex items-center gap-2 pt-6">
                                     <input
@@ -2415,7 +2686,7 @@ export default function Show({
                                 <div className="sm:col-span-2 flex justify-end">
                                     <button
                                         type="submit"
-                                        className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                                        className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                                         disabled={seatForm.processing}
                                     >
                                         {seatForm.processing ? 'Opslaan...' : 'Opslaan'}
@@ -2434,16 +2705,19 @@ export default function Show({
                             <div className="text-sm font-semibold">Nieuwe notitie</div>
                             <form onSubmit={submitNote} className="mt-4 space-y-3">
                                 <div>
-                                    <label className="block text-xs font-medium text-zinc-600">Titel</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="noteForm-titel">Titel</label>
                                     <input
+                                        id="noteForm-titel"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={noteForm.data.titel}
                                         onChange={(e) => noteForm.setData('titel', e.target.value)}
                                     />
+                                    {noteForm.errors.titel && <div className="mt-1 text-xs text-rose-600">{noteForm.errors.titel}</div>}
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-zinc-600">Notitie</label>
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="noteForm-inhoud">Notitie</label>
                                     <textarea
+                                        id="noteForm-inhoud"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         rows={4}
                                         value={noteForm.data.inhoud}
@@ -2456,7 +2730,7 @@ export default function Show({
                                 <div className="flex justify-end">
                                     <button
                                         type="submit"
-                                        className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                                        className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                                         disabled={noteForm.processing}
                                     >
                                         {noteForm.processing ? 'Opslaan...' : 'Notitie toevoegen'}
@@ -2479,13 +2753,13 @@ export default function Show({
                                         <div>
                                             <div className="text-sm font-semibold">{activity.titel}</div>
                                             <div className="mt-1 text-xs text-zinc-500">
-                                                {activity.type ? activity.type.replace('_', ' ') : 'Activiteit'} |{' '}
+                                                {activity.type ? ACTIVITY_TYPE_LABELS[activity.type] || activity.type.replace(/_/g, ' ') : 'Activiteit'} |{' '}
                                                 {formatDateTime(activity.created_at)}
                                             </div>
                                         </div>
                                         {activity.creator && <div className="text-xs font-semibold text-zinc-500">{activity.creator.name}</div>}
                                     </div>
-                                    {activity.inhoud && <div className="mt-3 text-sm text-zinc-700">{activity.inhoud}</div>}
+                                    {activity.inhoud && <div className="mt-3 whitespace-pre-line break-words text-sm text-zinc-700">{activity.inhoud}</div>}
                                     {(activity.due_at || activity.done_at) && (
                                         <div className="mt-3 text-xs text-zinc-500">
                                             {activity.due_at && `Gepland: ${formatDateTime(activity.due_at)}`}
@@ -2509,8 +2783,9 @@ export default function Show({
                                 <div className="text-sm font-semibold">Nieuwe taak / afspraak</div>
                                 <form onSubmit={submitTask} className="mt-4 space-y-3">
                                     <div>
-                                        <label className="block text-xs font-medium text-zinc-600">Type</label>
+                                        <label className="block text-xs font-medium text-zinc-600" htmlFor="taskForm-type">Type</label>
                                         <select
+                                            id="taskForm-type"
                                             className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                             value={taskForm.data.type}
                                             onChange={(e) => taskForm.setData('type', e.target.value)}
@@ -2518,10 +2793,12 @@ export default function Show({
                                             <option value="taak">Taak</option>
                                             <option value="afspraak">Afspraak</option>
                                         </select>
+                                        {taskForm.errors.type && <div className="mt-1 text-xs text-rose-600">{taskForm.errors.type}</div>}
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-medium text-zinc-600">Titel</label>
+                                        <label className="block text-xs font-medium text-zinc-600" htmlFor="taskForm-titel">Titel</label>
                                         <input
+                                            id="taskForm-titel"
                                             className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                             value={taskForm.data.titel}
                                             onChange={(e) => taskForm.setData('titel', e.target.value)}
@@ -2529,22 +2806,26 @@ export default function Show({
                                         {taskForm.errors.titel && <div className="mt-1 text-xs text-rose-600">{taskForm.errors.titel}</div>}
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-medium text-zinc-600">Omschrijving</label>
+                                        <label className="block text-xs font-medium text-zinc-600" htmlFor="taskForm-inhoud">Omschrijving</label>
                                         <textarea
+                                            id="taskForm-inhoud"
                                             className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                             rows={3}
                                             value={taskForm.data.inhoud}
                                             onChange={(e) => taskForm.setData('inhoud', e.target.value)}
                                         />
+                                        {taskForm.errors.inhoud && <div className="mt-1 text-xs text-rose-600">{taskForm.errors.inhoud}</div>}
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-medium text-zinc-600">Planning</label>
+                                        <label className="block text-xs font-medium text-zinc-600" htmlFor="taskForm-due-at">Planning</label>
                                         <input
+                                            id="taskForm-due-at"
                                             type="datetime-local"
                                             className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                             value={taskForm.data.due_at}
                                             onChange={(e) => taskForm.setData('due_at', e.target.value)}
                                         />
+                                        {taskForm.errors.due_at && <div className="mt-1 text-xs text-rose-600">{taskForm.errors.due_at}</div>}
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <input
@@ -2558,34 +2839,38 @@ export default function Show({
                                     {taskForm.data.createReminder && (
                                         <div className="space-y-2">
                                             <div>
-                                                <label className="block text-xs font-medium text-zinc-600">Reminder tijd</label>
+                                                <label className="block text-xs font-medium text-zinc-600" htmlFor="taskForm-remind-at">Reminder tijd</label>
                                                 <input
+                                                    id="taskForm-remind-at"
                                                     type="datetime-local"
                                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                                     value={taskForm.data.remind_at}
                                                     onChange={(e) => taskForm.setData('remind_at', e.target.value)}
                                                 />
+                                                {taskForm.errors.remind_at && <div className="mt-1 text-xs text-rose-600">{taskForm.errors.remind_at}</div>}
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-medium text-zinc-600">Kanaal</label>
+                                                <label className="block text-xs font-medium text-zinc-600" htmlFor="taskForm-channel">Kanaal</label>
                                                 <select
+                                                    id="taskForm-channel"
                                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                                     value={taskForm.data.channel}
                                                     onChange={(e) => taskForm.setData('channel', e.target.value)}
                                                 >
                                                     {reminderChannels.map((channel) => (
                                                         <option key={channel} value={channel}>
-                                                            {channel}
+                                                            {CHANNEL_LABELS[channel] || channel}
                                                         </option>
                                                     ))}
                                                 </select>
+                                                {taskForm.errors.channel && <div className="mt-1 text-xs text-rose-600">{taskForm.errors.channel}</div>}
                                             </div>
                                         </div>
                                     )}
                                     <div className="flex justify-end">
                                         <button
                                             type="submit"
-                                            className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                                            className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                                             disabled={taskForm.processing}
                                         >
                                             {taskForm.processing ? 'Opslaan...' : 'Opslaan'}

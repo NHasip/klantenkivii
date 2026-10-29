@@ -148,7 +148,7 @@ class DashboardController
                 $days = 0;
 
                 if ($since) {
-                    $days = max(0, $since->copy()->startOfDay()->diffInDays($todayStart, false));
+                    $days = (int) max(0, round($since->copy()->startOfDay()->diffInDays($todayStart, false)));
                 }
 
                 return [
@@ -168,7 +168,7 @@ class DashboardController
                 $days = 0;
 
                 if ($since) {
-                    $days = max(0, $since->copy()->startOfDay()->diffInDays($todayStart, false));
+                    $days = (int) max(0, round($since->copy()->startOfDay()->diffInDays($todayStart, false)));
                 }
 
                 return [

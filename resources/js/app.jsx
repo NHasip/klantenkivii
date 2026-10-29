@@ -3,6 +3,7 @@ import './bootstrap';
 import { createInertiaApp } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
 import { ConfirmProvider } from './components/ConfirmProvider';
+import { FlashToast } from './components/FlashToast';
 
 const pages = import.meta.glob('./Pages/**/*.jsx');
 
@@ -19,6 +20,7 @@ createInertiaApp({
         createRoot(el).render(
             <ConfirmProvider>
                 <App {...props} />
+                <FlashToast />
             </ConfirmProvider>
         );
     },

@@ -125,19 +125,20 @@ function EmptyState({ text }) {
 
 function TaskRow({ task }) {
     const overdue = task.deadline ? new Date(task.deadline) < new Date() : false;
+    const hasDeadline = Boolean(task.deadline);
 
     return (
         <li className={cx('rounded-xl border bg-white p-4', overdue ? 'border-rose-300' : 'border-zinc-200')}>
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                        <div className="truncate text-sm font-semibold text-zinc-950">{task.titel}</div>
+                        <div className="min-w-0 truncate text-sm font-semibold text-zinc-950" title={task.titel}>{task.titel}</div>
                         {task.project?.naam ? <Badge tone="info">{task.project.naam}</Badge> : null}
                         {overdue ? <Badge tone="danger">Te laat</Badge> : null}
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-600">
-                        <span>Deadline: {formatDateTime(task.deadline)}</span>
-                        {task.prioriteit ? <span>Prioriteit: {task.prioriteit}</span> : null}
+                        <span>{hasDeadline ? `Deadline: ${formatDateTime(task.deadline)}` : 'Geen deadline'}</span>
+                        {task.prioriteit ? <span>Prioriteit: {task.prioriteit.charAt(0).toUpperCase() + task.prioriteit.slice(1)}</span> : null}
                     </div>
                 </div>
                 <div className="shrink-0 text-xs font-semibold text-zinc-400">#{task.id}</div>
@@ -147,11 +148,15 @@ function TaskRow({ task }) {
 }
 
 function AppointmentRow({ item }) {
+    const overdue = item.due_at ? new Date(item.due_at) < new Date() : false;
     return (
         <li className="rounded-xl border border-zinc-200 bg-white p-4">
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                    <div className="text-sm font-semibold text-zinc-950">{item.titel}</div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="text-sm font-semibold text-zinc-950">{item.titel}</div>
+                        {overdue ? <Badge tone="danger">Verlopen</Badge> : null}
+                    </div>
                     <div className="mt-2 text-xs leading-5 text-zinc-600">
                         {formatDateTime(item.due_at)}
                         {item.garage_company?.bedrijfsnaam ? (
@@ -195,7 +200,7 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
     const activeDurationItems = lists?.status_duration?.active ?? [];
     const activeMissingSepaItems = lists?.active_missing_sepa ?? [];
 
-    const tasksTone = kpis.tasks_overdue > 0 ? 'danger' : kpis.tasks_open > 0 ? 'info' : 'default';
+    const tasksTone = kpis?.tasks_overdue > 0 ? 'danger' : kpis.tasks_open > 0 ? 'info' : 'default';
     const cancelledTone = kpis.cancelled_last_30 > 0 ? 'danger' : 'default';
 
     return (
@@ -246,7 +251,7 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <MetricCard label="Klanten totaal" value={formatInt(kpis.companies_total)} sub={`Actief: ${formatInt(kpis.companies_active)}`} />
                     <MetricCard label="Demo klanten" value={formatInt(kpis.demo_customers)} sub={`Gem. ${formatInt(kpis.demo_avg_days)} dagen`} tone="info" />
-                    <MetricCard label="Gem. actief duur" value={`${formatInt(kpis.active_avg_days)} dagen`} sub="Gemiddelde tijd in actief status" tone="info" />
+                    <MetricCard label="Gem. actief duur" value={`${formatInt(kpis.active_avg_days)} dagen`} sub="Gemiddelde tijd in actieve status" tone="info" />
                     <MetricCard
                         label="Opzeggingen (30d)"
                         value={formatInt(kpis.cancelled_last_30)}

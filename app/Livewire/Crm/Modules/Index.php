@@ -88,17 +88,17 @@ class Index extends Component
         $this->resetForm();
         $this->moduleId = null;
         $this->showForm = false;
-        session()->flash('status', 'Module opgeslagen.');
+        session()->now('livewire_status', 'Module opgeslagen.');
     }
 
     public function deleteModule(int $id): void
     {
         try {
             Module::findOrFail($id)->delete();
-            session()->flash('status', 'Module verwijderd.');
+            session()->now('livewire_status', 'Module verwijderd.');
         } catch (Throwable $e) {
             report($e);
-            session()->flash('status', 'Verwijderen mislukt. Deze module wordt mogelijk nog gebruikt.');
+            session()->now('livewire_error', 'Verwijderen mislukt. Deze module wordt mogelijk nog gebruikt.');
         }
     }
 

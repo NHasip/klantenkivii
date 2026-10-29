@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -15,6 +15,8 @@ function ToolbarButton({ active, disabled, onClick, children, title }) {
         <button
             type="button"
             title={title}
+            aria-label={title}
+            aria-pressed={active === undefined ? undefined : Boolean(active)}
             onClick={onClick}
             disabled={disabled}
             className={cx(
@@ -31,6 +33,11 @@ function ToolbarButton({ active, disabled, onClick, children, title }) {
 export default function Index({ templates, variables, urls }) {
     const confirm = useConfirm();
     const [selectedId, setSelectedId] = useState(templates?.[0]?.id ?? 'new');
+    const [saving, setSaving] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+    const [flash, setFlash] = useState(null);
+    const bodyTouchedRef = useRef(false);
+    const baselineRef = useRef({ name: '', subject: '', is_active: 1 });
 
     const selectedTemplate = useMemo(
         () => templates.find((item) => item.id === selectedId),
@@ -42,7 +49,6 @@ export default function Index({ templates, variables, urls }) {
         selectedTemplate &&
         (!selectedTemplate.is_system || !selectedTemplate.is_active);
     const updateUrl = urls.update_post || urls.update;
-    const deleteUrl = urls.delete_post || urls.delete;
 
     const form = useForm({
         name: '',
@@ -52,7 +58,14 @@ export default function Index({ templates, variables, urls }) {
     });
 
     useEffect(() => {
+        bodyTouchedRef.current = false;
+        form.clearErrors();
         if (selectedTemplate) {
+            baselineRef.current = {
+                name: selectedTemplate.name || '',
+                subject: selectedTemplate.subject || '',
+                is_active: selectedTemplate.is_active ? 1 : 0,
+            };
             form.setData({
                 name: selectedTemplate.name || '',
                 subject: selectedTemplate.subject || '',
@@ -60,6 +73,7 @@ export default function Index({ templates, variables, urls }) {
                 is_active: selectedTemplate.is_active ? 1 : 0,
             });
         } else if (isNew) {
+            baselineRef.current = { name: '', subject: '', is_active: 1 };
             form.setData({
                 name: '',
                 subject: '',
@@ -70,6 +84,8 @@ export default function Index({ templates, variables, urls }) {
     }, [selectedTemplate?.id, isNew]);
 
     const editor = useEditor({
+        // Zorgt dat de actieve status van de toolbarknoppen meebeweegt met de cursor.
+        shouldRerenderOnTransaction: true,
         extensions: [
             StarterKit.configure({ heading: { levels: [2, 3] } }),
             LinkExtension.configure({ openOnClick: false, autolink: true, defaultProtocol: 'https' }),
@@ -77,6 +93,7 @@ export default function Index({ templates, variables, urls }) {
         ],
         content: form.data.body_html || '<p></p>',
         onUpdate: ({ editor: ed }) => {
+            bodyTouchedRef.current = true;
             form.setData('body_html', ed.getHTML());
         },
     });
@@ -85,25 +102,63 @@ export default function Index({ templates, variables, urls }) {
         if (!editor) return;
         const nextHtml = form.data.body_html?.trim() ? form.data.body_html : '<p></p>';
         if (editor.getHTML() !== nextHtml) {
-            editor.commands.setContent(nextHtml, false);
+            editor.commands.setContent(nextHtml, { emitUpdate: false });
         }
     }, [editor, form.data.body_html]);
 
+    const isDirty = () => {
+        const base = baselineRef.current;
+        return (
+            bodyTouchedRef.current ||
+            form.data.name !== base.name ||
+            form.data.subject !== base.subject ||
+            Number(form.data.is_active) !== Number(base.is_active)
+        );
+    };
+
+    const selectTemplate = async (id) => {
+        if (id === selectedId) return;
+        if (isDirty()) {
+            const ok = await confirm({
+                title: 'Niet opgeslagen wijzigingen',
+                message: 'Je hebt wijzigingen die nog niet zijn opgeslagen. Wil je deze verwerpen?',
+                confirmText: 'Verwerpen',
+                cancelText: 'Blijven',
+                tone: 'danger',
+            });
+            if (!ok) return;
+        }
+        setFlash(null);
+        setSelectedId(id);
+    };
+
     const submitTemplate = (method, url, options = {}) => {
+        if (saving) return;
         const latestHtml = editor ? editor.getHTML() : form.data.body_html;
         const payload = {
             ...form.data,
             body_html: latestHtml,
         };
+        form.clearErrors();
+        setFlash(null);
         const requestOptions = {
             preserveScroll: true,
+            preserveState: true,
             ...options,
-            onSuccess: (...args) => {
-                router.reload({ only: ['templates'], preserveScroll: true, preserveState: true });
-                options.onSuccess?.(...args);
+            onStart: () => setSaving(true),
+            onFinish: () => setSaving(false),
+            onSuccess: (page) => {
+                bodyTouchedRef.current = false;
+                baselineRef.current = {
+                    name: payload.name || '',
+                    subject: payload.subject || '',
+                    is_active: payload.is_active ? 1 : 0,
+                };
+                options.onSuccess?.(page);
             },
             onError: (errors) => {
                 form.setError(errors || {});
+                setFlash({ tone: 'error', text: 'Controleer de gemarkeerde velden.' });
             },
         };
         if (method === 'patch') {
@@ -116,42 +171,52 @@ export default function Index({ templates, variables, urls }) {
     const saveTemplate = (event) => {
         event?.preventDefault?.();
         if (isNew) {
-            submitTemplate('post', urls.store, { onSuccess: () => setSelectedId('new') });
+            const knownIds = new Set(templates.map((item) => item.id));
+            submitTemplate('post', urls.store, {
+                onSuccess: (page) => {
+                    // Selecteer de zojuist aangemaakte template, zodat een tweede klik geen dubbele aanmaakt.
+                    const created = (page?.props?.templates ?? []).find((item) => !knownIds.has(item.id));
+                    if (created) setSelectedId(created.id);
+                },
+            });
             return;
         }
         if (selectedTemplate) {
-            form.clearErrors();
-            const targetUrl = updateUrl.replace('__TEMPLATE__', selectedTemplate.id);
-            submitTemplate(updateUrl ? 'post' : 'patch', targetUrl);
+            const targetUrl = (updateUrl || '').replace('__TEMPLATE__', selectedTemplate.id);
+            submitTemplate(urls.update_post ? 'post' : 'patch', targetUrl);
         }
     };
 
     const deleteTemplate = async () => {
-        if (!selectedTemplate || (selectedTemplate.is_system && selectedTemplate.is_active)) return;
+        if (deleting || !selectedTemplate || (selectedTemplate.is_system && selectedTemplate.is_active)) return;
         const ok = await confirm({
             title: 'Template verwijderen',
-            message: `Weet je zeker dat je "${selectedTemplate.name}" wilt verwijderen?`,
+            message: `Weet je zeker dat je "${selectedTemplate.name}" wilt verwijderen? Dit kan niet ongedaan worden gemaakt.`,
             confirmText: 'Verwijderen',
             cancelText: 'Annuleren',
             tone: 'danger',
         });
         if (!ok) return;
-        if (deleteUrl) {
-            router.post(
-                deleteUrl.replace('__TEMPLATE__', selectedTemplate.id),
-                { is_active: form.data.is_active },
-                {
-                    preserveScroll: true,
-                    onSuccess: () => setSelectedId('new'),
-                }
-            );
+        setFlash(null);
+        const options = {
+            preserveScroll: true,
+            onStart: () => setDeleting(true),
+            onFinish: () => setDeleting(false),
+            onSuccess: (page) => {
+                bodyTouchedRef.current = false;
+                setSelectedId('new');
+            },
+            onError: () => setFlash({ tone: 'error', text: 'Verwijderen mislukt. Probeer opnieuw.' }),
+        };
+        if (urls.delete_post) {
+            router.post(urls.delete_post.replace('__TEMPLATE__', selectedTemplate.id), { is_active: form.data.is_active }, options);
             return;
         }
-        router.delete(urls.delete.replace('__TEMPLATE__', selectedTemplate.id), {
-            preserveScroll: true,
-            onSuccess: () => setSelectedId('new'),
-        });
+        router.delete(urls.delete.replace('__TEMPLATE__', selectedTemplate.id), options);
     };
+
+    const flashText = typeof flash === 'string' ? flash : flash?.text;
+    const flashIsError = typeof flash === 'object' && flash?.tone === 'error';
 
     return (
         <div className="space-y-6">
@@ -172,6 +237,21 @@ export default function Index({ templates, variables, urls }) {
                 </Link>
             </div>
 
+            {flashText ? (
+                <div
+                    role={flashIsError ? 'alert' : 'status'}
+                    className={cx(
+                        'flex items-start justify-between gap-3 rounded-lg border px-4 py-3 text-sm',
+                        flashIsError ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    )}
+                >
+                    <div>{flashText}</div>
+                    <button type="button" className="text-xs font-semibold" onClick={() => setFlash(null)}>
+                        Sluiten
+                    </button>
+                </div>
+            ) : null}
+
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
                 <div className="space-y-3 lg:col-span-4">
                     <div className="rounded-xl border border-zinc-200 bg-white p-4">
@@ -180,7 +260,8 @@ export default function Index({ templates, variables, urls }) {
                             <button
                                 type="button"
                                 className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-semibold hover:bg-zinc-50"
-                                onClick={() => setSelectedId('new')}
+                                onClick={() => selectTemplate('new')}
+                                aria-pressed={isNew}
                             >
                                 Nieuw
                             </button>
@@ -193,7 +274,8 @@ export default function Index({ templates, variables, urls }) {
                                 <button
                                     key={template.id}
                                     type="button"
-                                    onClick={() => setSelectedId(template.id)}
+                                    onClick={() => selectTemplate(template.id)}
+                                    aria-current={selectedId === template.id ? 'true' : undefined}
                                     className={cx(
                                         'w-full rounded-lg border px-3 py-2 text-left transition',
                                         selectedId === template.id
@@ -201,7 +283,7 @@ export default function Index({ templates, variables, urls }) {
                                             : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
                                     )}
                                 >
-                                    <div className="text-sm font-semibold">{template.name}</div>
+                                    <div className="truncate text-sm font-semibold">{template.name}</div>
                                     <div className={cx('mt-1 text-xs', selectedId === template.id ? 'text-zinc-200' : 'text-zinc-500')}>
                                         {template.subject || 'Geen onderwerp'}
                                     </div>
@@ -227,8 +309,11 @@ export default function Index({ templates, variables, urls }) {
                         <div className="rounded-xl border border-zinc-200 bg-white p-4">
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <div>
-                                    <label className="text-xs font-semibold text-zinc-500">Naam</label>
+                                    <label htmlFor="email-template-name" className="text-xs font-semibold text-zinc-500">Naam</label>
                                     <input
+                                        id="email-template-name"
+                                        maxLength={120}
+                                        aria-invalid={form.errors.name ? 'true' : undefined}
                                         className="mt-2 w-full rounded-md border-zinc-300 text-sm"
                                         value={form.data.name}
                                         onChange={(e) => form.setData('name', e.target.value)}
@@ -236,8 +321,11 @@ export default function Index({ templates, variables, urls }) {
                                     {form.errors.name && <div className="mt-1 text-xs text-rose-600">{form.errors.name}</div>}
                                 </div>
                                 <div>
-                                    <label className="text-xs font-semibold text-zinc-500">Onderwerp</label>
+                                    <label htmlFor="email-template-subject" className="text-xs font-semibold text-zinc-500">Onderwerp</label>
                                     <input
+                                        id="email-template-subject"
+                                        maxLength={255}
+                                        aria-invalid={form.errors.subject ? 'true' : undefined}
                                         className="mt-2 w-full rounded-md border-zinc-300 text-sm"
                                         value={form.data.subject}
                                         onChange={(e) => form.setData('subject', e.target.value)}
@@ -299,7 +387,7 @@ export default function Index({ templates, variables, urls }) {
                                         onClick={() => {
                                             if (!editor) return;
                                             const previousUrl = editor.getAttributes('link').href || '';
-                                            const url = window.prompt('Link URL', previousUrl);
+                                            const url = window.prompt('Link (URL)', previousUrl);
                                             if (url === null) return;
                                             if (url === '') {
                                                 editor.chain().focus().unsetLink().run();
@@ -322,28 +410,28 @@ export default function Index({ templates, variables, urls }) {
                                         disabled={!editor}
                                         onClick={() => editor?.chain().focus().undo().run()}
                                     >
-                                        Undo
+                                        Ongedaan
                                     </ToolbarButton>
                                     <ToolbarButton
                                         title="Opnieuw"
                                         disabled={!editor}
                                         onClick={() => editor?.chain().focus().redo().run()}
                                     >
-                                        Redo
+                                        Opnieuw
                                     </ToolbarButton>
                                 </div>
                                 <EditorContent editor={editor} className="tiptap px-3 py-2 text-sm" />
                             </div>
+                            {form.errors.body_html && <div className="mt-1 text-xs text-rose-600">{form.errors.body_html}</div>}
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2">
                             <button
-                                type="button"
-                                className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-60"
-                                disabled={form.processing}
-                                onClick={saveTemplate}
+                                type="submit"
+                                className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                disabled={saving}
                             >
-                                {form.processing ? 'Opslaan...' : 'Opslaan'}
+                                {saving ? 'Opslaan...' : 'Opslaan'}
                             </button>
                             {!isNew && selectedTemplate && (
                                 <button
@@ -355,9 +443,9 @@ export default function Index({ templates, variables, urls }) {
                                             : 'border-rose-200 text-rose-600 hover:bg-rose-50'
                                     )}
                                     onClick={deleteTemplate}
-                                    disabled={selectedTemplate.is_system && selectedTemplate.is_active}
+                                    disabled={deleting || (selectedTemplate.is_system && selectedTemplate.is_active)}
                                 >
-                                    Verwijderen
+                                    {deleting ? 'Verwijderen...' : 'Verwijderen'}
                                 </button>
                             )}
                             {!canDelete && !isNew && selectedTemplate && selectedTemplate.is_system && selectedTemplate.is_active && (

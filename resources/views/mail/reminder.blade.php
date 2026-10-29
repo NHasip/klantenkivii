@@ -1,6 +1,6 @@
 @php($company = $reminder->garageCompany)
 <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; line-height: 1.5;">
-    <h2 style="margin: 0 0 12px;">Reminder: {{ $reminder->titel }}</h2>
+    <h2 style="margin: 0 0 12px;">Herinnering: {{ $reminder->titel }}</h2>
 
     @if($reminder->message)
         <p style="margin: 0 0 12px; white-space: pre-wrap;">{{ $reminder->message }}</p>
@@ -13,7 +13,7 @@
     @if($company)
         <p style="margin: 0 0 12px;">
             Klant: <strong>{{ $company->bedrijfsnaam }}</strong><br>
-            <a href="{{ route('crm.garage_companies.show', $company) }}">Open in CRM</a>
+            <a href="{{ route('crm.garage_companies.show', $company) }}">Openen in CRM</a>
         </p>
     @endif
 

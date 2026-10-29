@@ -53,7 +53,7 @@
                 <x-secondary-button id="passkey-login-button" type="button">
                     {{ __('Log in met passkey') }}
                 </x-secondary-button>
-                <span id="passkey-login-status" class="text-xs text-gray-600"></span>
+                <span id="passkey-login-status" class="text-xs text-gray-600" role="status" aria-live="polite"></span>
             </div>
         </div>
     </x-authentication-card>

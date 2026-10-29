@@ -1,4 +1,4 @@
-﻿import React from 'react';
+﻿import React, { useState } from 'react';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useConfirm } from '../../../components/ConfirmProvider';
 
@@ -11,7 +11,7 @@ function formatEuro(value) {
 }
 
 function formatDateTime(isoString) {
-    if (!isoString) return '—';
+    if (!isoString) return '-';
     try {
         return new Intl.DateTimeFormat('nl-NL', {
             year: 'numeric',
@@ -25,6 +25,11 @@ function formatDateTime(isoString) {
     }
 }
 
+function toLocalDateInput(date) {
+    const pad = (value) => String(value).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 function cx(...parts) {
     return parts.filter(Boolean).join(' ');
 }
@@ -33,22 +38,31 @@ function Pagination({ links }) {
     if (!Array.isArray(links) || links.length <= 1) return null;
 
     return (
-        <div className="mt-6 flex flex-wrap gap-2">
-            {links.map((link, idx) => (
-                <Link
-                    key={`${link.label}-${idx}`}
-                    href={link.url || '#'}
-                    className={cx(
-                        'rounded-md border px-3 py-1.5 text-sm',
-                        link.active
-                            ? 'border-indigo-600 bg-indigo-600 text-white'
-                            : 'border-zinc-200 text-zinc-700 hover:bg-zinc-50',
-                        !link.url && 'cursor-not-allowed opacity-50'
-                    )}
-                    dangerouslySetInnerHTML={{ __html: link.label }}
-                />
-            ))}
-        </div>
+        <nav aria-label="Paginering" className="mt-6 flex flex-wrap gap-2">
+            {links.map((link, idx) =>
+                link.url ? (
+                    <Link
+                        key={`${link.label}-${idx}`}
+                        href={link.url}
+                        aria-current={link.active ? 'page' : undefined}
+                        className={cx(
+                            'rounded-md border px-3 py-1.5 text-sm',
+                            link.active
+                                ? 'border-indigo-600 bg-indigo-600 text-white'
+                                : 'border-zinc-200 text-zinc-700 hover:bg-zinc-50'
+                        )}
+                        dangerouslySetInnerHTML={{ __html: link.label }}
+                    />
+                ) : (
+                    <span
+                        key={`${link.label}-${idx}`}
+                        aria-disabled="true"
+                        className="cursor-not-allowed rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-700 opacity-50"
+                        dangerouslySetInnerHTML={{ __html: link.label }}
+                    />
+                )
+            )}
+        </nav>
     );
 }
 
@@ -64,6 +78,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
         : { index: '/garagebedrijven', create: '/garagebedrijven/nieuw', purge_trash: null };
 
     const confirm = useConfirm();
+    const [filtering, setFiltering] = useState(false);
     const { data, setData } = useForm({
         view: safeFilters.view || 'actief',
         search: safeFilters.search || '',
@@ -72,12 +87,13 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
         sort: safeFilters.sort || 'updated_desc',
         perPage: safeFilters.perPage || safeCompanies.per_page || 15,
     });
-    const isTrashView = data.view === 'prullenbak';
+    // Use the view the server actually rendered; it falls back to 'actief' when the trash is unavailable.
+    const isTrashView = (safeFilters.view || data.view) === 'prullenbak';
     const nowDate = new Date();
     const exportForm = useForm({
         maand: String(nowDate.getMonth() + 1),
         jaar: String(nowDate.getFullYear()),
-        uitvoerdatum: nowDate.toISOString().slice(0, 10),
+        uitvoerdatum: toLocalDateInput(nowDate),
     });
 
     const maandOpties = [
@@ -141,16 +157,26 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
             view,
         };
         setData('view', view);
-        router.get(safeUrls.index, nextData, { preserveState: true, replace: true });
+        router.get(safeUrls.index, nextData, {
+            preserveState: true,
+            replace: true,
+            onStart: () => setFiltering(true),
+            onFinish: () => setFiltering(false),
+        });
     };
 
     const submit = (event) => {
         event.preventDefault();
-        router.get(safeUrls.index, data, { preserveState: true, replace: true });
+        router.get(safeUrls.index, data, {
+            preserveState: true,
+            replace: true,
+            onStart: () => setFiltering(true),
+            onFinish: () => setFiltering(false),
+        });
     };
 
     const exportIncasso = () => {
-        if (!safeUrls.export_incasso_batch) return;
+        if (!safeUrls.export_incasso_batch || !exportForm.data.uitvoerdatum) return;
         const query = new URLSearchParams({
             maand: exportForm.data.maand,
             jaar: exportForm.data.jaar,
@@ -175,6 +201,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                         <button
                             type="button"
                             onClick={() => switchView('actief')}
+                            aria-pressed={!isTrashView}
                             className={cx(
                                 'flex-1 rounded px-3 py-1.5 text-sm font-semibold transition sm:flex-none',
                                 !isTrashView ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-zinc-100'
@@ -185,6 +212,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                         <button
                             type="button"
                             onClick={() => switchView('prullenbak')}
+                            aria-pressed={isTrashView}
                             className={cx(
                                 'flex-1 rounded px-3 py-1.5 text-sm font-semibold transition sm:flex-none',
                                 isTrashView ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-zinc-100'
@@ -221,8 +249,9 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                             <div className="mt-1 text-xs text-zinc-500">Exporteert alle klanten met status Actief en complete SEPA gegevens.</div>
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">Maand</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="exportForm-maand">Maand</label>
                             <select
+                                id="exportForm-maand"
                                 className="mt-1 rounded-md border-zinc-300 text-sm"
                                 value={exportForm.data.maand}
                                 onChange={(e) => exportForm.setData('maand', e.target.value)}
@@ -235,8 +264,9 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                             </select>
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">Jaar</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="exportForm-jaar">Jaar</label>
                             <select
+                                id="exportForm-jaar"
                                 className="mt-1 rounded-md border-zinc-300 text-sm"
                                 value={exportForm.data.jaar}
                                 onChange={(e) => exportForm.setData('jaar', e.target.value)}
@@ -249,8 +279,9 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                             </select>
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600">Uitvoerdatum</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="exportForm-uitvoerdatum">Uitvoerdatum</label>
                             <input
+                                id="exportForm-uitvoerdatum"
                                 type="date"
                                 className="mt-1 rounded-md border-zinc-300 text-sm"
                                 value={exportForm.data.uitvoerdatum}
@@ -260,7 +291,8 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                         <button
                             type="button"
                             onClick={exportIncasso}
-                            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 md:self-end"
+                            disabled={!exportForm.data.uitvoerdatum}
+                            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60 md:self-end"
                         >
                             Exporteer alle actieve klanten
                         </button>
@@ -271,8 +303,10 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
             <form onSubmit={submit} className="rounded-xl border border-zinc-200 bg-white p-4">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <div>
-                        <label className="block text-xs font-medium text-zinc-600">Zoek</label>
+                        <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-search">Zoek</label>
                         <input
+                            id="gc-search"
+                            type="search"
                             className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                             value={data.search}
                             onChange={(e) => setData('search', e.target.value)}
@@ -280,8 +314,9 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                         />
                     </div>
                     <div>
-                        <label className="block text-xs font-medium text-zinc-600">Status</label>
+                        <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-status">Status</label>
                         <select
+                            id="gc-status"
                             className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                             value={data.status}
                             onChange={(e) => setData('status', e.target.value)}
@@ -295,8 +330,9 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                         </select>
                     </div>
                     <div>
-                        <label className="block text-xs font-medium text-zinc-600">Tag</label>
+                        <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-tag">Tag</label>
                         <input
+                            id="gc-tag"
                             className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                             value={data.tag}
                             onChange={(e) => setData('tag', e.target.value)}
@@ -304,8 +340,9 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                         />
                     </div>
                     <div>
-                        <label className="block text-xs font-medium text-zinc-600">Sortering</label>
+                        <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-sort">Sortering</label>
                         <select
+                            id="gc-sort"
                             className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                             value={data.sort}
                             onChange={(e) => setData('sort', e.target.value)}
@@ -316,8 +353,9 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                         </select>
                     </div>
                     <div>
-                        <label className="block text-xs font-medium text-zinc-600">Per pagina</label>
+                        <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-perPage">Per pagina</label>
                         <select
+                            id="gc-perPage"
                             className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                             value={data.perPage}
                             onChange={(e) => setData('perPage', e.target.value)}
@@ -330,12 +368,13 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                         </select>
                     </div>
                     <div className="flex items-end justify-between gap-3 md:col-span-1">
-                        <div className="text-xs text-zinc-500">Totaal: {safeCompanies.total} bedrijven</div>
+                        <div className="text-xs text-zinc-500">Totaal: {Number(safeCompanies.total || 0).toLocaleString('nl-NL')} bedrijven</div>
                         <button
                             type="submit"
-                            className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
+                            disabled={filtering}
+                            className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                            Filter
+                            {filtering ? 'Bezig...' : 'Filter'}
                         </button>
                     </div>
                 </div>
@@ -352,7 +391,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                         <div className="flex items-start justify-between gap-3">
                             <div>
                                 <div className="text-sm font-semibold text-zinc-900">{company.bedrijfsnaam}</div>
-                                <div className="text-xs text-zinc-500">{company.plaats || '—'}</div>
+                                <div className="text-xs text-zinc-500">{company.plaats || '-'}</div>
                             </div>
                             <span className="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
                                 {safeStatusLabels[company.status] || company.status}
@@ -360,9 +399,9 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                         </div>
                         <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                             <div className="text-zinc-500">Contact</div>
-                            <div className="text-right text-zinc-700">{company.hoofd_email || '—'}</div>
+                            <div className="break-all text-right text-zinc-700">{company.hoofd_email || '-'}</div>
                             <div className="text-zinc-500">Telefoon</div>
-                            <div className="text-right text-zinc-700">{company.hoofd_telefoon || '—'}</div>
+                            <div className="text-right text-zinc-700">{company.hoofd_telefoon || '-'}</div>
                             <div className="text-zinc-500">Gebruikers</div>
                             <div className="text-right text-zinc-700">{company.actieve_seats}</div>
                             <div className="text-zinc-500">Omzet excl.</div>
@@ -406,7 +445,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                 ))}
             </div>
 
-            <div className="hidden overflow-hidden rounded-xl border border-zinc-200 bg-white md:block">
+            <div className="hidden overflow-x-auto rounded-xl border border-zinc-200 bg-white md:block">
                 <table className="min-w-full divide-y divide-zinc-100">
                     <thead className="bg-zinc-50">
                         <tr>
@@ -418,7 +457,9 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                             <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600">
                                 {isTrashView ? 'Verwijderd op' : 'Laatst bijgewerkt'}
                             </th>
-                            <th className="px-4 py-3"></th>
+                            <th className="px-4 py-3">
+                                <span className="sr-only">Acties</span>
+                            </th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
@@ -433,7 +474,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                             <tr key={company.id} className="hover:bg-zinc-50">
                                 <td className="px-4 py-3 text-sm font-semibold">
                                     <div>{company.bedrijfsnaam}</div>
-                                    <div className="text-xs text-zinc-500">{company.plaats || '—'}</div>
+                                    <div className="text-xs text-zinc-500">{company.plaats || '-'}</div>
                                 </td>
                                 <td className="px-4 py-3 text-sm">
                                     <span className="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
@@ -441,8 +482,8 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                                     </span>
                                 </td>
                                 <td className="px-4 py-3 text-sm">
-                                    <div>{company.hoofd_email}</div>
-                                    <div className="text-xs text-zinc-500">{company.hoofd_telefoon || '—'}</div>
+                                    <div>{company.hoofd_email || '-'}</div>
+                                    <div className="text-xs text-zinc-500">{company.hoofd_telefoon || '-'}</div>
                                 </td>
                                 <td className="px-4 py-3 text-sm">{company.actieve_seats}</td>
                                 <td className="px-4 py-3 text-sm">{formatEuro(company.omzet_excl)}</td>

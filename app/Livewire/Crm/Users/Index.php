@@ -86,7 +86,7 @@ class Index extends Component
         $this->resetForm();
         $this->userId = null;
         $this->showForm = false;
-        session()->flash('status', 'Gebruiker opgeslagen.');
+        session()->now('livewire_status', 'Gebruiker opgeslagen.');
     }
 
     private function resetForm(): void
