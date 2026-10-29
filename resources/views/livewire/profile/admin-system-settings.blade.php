@@ -42,6 +42,9 @@
                 <div class="lg:col-span-2">
                     <x-label for="smtp_password" value="Wachtwoord" />
                     <x-input id="smtp_password" type="password" class="mt-1 block w-full" wire:model="smtp.password" autocomplete="new-password" />
+                    @if ($hasSmtpPassword)
+                        <p class="mt-1 text-xs text-gray-500">Er is een wachtwoord opgeslagen. Laat dit veld leeg om het te behouden.</p>
+                    @endif
                     <x-input-error for="smtp.password" class="mt-2" />
                 </div>
 

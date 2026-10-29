@@ -43,6 +43,8 @@ class AdminSystemSettings extends Component
 
     private ?int $smtpId = null;
 
+    public bool $hasSmtpPassword = false;
+
     public function mount(): void
     {
         abort_unless(auth()->user()?->isAdmin(), 403);
@@ -50,11 +52,12 @@ class AdminSystemSettings extends Component
         $smtp = SmtpSetting::query()->first();
         if ($smtp) {
             $this->smtpId = $smtp->id;
+            $this->hasSmtpPassword = filled($smtp->password);
             $this->smtp = [
                 'host' => $smtp->host ?? '',
                 'port' => $smtp->port ?? 587,
                 'username' => $smtp->username ?? '',
-                'password' => $smtp->password ?? '',
+                'password' => '',
                 'encryption' => $smtp->encryption ?? 'tls',
                 'from_address' => $smtp->from_address ?? '',
                 'from_name' => $smtp->from_name ?? '',
@@ -107,6 +110,8 @@ class AdminSystemSettings extends Component
         );
 
         $this->smtpId = $smtp->id;
+        $this->hasSmtpPassword = filled($smtp->password);
+        $this->smtp['password'] = '';
 
         $this->dispatch('smtp-saved');
         $this->dispatch('notify', message: 'SMTP instellingen opgeslagen.');
@@ -180,7 +185,7 @@ class AdminSystemSettings extends Component
             'smtp.host' => ['required', 'string'],
             'smtp.port' => ['required', 'integer', 'min:1', 'max:65535'],
             'smtp.username' => ['required', 'string'],
-            'smtp.password' => ['required', 'string'],
+            'smtp.password' => [$this->hasSmtpPassword ? 'nullable' : 'required', 'string'],
             'smtp.from_address' => ['required', 'email'],
         ]);
 
@@ -210,6 +215,16 @@ class AdminSystemSettings extends Component
         $this->dispatch('notify', message: 'Testmail verstuurd.');
     }
 
+    private function resolveSmtpPassword(): ?string
+    {
+        if (filled($this->smtp['password'] ?? null)) {
+            return $this->smtp['password'];
+        }
+
+        // Wachtwoord nooit naar de browser sturen: bij een leeg veld het opgeslagen wachtwoord gebruiken.
+        return SmtpSetting::query()->first()?->password;
+    }
+
     private function applySmtpConfig(): void
     {
         config([
@@ -217,7 +232,7 @@ class AdminSystemSettings extends Component
             'mail.mailers.smtp.host' => $this->smtp['host'] ?? null,
             'mail.mailers.smtp.port' => $this->smtp['port'] ?? null,
             'mail.mailers.smtp.username' => $this->smtp['username'] ?? null,
-            'mail.mailers.smtp.password' => $this->smtp['password'] ?? null,
+            'mail.mailers.smtp.password' => $this->resolveSmtpPassword(),
             'mail.mailers.smtp.encryption' => $this->smtp['encryption'] ?: null,
             'mail.from.address' => $this->smtp['from_address'] ?? null,
             'mail.from.name' => $this->smtp['from_name'] ?? config('app.name'),
