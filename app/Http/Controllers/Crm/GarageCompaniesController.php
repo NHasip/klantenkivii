@@ -1661,7 +1661,7 @@ class GarageCompaniesController
         }
 
         try {
-            $this->applySmtpSettings($smtp);
+            $smtp->applyToMailConfig();
 
             $templateData = $this->welcomeTemplateData($garageCompany, true);
             $subject = EmailTemplateRenderer::renderString((string) $draft->subject, $templateData);
@@ -1861,19 +1861,6 @@ class GarageCompaniesController
         return $baseUrl.'/reset-password/'.$token.'?email='.urlencode((string) $user->email);
     }
 
-    private function applySmtpSettings(SmtpSetting $smtp): void
-    {
-        config([
-            'mail.default' => 'smtp',
-            'mail.mailers.smtp.host' => $smtp->host,
-            'mail.mailers.smtp.port' => $smtp->port,
-            'mail.mailers.smtp.username' => $smtp->username,
-            'mail.mailers.smtp.password' => $smtp->password,
-            'mail.mailers.smtp.encryption' => $smtp->encryption ?: null,
-            'mail.from.address' => $smtp->from_address,
-            'mail.from.name' => $smtp->from_name ?: config('app.name'),
-        ]);
-    }
 
     private function ensureAssignmentsExist(int $garageCompanyId): void
     {
