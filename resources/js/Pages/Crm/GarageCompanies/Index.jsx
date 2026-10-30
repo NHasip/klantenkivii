@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useConfirm } from '../../../components/ConfirmProvider';
 import { Icon } from '../../../components/icons';
 import StatusBadge, { FOCUS_SCOPE } from '../../../components/StatusBadge';
@@ -495,11 +495,27 @@ export default function Index({ companies, totals, statusCounts, trashCount, fil
     const activeSort = safeFilters.sort || data.sort;
     const activeDir = safeFilters.dir || data.dir;
     const cardView = data.weergave === 'kaarten';
+    const pageErrors = usePage().props?.errors ?? {};
     const nowDate = new Date();
+    // ING accepteert alleen een uitvoerdatum in de toekomst: standaard 2 werkdagen vooruit.
+    const defaultExecutionDate = (() => {
+        const d = new Date(nowDate);
+        let left = 2;
+        while (left > 0) {
+            d.setDate(d.getDate() + 1);
+            if (d.getDay() !== 0 && d.getDay() !== 6) left -= 1;
+        }
+        return d;
+    })();
+    const minExecutionDate = (() => {
+        const d = new Date(nowDate);
+        d.setDate(d.getDate() + 1);
+        return toLocalDateInput(d);
+    })();
     const exportForm = useForm({
         maand: String(nowDate.getMonth() + 1),
         jaar: String(nowDate.getFullYear()),
-        uitvoerdatum: toLocalDateInput(nowDate),
+        uitvoerdatum: toLocalDateInput(defaultExecutionDate),
     });
     const jaarOpties = [];
     for (let i = nowDate.getFullYear() - 1; i <= nowDate.getFullYear() + 2; i += 1) jaarOpties.push(String(i));
@@ -803,7 +819,8 @@ export default function Index({ companies, totals, statusCounts, trashCount, fil
                         </div>
                         <div>
                             <label className="label mb-1.5" htmlFor="exportForm-uitvoerdatum">Uitvoerdatum</label>
-                            <input id="exportForm-uitvoerdatum" type="date" className={inputClasses} value={exportForm.data.uitvoerdatum} onChange={(e) => exportForm.setData('uitvoerdatum', e.target.value)} />
+                            <input id="exportForm-uitvoerdatum" type="date" min={minExecutionDate} className={inputClasses} value={exportForm.data.uitvoerdatum} onChange={(e) => exportForm.setData('uitvoerdatum', e.target.value)} />
+                            {pageErrors?.uitvoerdatum ? <p className="field-error" role="alert">{pageErrors.uitvoerdatum}</p> : <p className="field-hint">Minimaal 1 werkdag na vandaag.</p>}
                         </div>
                         <Button icon="download" onClick={exportIncasso} disabled={!exportForm.data.uitvoerdatum || !safeUrls.export_incasso_batch}>
                             Exporteren

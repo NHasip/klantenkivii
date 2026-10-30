@@ -34,7 +34,8 @@ class IncassoProrataCalculator
         }
 
         // Inclusive day count: active from start date through end of month.
-        $activeDays = $monthEnd->diffInDays($activeFrom) + 1;
+        // Carbon 3 geeft een (negatieve) float terug; tel hele dagen van startdatum tot en met maandeinde.
+        $activeDays = (int) floor(abs($activeFrom->diffInDays($monthEnd))) + 1;
         $ratio = min(1, max(0, $activeDays / $daysInMonth));
 
         return max(0.0, round($fullMonthAmount * $ratio, 2));

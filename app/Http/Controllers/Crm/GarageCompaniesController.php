@@ -1833,7 +1833,7 @@ class GarageCompaniesController
             'akkoord_op' => ['nullable', 'date'],
             'status' => ['required', Rule::enum(SepaMandateStatus::class)],
             'ontvangen_op' => ['nullable', 'date'],
-            'incasso_kenmerk_machtiging' => ['nullable', 'string', 'max:255'],
+            'incasso_kenmerk_machtiging' => ['nullable', 'string', 'max:35'],
             'incasso_formulier' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
         ]);
 
@@ -1963,7 +1963,7 @@ class GarageCompaniesController
         }
 
         $data = $request->validate([
-            'incasso_kenmerk_machtiging' => ['nullable', 'string', 'max:255'],
+            'incasso_kenmerk_machtiging' => ['nullable', 'string', 'max:35'],
             'incasso_formulier' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
             'remove_incasso_formulier' => ['nullable', 'boolean'],
         ]);
@@ -2011,14 +2011,16 @@ class GarageCompaniesController
         $data = $request->validate([
             'maand' => ['nullable', 'integer', 'min:1', 'max:12'],
             'jaar' => ['nullable', 'integer', 'min:2020', 'max:2100'],
-            'uitvoerdatum' => ['nullable', 'date'],
+            'uitvoerdatum' => ['nullable', 'date', 'after:today'],
+        ], [
+            'uitvoerdatum.after' => 'De uitvoerdatum moet in de toekomst liggen (ING accepteert geen datum van vandaag of eerder).',
         ]);
 
         $month = (int) ($data['maand'] ?? now()->month);
         $year = (int) ($data['jaar'] ?? now()->year);
         $executionDate = ! empty($data['uitvoerdatum'])
             ? Carbon::parse((string) $data['uitvoerdatum'])->startOfDay()
-            : now()->startOfDay();
+            : self::nextBusinessDays(2);
 
         $overview = $this->incassoExportOverview($month, $year);
         $records = $overview['eligible'];
@@ -2137,15 +2139,15 @@ class GarageCompaniesController
                 break;
             }
 
-            $setString('B'.$row, (string) $record['naam_debiteur']);
-            $setString('C'.$row, (string) $record['iban_debiteur']);
-            $setString('D'.$row, (string) $record['kenmerk_machtiging']);
-            $setNumber('E'.$row, (float) $record['bedrag']);
-            $setString('F'.$row, (string) $record['omschrijving']);
+            $setString('B'.$row, self::sepaText((string) $record['naam_debiteur'], 70));
+            $setString('C'.$row, self::normalizeIban((string) $record['iban_debiteur']));
+            $setString('D'.$row, trim((string) $record['kenmerk_machtiging']));
+            $setNumber('E'.$row, round((float) $record['bedrag'], 2));
+            $setString('F'.$row, self::sepaText((string) $record['omschrijving'], 140));
             $setNumber('G'.$row, $this->excelDateSerial((string) $record['machtigingsdatum']));
 
             $count++;
-            $totalAmount += (float) $record['bedrag'];
+            $totalAmount += round((float) $record['bedrag'], 2);
             $row++;
         }
 
@@ -2751,6 +2753,28 @@ class GarageCompaniesController
                 $missingFields[] = 'Bedrag voor geselecteerde maand is 0 (of ongeldig)';
             }
 
+            // Controles die het ING-sjabloon zelf ook uitvoert.
+            $kenmerkValue = trim((string) $this->companyIncassoValue($company, 'incasso_kenmerk_machtiging'));
+            if ($kenmerkValue !== '' && (mb_strlen($kenmerkValue) > 35 || self::sepaText($kenmerkValue, 35) !== $kenmerkValue)) {
+                $isComplete = false;
+                $missingFields[] = 'Kenmerk machtiging is te lang (max. 35 tekens) of bevat niet-toegestane tekens';
+            }
+            if ($activeMandate) {
+                $ibanValue = self::normalizeIban((string) $activeMandate->iban);
+                if (! preg_match('/^[A-Z]{2}[0-9]{2}[A-Z0-9]{10,30}$/', $ibanValue)) {
+                    $isComplete = false;
+                    $missingFields[] = 'IBAN van het mandaat is ongeldig';
+                }
+                $signedAt = $activeMandate->datum_van_tekenen ? Carbon::parse($activeMandate->datum_van_tekenen) : null;
+                if (! $signedAt) {
+                    $isComplete = false;
+                    $missingFields[] = 'Machtigingsdatum ontbreekt';
+                } elseif ($signedAt->startOfDay()->gt(now()->startOfDay())) {
+                    $isComplete = false;
+                    $missingFields[] = 'Machtigingsdatum ligt in de toekomst';
+                }
+            }
+
             if (! $isComplete || ! $activeMandate) {
                 $missing[] = [
                     'company_id' => $company->id,
@@ -2768,9 +2792,9 @@ class GarageCompaniesController
                 'company_id' => $company->id,
                 'company_name' => (string) $company->bedrijfsnaam,
                 'naam_debiteur' => (string) $company->bedrijfsnaam,
-                'iban_debiteur' => (string) $activeMandate->iban,
+                'iban_debiteur' => self::normalizeIban((string) $activeMandate->iban),
                 'kenmerk_machtiging' => (string) $this->companyIncassoValue($company, 'incasso_kenmerk_machtiging'),
-                'bedrag' => $amountForMonth,
+                'bedrag' => round($amountForMonth, 2),
                 'omschrijving' => $description,
                 'machtigingsdatum' => $activeMandate->datum_van_tekenen instanceof Carbon
                     ? $activeMandate->datum_van_tekenen->toDateString()
@@ -2855,12 +2879,49 @@ class GarageCompaniesController
         return null;
     }
 
+    /**
+     * Tekst beperken tot de SEPA-tekenset die het ING-sjabloon accepteert:
+     * cijfers, letters, spatie en / - ? : ( ) . , ' +
+     */
+    private static function sepaText(string $value, int $maxLength): string
+    {
+        $value = str_replace('&', ' en ', $value);
+        $value = \Illuminate\Support\Str::ascii($value);
+        $value = (string) preg_replace("~[^0-9A-Za-z /\-?:().,'+]~", ' ', $value);
+        $value = trim((string) preg_replace('~\s+~', ' ', $value));
+
+        return mb_substr($value, 0, $maxLength);
+    }
+
+    private static function normalizeIban(string $iban): string
+    {
+        return strtoupper((string) preg_replace('~\s+~', '', $iban));
+    }
+
+    /**
+     * Eerstvolgende werkdag(en) vanaf vandaag (zaterdag en zondag overgeslagen).
+     */
+    private static function nextBusinessDays(int $days): Carbon
+    {
+        $date = now()->startOfDay();
+        while ($days > 0) {
+            $date->addDay();
+            if (! $date->isWeekend()) {
+                $days--;
+            }
+        }
+
+        return $date;
+    }
+
     private function excelDateSerial(string $date): int
     {
-        $parsed = Carbon::parse($date)->startOfDay();
-        $base = Carbon::create(1899, 12, 30, 0, 0, 0, $parsed->timezone)->startOfDay();
+        // Rekenen in UTC: in 1899 had Europe/Amsterdam een afwijkende offset (+00:19:32),
+        // waardoor het verschil net onder een hele dag uitkwam en datums een dag te vroeg werden.
+        $parsed = Carbon::parse(Carbon::parse($date)->toDateString(), 'UTC')->startOfDay();
+        $base = Carbon::create(1899, 12, 30, 0, 0, 0, 'UTC');
 
-        return (int) $base->diffInDays($parsed, false);
+        return (int) round($base->diffInDays($parsed, false));
     }
 
     private function dutchMonthName(int $month): string
