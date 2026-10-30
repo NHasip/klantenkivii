@@ -23,10 +23,11 @@ export default {
                     300: '#dce792',
                     400: '#cede69',
                     500: '#aec22b',
-                    600: '#96a725',
-                    700: '#78861e',
-                    800: '#5a6416',
-                    900: '#434b11',
+                    // 600+ donkerder gemaakt: wit op 600 haalt 5.2:1 (WCAG AA), 500 blijft het merkgroen.
+                    600: '#667319',
+                    700: '#56611a',
+                    800: '#474f15',
+                    900: '#383e11',
                 },
                 // Override Tailwind "indigo" to match Kivii brand color across Jetstream scaffolding.
                 indigo: {
@@ -36,10 +37,11 @@ export default {
                     300: '#dce792',
                     400: '#cede69',
                     500: '#aec22b',
-                    600: '#96a725',
-                    700: '#78861e',
-                    800: '#5a6416',
-                    900: '#434b11',
+                    // 600+ donkerder gemaakt: wit op 600 haalt 5.2:1 (WCAG AA), 500 blijft het merkgroen.
+                    600: '#667319',
+                    700: '#56611a',
+                    800: '#474f15',
+                    900: '#383e11',
                 },
             },
             fontFamily: {

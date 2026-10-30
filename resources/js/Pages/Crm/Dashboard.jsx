@@ -70,12 +70,23 @@ function Badge({ children, tone = 'neutral' }) {
     );
 }
 
+const primaryButtonClass =
+    'inline-flex items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700';
+
+function ButtonLink({ href, children }) {
+    return (
+        <a href={href} className={primaryButtonClass}>
+            {children}
+        </a>
+    );
+}
+
 function Panel({ title, subtitle, action, children }) {
     return (
-        <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+        <section className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5">
             {(title || subtitle || action) && (
-                <div className="mb-4 flex items-start justify-between gap-4">
-                    <div>
+                <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1 basis-48">
                         {title ? <h2 className="text-base font-semibold text-zinc-950">{title}</h2> : null}
                         {subtitle ? <p className="mt-1 text-sm text-zinc-600">{subtitle}</p> : null}
                     </div>
@@ -95,9 +106,9 @@ function MetricCard({ label, value, sub, tone = 'default' }) {
     };
 
     return (
-        <div className={cx('rounded-xl border p-4', toneClasses[tone] || toneClasses.default)}>
+        <div className={cx('min-w-0 rounded-xl border p-4', toneClasses[tone] || toneClasses.default)}>
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">{label}</div>
-            <div className="mt-2 text-2xl font-semibold tracking-tight text-zinc-950">{value}</div>
+            <div className="mt-2 break-words text-2xl font-semibold tracking-tight text-zinc-950">{value}</div>
             {sub ? <div className="mt-1 text-sm text-zinc-600">{sub}</div> : null}
         </div>
     );
@@ -107,7 +118,7 @@ function QuickLink({ href, title, subtitle }) {
     return (
         <a
             href={href}
-            className="rounded-xl border border-zinc-200 bg-white p-4 transition hover:-translate-y-px hover:border-zinc-300 hover:shadow-sm"
+            className="min-w-0 rounded-xl border border-zinc-200 bg-white p-4 transition hover:-translate-y-px hover:border-zinc-300 hover:shadow-sm"
         >
             <div className="text-sm font-semibold text-zinc-900">{title}</div>
             <div className="mt-1 text-xs leading-5 text-zinc-600">{subtitle}</div>
@@ -128,15 +139,15 @@ function TaskRow({ task }) {
     const hasDeadline = Boolean(task.deadline);
 
     return (
-        <li className={cx('rounded-xl border bg-white p-4', overdue ? 'border-rose-300' : 'border-zinc-200')}>
+        <li className={cx('min-w-0 rounded-xl border bg-white p-4', overdue ? 'border-rose-300' : 'border-zinc-200')}>
             <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                        <div className="min-w-0 truncate text-sm font-semibold text-zinc-950" title={task.titel}>{task.titel}</div>
-                        {task.project?.naam ? <Badge tone="info">{task.project.naam}</Badge> : null}
+                        <div className="min-w-0 max-w-full truncate text-sm font-semibold text-zinc-950" title={task.titel}>{task.titel}</div>
                         {overdue ? <Badge tone="danger">Te laat</Badge> : null}
                     </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-600">
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-600">
+                        {task.project?.naam ? <span>Project: {task.project.naam}</span> : null}
                         <span>{hasDeadline ? `Deadline: ${formatDateTime(task.deadline)}` : 'Geen deadline'}</span>
                         {task.prioriteit ? <span>Prioriteit: {task.prioriteit.charAt(0).toUpperCase() + task.prioriteit.slice(1)}</span> : null}
                     </div>
@@ -150,11 +161,11 @@ function TaskRow({ task }) {
 function AppointmentRow({ item }) {
     const overdue = item.due_at ? new Date(item.due_at) < new Date() : false;
     return (
-        <li className="rounded-xl border border-zinc-200 bg-white p-4">
+        <li className="min-w-0 rounded-xl border border-zinc-200 bg-white p-4">
             <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                        <div className="text-sm font-semibold text-zinc-950">{item.titel}</div>
+                        <div className="min-w-0 break-words text-sm font-semibold text-zinc-950">{item.titel}</div>
                         {overdue ? <Badge tone="danger">Verlopen</Badge> : null}
                     </div>
                     <div className="mt-2 text-xs leading-5 text-zinc-600">
@@ -179,15 +190,15 @@ function DurationRow({ item, typeLabel }) {
     return (
         <a
             href={item.url}
-            className="flex items-start justify-between gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition hover:border-zinc-300"
+            className="flex min-w-0 items-start justify-between gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition hover:border-zinc-300"
         >
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-semibold text-zinc-950">{item.bedrijfsnaam}</div>
                 <div className="mt-1 text-xs text-zinc-600">
                     Sinds {formatDate(item.since_at)} | {typeLabel}
                 </div>
             </div>
-            <Badge tone="info">{formatInt(item.days)} dagen</Badge>
+            <div className="shrink-0 whitespace-nowrap text-sm font-semibold text-zinc-700">{formatInt(item.days)} dagen</div>
         </a>
     );
 }
@@ -207,15 +218,13 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
         <>
             <Head title="Dashboard" />
 
-            <div className="space-y-6">
-                <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+            <div className="min-w-0 space-y-6 overflow-x-hidden">
+                <section className="min-w-0 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
                     <div className="h-1.5 w-full bg-sky-400" />
-                    <div className="grid gap-6 p-6 xl:grid-cols-[1.3fr_0.7fr]">
-                        <div>
-                            <div className="inline-flex items-center rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-semibold text-zinc-600">
-                                Bijgewerkt om {meta.generated_at}
-                            </div>
-                            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">Dashboard</h1>
+                    <div className="grid gap-6 p-4 sm:p-6 xl:grid-cols-[1.3fr_0.7fr]">
+                        <div className="min-w-0">
+                            <div className="text-xs font-medium text-zinc-500">Bijgewerkt om {meta.generated_at}</div>
+                            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">Dashboard</h1>
                             <p className="mt-2 max-w-2xl text-sm leading-7 text-zinc-600 sm:text-base">
                                 Helder overzicht van taken, afspraken, omzet en statusduur van je klanten.
                             </p>
@@ -231,7 +240,7 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                             </div>
                         </div>
 
-                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                        <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-1">
                             <MetricCard
                                 label="Open taken"
                                 value={formatInt(kpis.tasks_open)}
@@ -241,14 +250,19 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                             <MetricCard
                                 label="MRR excl. btw"
                                 value={formatEuro(kpis.mrr_excl)}
-                                sub={`BTW ${formatEuro(kpis.mrr_btw)} | Incl. ${formatEuro(kpis.mrr_incl)}`}
+                                sub={`Alleen status Actief | Incl. btw ${formatEuro(kpis.mrr_incl)}`}
                                 tone="info"
+                            />
+                            <MetricCard
+                                label="Pijplijn (demo)"
+                                value={formatEuro(kpis.demo_pipeline_excl)}
+                                sub="Modules van demo-klanten, excl. btw. Telt niet mee in MRR."
                             />
                         </div>
                     </div>
                 </section>
 
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <MetricCard label="Klanten totaal" value={formatInt(kpis.companies_total)} sub={`Actief: ${formatInt(kpis.companies_active)}`} />
                     <MetricCard label="Demo klanten" value={formatInt(kpis.demo_customers)} sub={`Gem. ${formatInt(kpis.demo_avg_days)} dagen`} tone="info" />
                     <MetricCard label="Gem. actief duur" value={`${formatInt(kpis.active_avg_days)} dagen`} sub="Gemiddelde tijd in actieve status" tone="info" />
@@ -265,12 +279,7 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                         title="Actieve klanten zonder complete SEPA"
                         subtitle="Vul de ontbrekende gegevens aan in de Incasso-tab per klant."
                         action={
-                            <a
-                                href={`${urls.customers}?status=actief`}
-                                className="inline-flex items-center rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
-                            >
-                                Actieve klanten
-                            </a>
+                            <ButtonLink href={`${urls.customers}?status=actief`}>Actieve klanten</ButtonLink>
                         }
                     >
                         <div className="space-y-3">
@@ -288,17 +297,12 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                     </Panel>
                 )}
 
-                <div className="grid gap-6 xl:grid-cols-2">
+                <div className="grid min-w-0 gap-6 xl:grid-cols-2">
                     <Panel
                         title="Demo statusduur"
                         subtitle="Aantal dagen dat klanten in demo-status staan."
                         action={
-                            <a
-                                href={`${urls.customers}?status=proefperiode`}
-                                className="inline-flex items-center rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
-                            >
-                                Bekijk demo klanten
-                            </a>
+                            <ButtonLink href={`${urls.customers}?status=proefperiode`}>Bekijk demo klanten</ButtonLink>
                         }
                     >
                         {demoDurationItems.length === 0 ? (
@@ -316,12 +320,7 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                         title="Actief statusduur"
                         subtitle="Aantal dagen dat klanten actief zijn."
                         action={
-                            <a
-                                href={`${urls.customers}?status=actief`}
-                                className="inline-flex items-center rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
-                            >
-                                Bekijk actieve klanten
-                            </a>
+                            <ButtonLink href={`${urls.customers}?status=actief`}>Bekijk actieve klanten</ButtonLink>
                         }
                     >
                         {activeDurationItems.length === 0 ? (
@@ -336,17 +335,12 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                     </Panel>
                 </div>
 
-                <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
+                <div className="grid min-w-0 gap-6 xl:grid-cols-[1.3fr_0.7fr]">
                     <Panel
                         title="Urgente taken"
                         subtitle="Open taken gesorteerd op deadline."
                         action={
-                            <a
-                                href={urls.tasks}
-                                className="inline-flex items-center rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
-                            >
-                                Naar taken
-                            </a>
+                            <ButtonLink href={urls.tasks}>Naar taken</ButtonLink>
                         }
                     >
                         {taskItems.length === 0 ? (
@@ -360,7 +354,7 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                         )}
                     </Panel>
 
-                    <div className="space-y-6">
+                    <div className="min-w-0 space-y-6">
                         <Panel title="Komende afspraken" subtitle="Eerstvolgende afspraken uit de planning.">
                             {appointmentItems.length === 0 ? (
                                 <EmptyState text="Geen komende afspraken." />
@@ -382,9 +376,9 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                                         <a
                                             key={row.garage_company.id}
                                             href={row.garage_company.url}
-                                            className="flex items-start justify-between gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition hover:border-zinc-300"
+                                            className="flex min-w-0 items-start justify-between gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition hover:border-zinc-300"
                                         >
-                                            <div className="min-w-0">
+                                            <div className="min-w-0 flex-1">
                                                 <div className="truncate text-sm font-semibold text-zinc-950">{row.garage_company.bedrijfsnaam}</div>
                                                 <div className="mt-1 text-xs leading-5 text-zinc-600">
                                                     Volgende afspraak: {row.eerstvolgende.titel}
@@ -392,7 +386,7 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                                                     {formatDateTime(row.eerstvolgende.due_at)}
                                                 </div>
                                             </div>
-                                            <Badge tone="neutral">{row.aantal} afspraken</Badge>
+                                            <div className="shrink-0 whitespace-nowrap text-sm font-semibold text-zinc-700">{row.aantal} afspraken</div>
                                         </a>
                                     ))}
                                 </div>

@@ -5,6 +5,7 @@ import LinkExtension from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useConfirm } from '../../../components/ConfirmProvider';
+import StatusBadge, { FOCUS_SCOPE, translateStatusText } from '../../../components/StatusBadge';
 
 function formatEuro(value) {
     try {
@@ -53,6 +54,25 @@ function toLocalDateInput(date) {
 
 function toLocalDateTimeInput(date) {
     return `${toLocalDateInput(date)}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+}
+
+// Datumvelden zonder betekenisvolle tijd: toon alleen de datum.
+function toDateOnly(value) {
+    return value ? String(value).slice(0, 10) : '';
+}
+
+// Bewaar de oorspronkelijke waarde (incl. tijd) als de datum niet is gewijzigd, zodat bestaande data intact blijft.
+function keepOriginalIfSameDate(value, original) {
+    if (value && original && String(original).slice(0, 10) === value) return original;
+    return value;
+}
+
+const DATE_ONLY_FIELDS = ['proefperiode_start', 'actief_vanaf', 'opgezegd_op', 'verloren_op'];
+
+function roleLabel(value) {
+    if (!value) return '-';
+    const text = String(value).trim();
+    return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 const SOURCE_LABELS = {
@@ -119,6 +139,8 @@ function ToolbarButton({ active, disabled, onClick, children, title }) {
         <button
             type="button"
             title={title}
+            aria-label={title}
+            aria-pressed={active === undefined ? undefined : Boolean(active)}
             onClick={onClick}
             disabled={disabled}
             className={cx(
@@ -132,8 +154,9 @@ function ToolbarButton({ active, disabled, onClick, children, title }) {
     );
 }
 
-function Pagination({ links }) {
+function Pagination({ links, lastPage }) {
     if (!links || links.length <= 1) return null;
+    if (lastPage !== undefined && lastPage !== null && Number(lastPage) <= 1) return null;
 
     return (
         <nav aria-label="Paginering" className="mt-6 flex flex-wrap gap-2">
@@ -172,8 +195,8 @@ const TABS = [
     { key: 'incasso', label: 'Incasso' },
     { key: 'modules', label: 'Modules & prijzen' },
     { key: 'gebruikers', label: 'Gebruikers' },
-    { key: 'timeline', label: 'Notities & timeline' },
-    { key: 'taken_afspraken', label: 'Taken & afspraken' },
+    { key: 'timeline', label: 'Notities en tijdlijn' },
+    { key: 'taken_afspraken', label: 'Klantafspraken' },
 ];
 
 export default function Show({
@@ -248,36 +271,26 @@ export default function Show({
         tags: garageCompany.tags || '',
         demo_aangevraagd_op: garageCompany.demo_aangevraagd_op || '',
         demo_gepland_op: garageCompany.demo_gepland_op || '',
-        proefperiode_start: garageCompany.proefperiode_start || '',
-        actief_vanaf: garageCompany.actief_vanaf || '',
-        opgezegd_op: garageCompany.opgezegd_op || '',
+        proefperiode_start: toDateOnly(garageCompany.proefperiode_start),
+        actief_vanaf: toDateOnly(garageCompany.actief_vanaf),
+        opgezegd_op: toDateOnly(garageCompany.opgezegd_op),
         opzegreden: garageCompany.opzegreden || '',
-        verloren_op: garageCompany.verloren_op || '',
+        verloren_op: toDateOnly(garageCompany.verloren_op),
         verloren_reden: garageCompany.verloren_reden || '',
     });
 
-    const handleStatusChange = (value) => {
-        overviewForm.setData('status', value);
-        if (value === 'demo_aangevraagd' && !overviewForm.data.demo_aangevraagd_op) {
-            overviewForm.setData('demo_aangevraagd_op', toLocalDateTimeInput(new Date()));
-        }
-        if (value === 'actief' && !overviewForm.data.actief_vanaf) {
-            overviewForm.setData('actief_vanaf', toLocalDateTimeInput(new Date()));
-        }
+    const withOriginalTimes = (data) => {
+        const next = { ...data };
+        DATE_ONLY_FIELDS.forEach((field) => {
+            if (field in next) next[field] = keepOriginalIfSameDate(next[field], garageCompany[field]);
+        });
+        return next;
     };
 
-    const submitOverview = async (event) => {
+    // Status wijzig je alleen via tab "Demo & status"; Overzicht stuurt de huidige status ongewijzigd mee.
+    const submitOverview = (event) => {
         event.preventDefault();
-        if (['opgezegd', 'verloren'].includes(overviewForm.data.status)) {
-            const ok = await confirm({
-                title: 'Status wijzigen',
-                message: 'Weet je het zeker? Dit wordt gelogd in de timeline.',
-                confirmText: 'Doorgaan',
-                cancelText: 'Annuleren',
-                tone: 'danger',
-            });
-            if (!ok) return;
-        }
+        overviewForm.transform((data) => ({ ...withOriginalTimes(data), status: normalizedCompanyStatus }));
         overviewForm.patch(urls.update_overview, {
             preserveScroll: true,
             onSuccess: () => overviewForm.reset('login_password'),
@@ -473,8 +486,8 @@ export default function Show({
         demo_aangevraagd_op: garageCompany.demo_aangevraagd_op || '',
         demo_gepland_op: garageCompany.demo_gepland_op || '',
         demo_duur_dagen: garageCompany.demo_duur_dagen || '',
-        proefperiode_start: garageCompany.proefperiode_start || '',
-        actief_vanaf: garageCompany.actief_vanaf || '',
+        proefperiode_start: toDateOnly(garageCompany.proefperiode_start),
+        actief_vanaf: toDateOnly(garageCompany.actief_vanaf),
     });
 
     const demoEndPreview = useMemo(() => {
@@ -490,6 +503,7 @@ export default function Show({
 
     const submitDemoDates = (event) => {
         event.preventDefault();
+        demoForm.transform((data) => withOriginalTimes(data));
         demoForm.patch(urls.save_demo_dates, { preserveScroll: true });
     };
 
@@ -530,7 +544,7 @@ export default function Show({
         if (['opgezegd', 'verloren'].includes(statusForm.data.status)) {
             const ok = await confirm({
                 title: 'Status wijzigen',
-                message: 'Weet je het zeker? Dit wordt gelogd in de timeline.',
+                message: 'Weet je het zeker? Dit wordt vastgelegd in de tijdlijn.',
                 confirmText: 'Doorgaan',
                 cancelText: 'Annuleren',
                 tone: 'danger',
@@ -775,6 +789,13 @@ export default function Show({
             }),
         ],
         content: welcomeForm.data.body_html || '<p></p>',
+        editorProps: {
+            attributes: {
+                'aria-label': 'Inhoud welkomstmail',
+                role: 'textbox',
+                'aria-multiline': 'true',
+            },
+        },
         onUpdate: ({ editor }) => {
             welcomeForm.setData('body_html', editor.getHTML());
         },
@@ -884,12 +905,15 @@ export default function Show({
     };
 
     return (
-        <div className="space-y-6">
+        <div className={cx('space-y-6', FOCUS_SCOPE)}>
             <Head title={garageCompany.bedrijfsnaam} />
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h1 className="text-xl font-semibold text-zinc-900">{garageCompany.bedrijfsnaam}</h1>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <h1 className="text-xl font-semibold text-zinc-900">{garageCompany.bedrijfsnaam}</h1>
+                        <StatusBadge status={normalizedCompanyStatus} labels={safeStatusLabels} />
+                    </div>
                     <p className="mt-1 text-sm text-zinc-500">Klantdossier en modules</p>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -1002,22 +1026,7 @@ export default function Show({
                                 )}
                             </div>
 
-                            <div>
-                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-status">Status</label>
-                                <select
-                                    id="overviewForm-status"
-                                    className="mt-1 w-full rounded-md border-zinc-300 text-sm"
-                                    value={overviewForm.data.status}
-                                    onChange={(e) => handleStatusChange(e.target.value)}
-                                >
-                                    {statusOptions.map((status) => (
-                                        <option key={status} value={status}>
-                                            {statusLabel(status)}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
+                            <div className="sm:col-span-2">
                                 <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-bron">Bron</label>
                                 <select
                                     id="overviewForm-bron"
@@ -1192,7 +1201,7 @@ export default function Show({
                                 <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-proefperiode-start">Demo start</label>
                                 <input
                                     id="overviewForm-proefperiode-start"
-                                    type="datetime-local"
+                                    type="date"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                     value={overviewForm.data.proefperiode_start}
                                     onChange={(e) => overviewForm.setData('proefperiode_start', e.target.value)}
@@ -1203,7 +1212,7 @@ export default function Show({
                                 <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-actief-vanaf">Actief vanaf</label>
                                 <input
                                     id="overviewForm-actief-vanaf"
-                                    type="datetime-local"
+                                    type="date"
                                     className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                     value={overviewForm.data.actief_vanaf}
                                     onChange={(e) => overviewForm.setData('actief_vanaf', e.target.value)}
@@ -1211,51 +1220,59 @@ export default function Show({
                                 {overviewForm.errors.actief_vanaf && <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.actief_vanaf}</div>}
                             </div>
 
-                            <div>
-                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-opgezegd-op">Opgezegd op</label>
-                                <input
-                                    id="overviewForm-opgezegd-op"
-                                    type="datetime-local"
-                                    className="mt-1 w-full rounded-md border-zinc-300 text-sm"
-                                    value={overviewForm.data.opgezegd_op}
-                                    onChange={(e) => overviewForm.setData('opgezegd_op', e.target.value)}
-                                />
-                                {overviewForm.errors.opgezegd_op && <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.opgezegd_op}</div>}
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-verloren-op">Verloren op</label>
-                                <input
-                                    id="overviewForm-verloren-op"
-                                    type="datetime-local"
-                                    className="mt-1 w-full rounded-md border-zinc-300 text-sm"
-                                    value={overviewForm.data.verloren_op}
-                                    onChange={(e) => overviewForm.setData('verloren_op', e.target.value)}
-                                />
-                                {overviewForm.errors.verloren_op && <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.verloren_op}</div>}
-                            </div>
+                            {normalizedCompanyStatus === 'opgezegd' && (
+                                <>
+                                <div className="sm:col-span-2">
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-opgezegd-op">Opgezegd op</label>
+                                    <input
+                                        id="overviewForm-opgezegd-op"
+                                        type="date"
+                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        value={overviewForm.data.opgezegd_op}
+                                        onChange={(e) => overviewForm.setData('opgezegd_op', e.target.value)}
+                                    />
+                                    {overviewForm.errors.opgezegd_op && <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.opgezegd_op}</div>}
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-opzegreden">Opzegreden</label>
+                                    <textarea
+                                        id="overviewForm-opzegreden"
+                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        rows={2}
+                                        value={overviewForm.data.opzegreden}
+                                        onChange={(e) => overviewForm.setData('opzegreden', e.target.value)}
+                                    />
+                                    {overviewForm.errors.opzegreden && <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.opzegreden}</div>}
+                                </div>
+                                </>
+                            )}
+                            {normalizedCompanyStatus === 'verloren' && (
+                                <>
+                                <div className="sm:col-span-2">
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-verloren-op">Verloren op</label>
+                                    <input
+                                        id="overviewForm-verloren-op"
+                                        type="date"
+                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        value={overviewForm.data.verloren_op}
+                                        onChange={(e) => overviewForm.setData('verloren_op', e.target.value)}
+                                    />
+                                    {overviewForm.errors.verloren_op && <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.verloren_op}</div>}
+                                </div>
 
-                            <div className="sm:col-span-2">
-                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-opzegreden">Opzegreden</label>
-                                <textarea
-                                    id="overviewForm-opzegreden"
-                                    className="mt-1 w-full rounded-md border-zinc-300 text-sm"
-                                    rows={2}
-                                    value={overviewForm.data.opzegreden}
-                                    onChange={(e) => overviewForm.setData('opzegreden', e.target.value)}
-                                />
-                                {overviewForm.errors.opzegreden && <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.opzegreden}</div>}
-                            </div>
-                            <div className="sm:col-span-2">
-                                <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-verloren-reden">Verloren reden</label>
-                                <textarea
-                                    id="overviewForm-verloren-reden"
-                                    className="mt-1 w-full rounded-md border-zinc-300 text-sm"
-                                    rows={2}
-                                    value={overviewForm.data.verloren_reden}
-                                    onChange={(e) => overviewForm.setData('verloren_reden', e.target.value)}
-                                />
-                                {overviewForm.errors.verloren_reden && <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.verloren_reden}</div>}
-                            </div>
+                                <div className="sm:col-span-2">
+                                    <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-verloren-reden">Verloren reden</label>
+                                    <textarea
+                                        id="overviewForm-verloren-reden"
+                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        rows={2}
+                                        value={overviewForm.data.verloren_reden}
+                                        onChange={(e) => overviewForm.setData('verloren_reden', e.target.value)}
+                                    />
+                                    {overviewForm.errors.verloren_reden && <div className="mt-1 text-xs text-rose-600">{overviewForm.errors.verloren_reden}</div>}
+                                </div>
+                                </>
+                            )}
 
                             <div className="sm:col-span-2">
                                 <label className="block text-xs font-medium text-zinc-600" htmlFor="overviewForm-tags">Tags</label>
@@ -1285,6 +1302,23 @@ export default function Show({
                             </button>
                         </div>
                     </form>
+
+                    <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <div className="text-xs text-rose-800">
+                                    Verwijder deze klant en verplaats naar de prullenbak.
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={deleteCompany}
+                                className="w-full rounded-md border border-rose-300 bg-white px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 sm:w-auto"
+                            >
+                                Verwijder klant
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -1456,7 +1490,7 @@ export default function Show({
                                                     onClick={() => {
                                                         if (!welcomeEditor) return;
                                                         const previousUrl = welcomeEditor.getAttributes('link').href || '';
-                                                        const url = window.prompt('Link URL', previousUrl);
+                                                        const url = window.prompt('Link (URL)', previousUrl);
                                                         if (url === null) return;
                                                         if (url === '') {
                                                             welcomeEditor.chain().focus().unsetLink().run();
@@ -1575,7 +1609,7 @@ export default function Show({
                                             )}
                                             <button
                                                 type="button"
-                                                className="rounded-full bg-zinc-900 px-3.5 py-1.5 text-[11px] font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+                                                className="rounded-full bg-indigo-600 px-3.5 py-1.5 text-[11px] font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
                                                 disabled={!selectedTemplate}
                                                 onClick={() => {
                                                     applyTemplate(selectedTemplate, { close: true, send: pendingSend });
@@ -1610,7 +1644,7 @@ export default function Show({
                     </div>
 
                     <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
-                        <table className="min-w-[760px] divide-y divide-zinc-100">
+                        <table className="w-full min-w-[760px] divide-y divide-zinc-100">
                             <thead className="bg-zinc-50">
                                 <tr>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Naam</th>
@@ -1635,12 +1669,12 @@ export default function Show({
                                                 {person.voornaam} {person.achternaam}
                                             </div>
                                             {person.is_primary && (
-                                                <div className="mt-0.5 inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
-                                                    Primair
+                                                <div className="mt-0.5 inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-800">
+                                                    Hoofdcontact
                                                 </div>
                                             )}
                                         </td>
-                                        <td className="px-4 py-3 text-sm text-zinc-600">{person.rol || '-'}</td>
+                                        <td className="px-4 py-3 text-sm text-zinc-600">{roleLabel(person.rol)}</td>
                                         <td className="px-4 py-3 text-sm">
                                             <div>{person.email}</div>
                                             <div className="text-xs text-zinc-500">{person.telefoon || '-'}</div>
@@ -1738,7 +1772,7 @@ export default function Show({
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={personForm.data.rol}
                                         onChange={(e) => personForm.setData('rol', e.target.value)}
-                                        placeholder="bijv. eigenaar, administratie, monteur"
+                                        placeholder="bijv. Eigenaar, Administratie, Monteur"
                                     />
                                     {personForm.errors.rol && <div className="mt-1 text-xs text-rose-600">{personForm.errors.rol}</div>}
                                 </div>
@@ -1749,7 +1783,7 @@ export default function Show({
                                         checked={personForm.data.is_primary}
                                         onChange={(e) => personForm.setData('is_primary', e.target.checked)}
                                     />
-                                    <span className="text-sm">Primair</span>
+                                    <span className="text-sm">Hoofdcontact</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <input
@@ -1808,7 +1842,7 @@ export default function Show({
                                     </div>
                                     <button
                                         type="submit"
-                                        className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                        className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                                         disabled={statusForm.processing}
                                     >
                                         {statusForm.processing ? 'Opslaan...' : 'Status opslaan'}
@@ -1886,9 +1920,9 @@ export default function Show({
                             <label className="block text-xs font-medium text-zinc-600" htmlFor="demo-eind-op">Demo einddatum</label>
                             <input
                                 id="demo-eind-op"
-                                type="datetime-local"
+                                type="date"
                                 className="mt-1 w-full rounded-md border-zinc-200 bg-zinc-50 text-sm"
-                                value={demoEndPreview}
+                                value={toDateOnly(demoEndPreview)}
                                 disabled
                             />
                         </div>
@@ -1896,7 +1930,7 @@ export default function Show({
                             <label className="block text-xs font-medium text-zinc-600" htmlFor="demoForm-proefperiode-start">Demo start</label>
                             <input
                                 id="demoForm-proefperiode-start"
-                                type="datetime-local"
+                                type="date"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={demoForm.data.proefperiode_start}
                                 onChange={(e) => demoForm.setData('proefperiode_start', e.target.value)}
@@ -1907,7 +1941,7 @@ export default function Show({
                             <label className="block text-xs font-medium text-zinc-600" htmlFor="demoForm-actief-vanaf">Actief vanaf</label>
                             <input
                                 id="demoForm-actief-vanaf"
-                                type="datetime-local"
+                                type="date"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                 value={demoForm.data.actief_vanaf}
                                 onChange={(e) => demoForm.setData('actief_vanaf', e.target.value)}
@@ -1925,6 +1959,7 @@ export default function Show({
                         </div>
                     </form>
 
+                    {normalizedCompanyStatus === 'proefperiode' && (
                     <form onSubmit={submitExtend} className="rounded-xl border border-zinc-200 bg-white p-4">
                         <div className="text-sm font-semibold">Demo verlengen</div>
                         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1964,6 +1999,7 @@ export default function Show({
                             </button>
                         </div>
                     </form>
+                    )}
                 </div>
             )}
 
@@ -1972,7 +2008,7 @@ export default function Show({
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <div className="text-sm font-semibold">Incasso</div>
-                            <div className="mt-1 text-xs text-zinc-500">Beheer de 6 incasso velden en SEPA-mandaten voor deze klant.</div>
+                            <div className="mt-1 text-xs text-zinc-500">Beheer de incassogegevens en SEPA-machtigingen van deze klant.</div>
                         </div>
                         <button
                             type="button"
@@ -1984,7 +2020,7 @@ export default function Show({
                     </div>
 
                     <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
-                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Primair incasso overzicht</div>
+                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Incasso-overzicht</div>
                         <dl className="mt-3 space-y-2 text-sm">
                             <div className="flex items-start justify-between gap-3">
                                 <dt className="text-zinc-500">Naam debiteur</dt>
@@ -2078,12 +2114,12 @@ export default function Show({
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <div className="text-sm font-semibold">SEPA mandaten</div>
-                            <div className="mt-1 text-xs text-zinc-500">0 of 1 actief mandaat per klant, historie blijft behouden.</div>
+                            <div className="mt-1 text-xs text-zinc-500">Maximaal 1 actief mandaat per klant. Eerdere mandaten blijven bewaard.</div>
                         </div>
                     </div>
 
                     <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
-                        <table className="min-w-[760px] divide-y divide-zinc-100">
+                        <table className="w-full min-w-[760px] divide-y divide-zinc-100">
                             <thead className="bg-zinc-50">
                                 <tr>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Mandaat</th>
@@ -2467,7 +2503,7 @@ export default function Show({
                     </div>
 
                     <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
-                        <table className="min-w-[900px] divide-y divide-zinc-100">
+                        <table className="w-full min-w-[900px] divide-y divide-zinc-100">
                             <thead className="bg-zinc-50">
                                 <tr>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Actief</th>
@@ -2568,7 +2604,7 @@ export default function Show({
                     </div>
 
                     <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
-                        <table className="min-w-[820px] divide-y divide-zinc-100">
+                        <table className="w-full min-w-[820px] divide-y divide-zinc-100">
                             <thead className="bg-zinc-50">
                                 <tr>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Naam</th>
@@ -2751,7 +2787,9 @@ export default function Show({
                                 <div key={activity.id} className="rounded-xl border border-zinc-200 bg-white p-4">
                                     <div className="flex flex-wrap items-center justify-between gap-2">
                                         <div>
-                                            <div className="text-sm font-semibold">{activity.titel}</div>
+                                            <div className="text-sm font-semibold">
+                                                {activity.type === 'status_wijziging' ? translateStatusText(activity.titel, safeStatusLabels) : activity.titel}
+                                            </div>
                                             <div className="mt-1 text-xs text-zinc-500">
                                                 {activity.type ? ACTIVITY_TYPE_LABELS[activity.type] || activity.type.replace(/_/g, ' ') : 'Activiteit'} |{' '}
                                                 {formatDateTime(activity.created_at)}
@@ -2770,7 +2808,7 @@ export default function Show({
                             ))}
                         </div>
 
-                        <Pagination links={activities.links} />
+                        <Pagination links={activities.links} lastPage={activities.last_page} />
                     </div>
                 </div>
             )}
@@ -2780,7 +2818,7 @@ export default function Show({
                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                         <div className="lg:col-span-1">
                             <div className="rounded-xl border border-zinc-200 bg-white p-5">
-                                <div className="text-sm font-semibold">Nieuwe taak / afspraak</div>
+                                <div className="text-sm font-semibold">Nieuwe klantafspraak</div>
                                 <form onSubmit={submitTask} className="mt-4 space-y-3">
                                     <div>
                                         <label className="block text-xs font-medium text-zinc-600" htmlFor="taskForm-type">Type</label>
@@ -2834,12 +2872,12 @@ export default function Show({
                                             checked={taskForm.data.createReminder}
                                             onChange={(e) => taskForm.setData('createReminder', e.target.checked)}
                                         />
-                                        <span className="text-sm">Reminder instellen</span>
+                                        <span className="text-sm">Herinnering instellen</span>
                                     </div>
                                     {taskForm.data.createReminder && (
                                         <div className="space-y-2">
                                             <div>
-                                                <label className="block text-xs font-medium text-zinc-600" htmlFor="taskForm-remind-at">Reminder tijd</label>
+                                                <label className="block text-xs font-medium text-zinc-600" htmlFor="taskForm-remind-at">Tijdstip herinnering</label>
                                                 <input
                                                     id="taskForm-remind-at"
                                                     type="datetime-local"
@@ -2949,22 +2987,6 @@ export default function Show({
                 </div>
             )}
 
-            <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <div className="text-xs text-rose-700">
-                            Verwijder deze klant en verplaats naar de prullenbak.
-                        </div>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={deleteCompany}
-                        className="w-full rounded-md border border-rose-300 bg-white px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 sm:w-auto"
-                    >
-                        Verwijder klant
-                    </button>
-                </div>
-            </div>
         </div>
     );
 }

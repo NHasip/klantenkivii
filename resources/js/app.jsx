@@ -8,6 +8,7 @@ import { FlashToast } from './components/FlashToast';
 const pages = import.meta.glob('./Pages/**/*.jsx');
 
 createInertiaApp({
+    title: (title) => (title ? `${title} - Kivii CRM` : 'Kivii CRM'),
     resolve: async (name) => {
         const page = pages[`./Pages/${name}.jsx`];
         if (!page) {

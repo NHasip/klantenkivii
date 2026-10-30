@@ -9,12 +9,8 @@ use Livewire\Component;
 
 class Bell extends Component
 {
-    public bool $open = false;
-
-    public function toggle(): void
-    {
-        $this->open = ! $this->open;
-    }
+    // Open/dicht-status van het paneel staat in Alpine (client-side), zodat
+    // bel en gebruikersmenu elkaar kunnen sluiten en Escape direct werkt.
 
     public function dismiss(int $reminderId): void
     {

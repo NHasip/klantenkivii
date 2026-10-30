@@ -1,9 +1,11 @@
 <x-app-layout>
+    <x-slot name="title">Profiel</x-slot>
+
     <x-slot name="header">
         <div class="flex flex-col gap-1">
-            <h2 class="text-xl font-semibold leading-tight text-slate-900">
+            <h1 class="text-2xl font-bold text-zinc-900">
                 {{ __('Profielinstellingen') }}
-            </h2>
+            </h1>
             <p class="text-sm text-slate-600">
                 {{ __('Beheer accountgegevens, beveiliging en systeeminstellingen op een overzichtelijke manier.') }}
             </p>
@@ -16,7 +18,7 @@
                 <p class="text-sm font-semibold text-slate-900">{{ __('Accountcentrum') }}</p>
                 <p class="mt-1 text-sm text-slate-600">
                     @if (auth()->user()?->isAdmin())
-                        {{ __('Werk stap voor stap: pas eerst je profiel aan, controleer daarna beveiliging en beheer als admin de e-mailtemplates.') }}
+                        {{ __('Werk stap voor stap: pas eerst je profiel aan, controleer daarna beveiliging en beheer als admin de e-mailinstellingen.') }}
                     @else
                         {{ __('Werk stap voor stap: pas eerst je profiel aan en controleer daarna je beveiliging.') }}
                     @endif
@@ -33,7 +35,7 @@
                             <a class="block rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-100" href="#two-factor">{{ __('2FA') }}</a>
                             <a class="block rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-100" href="#passkeys">{{ __('Passkeys') }}</a>
                             @if (auth()->user()?->isAdmin())
-                                <a class="block rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-100" href="#admin-mail">{{ __('E-mailbeheer') }}</a>
+                                <a class="block rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-100" href="#admin-mail">{{ __('E-mailinstellingen') }}</a>
                             @endif
                             <a class="block rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-100" href="#sessions">{{ __('Sessies') }}</a>
                             @if (Laravel\Jetstream\Jetstream::hasAccountDeletionFeatures())

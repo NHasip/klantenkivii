@@ -5,6 +5,17 @@ import { DndContext, DragOverlay, PointerSensor, closestCorners, useSensor, useS
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useDialog } from '../../components/useDialog';
+import { MultiSelectChips } from '../../components/MultiSelectChips';
+
+function dedupeById(list) {
+    const seen = new Set();
+    return (Array.isArray(list) ? list : []).filter((item) => {
+        const key = Number(item?.id);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
 
 function formatDateTime(isoString) {
     if (!isoString) return null;
@@ -105,9 +116,9 @@ function toLocalInputValue(isoString) {
 
 function Button({ tone = 'primary', className = '', ...props }) {
     const base =
-        'inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60';
+        'inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60';
     const tones = {
-        primary: 'bg-zinc-900 text-white hover:bg-zinc-800',
+        primary: 'bg-indigo-600 text-white hover:bg-indigo-700',
         secondary: 'bg-white text-zinc-900 ring-1 ring-zinc-200 hover:bg-zinc-50',
         ghost: 'bg-transparent text-zinc-700 hover:bg-zinc-100',
         danger: 'bg-rose-600 text-white hover:bg-rose-500',
@@ -211,7 +222,7 @@ function buildColumnSpecs({ view, groupBoardBy, projects, users, statusOptions }
     const group = view === 'team' ? 'assignee' : groupBoardBy;
 
     if (group === 'project') {
-        columns.push({ id: 'col-project-inbox', title: 'Inbox', subtitle: 'Geen project', projectId: null });
+        columns.push({ id: 'col-project-inbox', title: 'Geen project', subtitle: null, projectId: null });
         projects.forEach((p) => {
             columns.push({
                 id: `col-project-${p.id}`,
@@ -278,7 +289,7 @@ function findContainerId(itemsByColumn, id) {
 export default function Tasks({ initial, filters, urls }) {
     const [tasks, setTasks] = useState(initial?.tasks ?? []);
     const [projects, setProjects] = useState(initial?.projects ?? []);
-    const [users, setUsers] = useState(initial?.users ?? []);
+    const [users, setUsers] = useState(() => dedupeById(initial?.users));
     const [statusOptions, setStatusOptions] = useState(initial?.statusOptions ?? []);
     const [priorityOptions, setPriorityOptions] = useState(initial?.priorityOptions ?? []);
 
@@ -348,7 +359,7 @@ export default function Tasks({ initial, filters, urls }) {
             if (seq !== fetchSeqRef.current) return;
             setTasks(response.data.tasks ?? []);
             setProjects(response.data.projects ?? []);
-            setUsers(response.data.users ?? []);
+            setUsers(dedupeById(response.data.users));
             setStatusOptions(response.data.statusOptions ?? []);
             setPriorityOptions(response.data.priorityOptions ?? []);
         } catch {
@@ -850,7 +861,7 @@ export default function Tasks({ initial, filters, urls }) {
                             <button
                                 type="button"
                                 aria-pressed={view === 'list'}
-                                className={cx('rounded-md px-3 py-2 text-sm font-semibold', view === 'list' ? 'bg-zinc-900 text-white' : 'text-zinc-700')}
+                                className={cx('rounded-md px-3 py-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600', view === 'list' ? 'bg-indigo-600 text-white' : 'text-zinc-700 hover:bg-zinc-100')}
                                 onClick={() => setView('list')}
                             >
                                 Lijst
@@ -858,15 +869,15 @@ export default function Tasks({ initial, filters, urls }) {
                             <button
                                 type="button"
                                 aria-pressed={view === 'board'}
-                                className={cx('rounded-md px-3 py-2 text-sm font-semibold', view === 'board' ? 'bg-zinc-900 text-white' : 'text-zinc-700')}
+                                className={cx('rounded-md px-3 py-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600', view === 'board' ? 'bg-indigo-600 text-white' : 'text-zinc-700 hover:bg-zinc-100')}
                                 onClick={() => setView('board')}
                             >
-                                Board
+                                Bord
                             </button>
                             <button
                                 type="button"
                                 aria-pressed={view === 'team'}
-                                className={cx('rounded-md px-3 py-2 text-sm font-semibold', view === 'team' ? 'bg-zinc-900 text-white' : 'text-zinc-700')}
+                                className={cx('rounded-md px-3 py-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600', view === 'team' ? 'bg-indigo-600 text-white' : 'text-zinc-700 hover:bg-zinc-100')}
                                 onClick={() => setView('team')}
                             >
                                 Team
@@ -1117,7 +1128,7 @@ export default function Tasks({ initial, filters, urls }) {
                         <div className="flex items-start justify-between gap-4">
                             <div>
                                 <div id="project-modal-title" className="text-lg font-bold text-zinc-900">Nieuw project</div>
-                                <div className="mt-1 text-sm text-zinc-500">Maak een nieuwe projectkolom voor je board.</div>
+                                <div className="mt-1 text-sm text-zinc-500">Maak een nieuwe projectkolom voor je bord.</div>
                             </div>
                             <Button tone="ghost" type="button" onClick={closeProjectModal}>
                                 Sluiten
@@ -1293,22 +1304,13 @@ export default function Tasks({ initial, filters, urls }) {
                                 </div>
                                 <div className="md:col-span-2">
                                     <label htmlFor="tasks-task-toegewezen-aan" className="block text-xs font-semibold text-zinc-500">Toegewezen aan</label>
-                                    <select
+                                    <MultiSelectChips
                                         id="tasks-task-toegewezen-aan"
-                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
-                                        multiple
-                                        value={taskForm.assignees.map(String)}
-                                        onChange={(e) => {
-                                            const selected = Array.from(e.target.selectedOptions).map((o) => Number(o.value));
-                                            setTaskForm((t) => ({ ...t, assignees: selected }));
-                                        }}
-                                    >
-                                        {users.map((u) => (
-                                            <option key={u.id} value={u.id}>
-                                                {u.name}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        options={users}
+                                        value={taskForm.assignees}
+                                        placeholder="Zoek een collega..."
+                                        onChange={(ids) => setTaskForm((t) => ({ ...t, assignees: ids }))}
+                                    />
                                 </div>
                                 <div className="md:col-span-2">
                                     <label htmlFor="tasks-task-bijlagen" className="block text-xs font-semibold text-zinc-500">Bijlagen</label>
@@ -1470,24 +1472,19 @@ export default function Tasks({ initial, filters, urls }) {
                                         </div>
                                         <div className="md:col-span-2">
                                             <label htmlFor="tasks-detail-toegewezen-aan" className="block text-xs font-semibold text-zinc-500">Toegewezen aan</label>
-                                            <select
+                                            <MultiSelectChips
                                                 id="tasks-detail-toegewezen-aan"
-                                                className="mt-1 w-full rounded-md border-zinc-300 text-sm"
-                                                multiple
-                                                value={(selectedTask.assignees ?? []).map((a) => String(a.id))}
-                                                onChange={(e) => {
-                                                    const selected = Array.from(e.target.selectedOptions).map((o) => Number(o.value));
-                                                    const mapped = users.filter((u) => selected.includes(u.id)).map((u) => ({ id: u.id, name: u.name }));
+                                                options={users}
+                                                value={(selectedTask.assignees ?? []).map((a) => Number(a.id))}
+                                                placeholder="Zoek een collega..."
+                                                onChange={(ids) => {
+                                                    const mapped = ids
+                                                        .map((sid) => users.find((u) => Number(u.id) === sid))
+                                                        .filter(Boolean)
+                                                        .map((u) => ({ id: u.id, name: u.name }));
                                                     setSelectedTask((t) => ({ ...t, assignees: mapped }));
                                                 }}
-                                            >
-                                                {users.map((u) => (
-                                                    <option key={u.id} value={u.id}>
-                                                        {u.name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <div className="mt-1 text-xs text-zinc-500">Tip: houd Ctrl (Mac: Cmd) ingedrukt om meerdere te kiezen.</div>
+                                            />
                                         </div>
                                     </div>
 

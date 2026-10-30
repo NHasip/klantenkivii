@@ -101,7 +101,9 @@ class Index extends Component
 
     public function render()
     {
+        // Klantlogins (eigenaar van een garagebedrijf) horen niet in de gebruikerslijst.
         $users = User::query()
+            ->crmUsers()
             ->orderByDesc('active')
             ->orderBy('role')
             ->orderBy('name')

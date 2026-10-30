@@ -89,103 +89,19 @@
     </section>
 
     <section class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-        <div class="flex flex-wrap items-start justify-between gap-3">
+        <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
                 <h3 class="text-base font-semibold text-gray-900">E-mail templates</h3>
                 <p class="mt-1 text-sm text-gray-600">
-                    Maak hier zelf templates aan en sla ze op. Deze zijn daarna direct beschikbaar bij verzenden.
+                    Templates maak en bewerk je op een aparte pagina.
                 </p>
             </div>
-
-            <div class="flex flex-wrap items-center gap-2">
-                <a
-                    href="{{ $advancedTemplatesUrl }}"
-                    class="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                    Geavanceerd beheer
-                </a>
-                <x-button type="button" wire:click="newTemplate">
-                    {{ __('Nieuwe template') }}
-                </x-button>
-            </div>
-        </div>
-
-        <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[280px,minmax(0,1fr)]">
-            <aside class="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Templatebibliotheek</div>
-                <div class="mt-3 space-y-2">
-                    @forelse ($templateItems as $item)
-                        <button
-                            type="button"
-                            wire:click="selectTemplate({{ $item['id'] }})"
-                            aria-pressed="{{ $editingTemplateId === $item['id'] ? 'true' : 'false' }}"
-                            class="@if($editingTemplateId === $item['id']) bg-gray-900 text-white @else bg-white text-gray-700 hover:bg-gray-100 @endif w-full rounded-md border border-gray-200 px-3 py-2 text-left transition"
-                        >
-                            <div class="text-sm font-semibold">{{ $item['name'] }}</div>
-                            <div class="@if($editingTemplateId === $item['id']) text-gray-200 @else text-gray-500 @endif mt-1 text-xs">
-                                {{ $item['subject'] ?: 'Geen onderwerp' }}
-                            </div>
-                        </button>
-                    @empty
-                        <div class="rounded-md border border-dashed border-gray-300 bg-white px-3 py-3 text-xs text-gray-500">
-                            Nog geen templates gevonden.
-                        </div>
-                    @endforelse
-                </div>
-            </aside>
-
-            <form wire:submit.prevent="saveTemplate" class="space-y-4 rounded-lg border border-gray-200 bg-white p-4">
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                        <x-label for="template_name" value="Template naam" />
-                        <x-input id="template_name" type="text" class="mt-1 block w-full" wire:model="templateForm.name" placeholder="Bijv. Herinnering factuur" />
-                        <x-input-error for="templateForm.name" class="mt-2" />
-                    </div>
-
-                    <div>
-                        <x-label for="template_subject" value="Onderwerp" />
-                        <x-input id="template_subject" type="text" class="mt-1 block w-full" wire:model="templateForm.subject" />
-                        <x-input-error for="templateForm.subject" class="mt-2" />
-                    </div>
-                </div>
-
-                <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-                    <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Beschikbare placeholders</div>
-                    <div class="mt-2 flex flex-wrap gap-2">
-                        @foreach ($placeholders as $placeholder)
-                            <span class="rounded-full border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700">
-                                {{ $placeholder }}
-                            </span>
-                        @endforeach
-                    </div>
-                </div>
-
-                <div>
-                    <x-label for="template_body_text" value="Bericht (tekst)" />
-                    <textarea
-                        id="template_body_text"
-                        class="mt-1 block w-full rounded-md border-gray-300 text-sm"
-                        rows="12"
-                        wire:model="templateForm.body_text"
-                    ></textarea>
-                    <x-input-error for="templateForm.body_text" class="mt-2" />
-                </div>
-
-                <label for="template_is_active" class="inline-flex items-center gap-2 text-sm text-gray-700">
-                    <input id="template_is_active" type="checkbox" class="rounded border-gray-300 text-gray-800" wire:model="templateForm.is_active">
-                    Template actief
-                </label>
-
-                <div class="flex flex-wrap items-center gap-2">
-                    <x-action-message class="me-2" on="template-saved">
-                        {{ __('Opgeslagen.') }}
-                    </x-action-message>
-
-                    <x-button wire:loading.attr="disabled" wire:target="saveTemplate">
-                        {{ $editingTemplateId ? 'Template opslaan' : 'Template aanmaken' }}
-                    </x-button>
-                </div>
-            </form>
+            <a
+                href="{{ $templatesUrl }}"
+                class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2"
+            >
+                E-mail templates beheren
+            </a>
         </div>
     </section>
 </div>

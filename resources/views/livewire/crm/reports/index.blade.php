@@ -1,4 +1,4 @@
-<div class="space-y-5">
+<div class="min-w-0 space-y-5">
     <div class="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5">
         <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
@@ -39,13 +39,13 @@
                         </div>
                     @endif
 
-                    <div class="sm:col-span-6 flex items-center justify-between gap-3">
+                    <div class="sm:col-span-6 flex flex-wrap items-center justify-between gap-3">
                         <div class="text-xs text-rose-600" role="alert">
                             @error('from') {{ $message }} @enderror
                             @error('to') {{ $message }} @enderror
                             @error('preset') {{ $message }} @enderror
                         </div>
-                        <button type="button" class="rounded-md bg-zinc-900 px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-700 disabled:opacity-60" wire:click="applyFilters" wire:loading.attr="disabled" wire:target="applyFilters">
+                        <button type="button" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60" wire:click="applyFilters" wire:loading.attr="disabled" wire:target="applyFilters">
                             <span wire:loading.remove wire:target="applyFilters">Toepassen</span>
                             <span wire:loading wire:target="applyFilters">Laden...</span>
                         </button>
@@ -71,14 +71,14 @@
     @endphp
 
     <div class="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-12">
-        <div class="flex h-full flex-col rounded-2xl border border-zinc-200 bg-white p-4 xl:col-span-6">
-            <div class="flex items-start justify-between gap-3">
-                <div>
+        <div class="flex h-full min-w-0 flex-col rounded-2xl border border-zinc-200 bg-white p-4 xl:col-span-6">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0">
                     <div class="text-xs font-medium uppercase tracking-wide text-zinc-500">Omzet per maand</div>
-                    <div class="mt-1 text-3xl font-semibold text-zinc-900">&euro; {{ number_format($kpis['mrr_excl'], 2, ',', '.') }}</div>
-                    <div class="mt-1 text-xs text-zinc-600">Excl. btw</div>
+                    <div class="mt-1 break-words text-3xl font-semibold text-zinc-900">&euro; {{ number_format($kpis['mrr_excl'], 2, ',', '.') }}</div>
+                    <div class="mt-1 text-xs text-zinc-600">Excl. btw, alleen klanten met status Actief</div>
                 </div>
-                <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-right">
+                <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 sm:text-right">
                     <div class="text-xs font-medium text-emerald-700">Incl. btw</div>
                     <div class="text-sm font-semibold text-emerald-800">&euro; {{ number_format($kpis['mrr_incl'], 2, ',', '.') }}</div>
                 </div>
@@ -89,17 +89,17 @@
                     <div class="text-sm font-semibold text-zinc-800">&euro; {{ number_format($kpis['mrr_btw'], 2, ',', '.') }}</div>
                 </div>
                 <div class="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2">
-                    <div class="text-xs text-zinc-500">Actieve modules</div>
-                    <div class="text-sm font-semibold text-zinc-800">{{ number_format($kpis['modules_active_subscriptions'], 0, ',', '.') }}</div>
+                    <div class="text-xs text-zinc-500">Afgenomen modules</div>
+                    <div class="text-sm font-semibold text-zinc-800">{{ number_format($kpis['modules_total_aantal'], 0, ',', '.') }}</div>
                 </div>
                 <div class="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2">
-                    <div class="text-xs text-zinc-500">Actieve seats</div>
-                    <div class="text-sm font-semibold text-zinc-800">{{ number_format($kpis['active_seats'], 0, ',', '.') }}</div>
+                    <div class="text-xs text-zinc-500">Pijplijn (demo)</div>
+                    <div class="text-sm font-semibold text-zinc-800">&euro; {{ number_format($kpis['demo_pipeline_excl'], 2, ',', '.') }}</div>
                 </div>
             </div>
         </div>
 
-        <div class="flex h-full flex-col rounded-2xl border border-zinc-200 bg-white p-4 xl:col-span-3">
+        <div class="flex h-full min-w-0 flex-col rounded-2xl border border-zinc-200 bg-white p-4 xl:col-span-3">
             <div class="text-xs font-medium uppercase tracking-wide text-zinc-500">Klanten</div>
             <div class="mt-2 text-2xl font-semibold">{{ number_format($kpis['companies_total'], 0, ',', '.') }}</div>
             <div class="mt-1 text-sm text-zinc-600">Actief: {{ number_format($kpis['companies_active'], 0, ',', '.') }} ({{ $activeRatio }}%)</div>
@@ -110,11 +110,11 @@
             </div>
         </div>
 
-        <div class="flex h-full flex-col rounded-2xl border border-zinc-200 bg-white p-4 xl:col-span-3">
-            <div class="text-xs font-medium uppercase tracking-wide text-zinc-500">Instroom</div>
+        <div class="flex h-full min-w-0 flex-col rounded-2xl border border-zinc-200 bg-white p-4 xl:col-span-3">
+            <div class="text-xs font-medium uppercase tracking-wide text-zinc-500">Instroom in periode</div>
             <div class="mt-3 space-y-2 text-sm">
                 <div class="flex items-center justify-between">
-                    <span class="text-zinc-600">Nieuwe leads</span>
+                    <span class="text-zinc-600">Nieuw toegevoegd</span>
                     <span class="font-semibold">{{ number_format($kpis['leads_new'], 0, ',', '.') }}</span>
                 </div>
                 <div class="flex items-center justify-between">
@@ -122,8 +122,8 @@
                     <span class="font-semibold">{{ number_format($kpis['demo_requested'], 0, ',', '.') }}</span>
                 </div>
                 <div class="flex items-center justify-between">
-                    <span class="text-zinc-600">Demo gepland</span>
-                    <span class="font-semibold">{{ number_format($kpis['demo_scheduled'], 0, ',', '.') }}</span>
+                    <span class="text-zinc-600">Demo gestart</span>
+                    <span class="font-semibold">{{ number_format($kpis['demo_started'], 0, ',', '.') }}</span>
                 </div>
                 <div class="flex items-center justify-between">
                     <span class="text-zinc-600">Nieuw actief</span>
@@ -185,20 +185,17 @@
             </div>
         </div>
 
-        <div class="flex h-full flex-col rounded-2xl border border-zinc-200 bg-white p-4 lg:col-span-8">
+        <div class="flex h-full min-w-0 flex-col rounded-2xl border border-zinc-200 bg-white p-4 lg:col-span-8">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
+                <div class="min-w-0">
                     <div class="text-sm font-semibold">Modules prestaties</div>
-                    <div class="mt-1 text-xs text-zinc-500">
-                        Actieve modules: {{ number_format($kpis['modules_active'], 0, ',', '.') }} van {{ number_format($kpis['modules_total'], 0, ',', '.') }}
-                        &middot; Totaal aantallen: {{ number_format($kpis['modules_total_aantal'], 0, ',', '.') }}
-                    </div>
+                    <div class="mt-1 text-xs text-zinc-500">Alleen klanten met status Actief. Demo-klanten tellen niet mee.</div>
                 </div>
                 <div class="grid grid-cols-1 gap-2 sm:w-72">
                     @forelse($topModules as $module)
                         <div class="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs">
                             <div class="flex items-center justify-between gap-2">
-                                <span class="truncate font-medium text-zinc-700">{{ $module->naam }}</span>
+                                <span class="min-w-0 truncate font-medium text-zinc-700">{{ $module->naam }}</span>
                                 <span class="font-semibold text-zinc-900">&euro; {{ number_format((float) $module->mrr_excl, 2, ',', '.') }}</span>
                             </div>
                         </div>
@@ -213,7 +210,7 @@
                     <thead class="bg-zinc-50">
                         <tr>
                             <th class="px-3 py-2 text-left text-xs font-semibold text-zinc-600">Module</th>
-                            <th class="px-3 py-2 text-right text-xs font-semibold text-zinc-600">Actief</th>
+                            <th class="px-3 py-2 text-right text-xs font-semibold text-zinc-600">Klanten</th>
                             <th class="px-3 py-2 text-right text-xs font-semibold text-zinc-600">Aantal</th>
                             <th class="px-3 py-2 text-right text-xs font-semibold text-zinc-600">MRR excl.</th>
                             <th class="px-3 py-2 text-right text-xs font-semibold text-zinc-600">BTW %</th>
@@ -223,7 +220,7 @@
                         @forelse($modulesOverview as $row)
                             <tr class="hover:bg-zinc-50">
                                 <td class="px-3 py-2 text-sm font-medium">{{ $row->naam }}</td>
-                                <td class="px-3 py-2 text-right text-sm">{{ number_format((int) $row->active_subscriptions, 0, ',', '.') }}</td>
+                                <td class="px-3 py-2 text-right text-sm">{{ number_format((int) $row->active_customers, 0, ',', '.') }}</td>
                                 <td class="px-3 py-2 text-right text-sm">{{ number_format((int) $row->total_aantal, 0, ',', '.') }}</td>
                                 <td class="px-3 py-2 text-right text-sm font-semibold">&euro; {{ number_format((float) $row->mrr_excl, 2, ',', '.') }}</td>
                                 <td class="px-3 py-2 text-right text-sm text-zinc-600">
@@ -244,16 +241,27 @@
                             </tr>
                         @endforelse
                     </tbody>
+                    @if($modulesOverview->isNotEmpty())
+                        <tfoot class="bg-zinc-50">
+                            <tr>
+                                <td class="px-3 py-2 text-sm font-semibold">Totaal</td>
+                                <td class="px-3 py-2"></td>
+                                <td class="px-3 py-2 text-right text-sm font-semibold">{{ number_format($kpis['modules_total_aantal'], 0, ',', '.') }}</td>
+                                <td class="px-3 py-2 text-right text-sm font-semibold">&euro; {{ number_format($kpis['mrr_excl'], 2, ',', '.') }}</td>
+                                <td class="px-3 py-2"></td>
+                            </tr>
+                        </tfoot>
+                    @endif
                 </table>
             </div>
         </div>
     </div>
 
     <div class="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-12">
-        <div class="h-full rounded-2xl border border-zinc-200 bg-white p-4 lg:col-span-8">
+        <div class="h-full min-w-0 rounded-2xl border border-zinc-200 bg-white p-4 lg:col-span-8">
             <div class="flex items-center justify-between gap-3">
                 <div class="text-sm font-semibold">Top 10 klanten op MRR</div>
-                <div class="text-xs text-zinc-500">Actieve module-omzet</div>
+                <div class="text-xs text-zinc-500">Alleen status Actief</div>
             </div>
             <div class="mt-4 overflow-x-auto rounded-lg border border-zinc-200">
                 <table class="min-w-full divide-y divide-zinc-100">

@@ -28,6 +28,15 @@ class EnsureUserIsActive
                 ->with('status', 'Je account is gedeactiveerd. Neem contact op met de beheerder.');
         }
 
+        if ($user->isCustomerAccount()) {
+            auth()->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return redirect()->route('login')
+                ->with('status', 'Dit account heeft geen toegang tot het CRM.');
+        }
+
         return $next($request);
     }
 }

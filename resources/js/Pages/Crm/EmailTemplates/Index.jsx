@@ -20,8 +20,8 @@ function ToolbarButton({ active, disabled, onClick, children, title }) {
             onClick={onClick}
             disabled={disabled}
             className={cx(
-                'rounded-md px-2 py-1 text-xs font-semibold transition',
-                active ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-zinc-100',
+                'rounded-md px-2 py-1 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1',
+                active ? 'bg-indigo-600 text-white' : 'text-zinc-700 hover:bg-zinc-100',
                 disabled && 'cursor-not-allowed opacity-40'
             )}
         >
@@ -92,6 +92,13 @@ export default function Index({ templates, variables, urls }) {
             Placeholder.configure({ placeholder: 'Schrijf je e-mail template...' }),
         ],
         content: form.data.body_html || '<p></p>',
+        editorProps: {
+            attributes: {
+                role: 'textbox',
+                'aria-multiline': 'true',
+                'aria-label': 'Template inhoud',
+            },
+        },
         onUpdate: ({ editor: ed }) => {
             bodyTouchedRef.current = true;
             form.setData('body_html', ed.getHTML());
@@ -231,7 +238,7 @@ export default function Index({ templates, variables, urls }) {
                 </div>
                 <Link
                     href={urls.back || '/dashboard'}
-                    className="rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
+                    className="rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1"
                 >
                     Terug
                 </Link>
@@ -246,7 +253,7 @@ export default function Index({ templates, variables, urls }) {
                     )}
                 >
                     <div>{flashText}</div>
-                    <button type="button" className="text-xs font-semibold" onClick={() => setFlash(null)}>
+                    <button type="button" className="rounded text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1" onClick={() => setFlash(null)}>
                         Sluiten
                     </button>
                 </div>
@@ -259,9 +266,10 @@ export default function Index({ templates, variables, urls }) {
                             <div className="text-sm font-semibold">Templates</div>
                             <button
                                 type="button"
-                                className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-semibold hover:bg-zinc-50"
+                                className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-semibold hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1"
                                 onClick={() => selectTemplate('new')}
                                 aria-pressed={isNew}
+                                aria-label="Nieuwe template"
                             >
                                 Nieuw
                             </button>
@@ -276,15 +284,16 @@ export default function Index({ templates, variables, urls }) {
                                     type="button"
                                     onClick={() => selectTemplate(template.id)}
                                     aria-current={selectedId === template.id ? 'true' : undefined}
+                                    aria-label={`${template.name || 'Template zonder naam'} bewerken${template.subject ? `, onderwerp: ${template.subject}` : ''}`}
                                     className={cx(
-                                        'w-full rounded-lg border px-3 py-2 text-left transition',
+                                        'w-full rounded-lg border px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1',
                                         selectedId === template.id
-                                            ? 'border-zinc-900 bg-zinc-900 text-white'
+                                            ? 'border-indigo-600 bg-indigo-600 text-white'
                                             : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
                                     )}
                                 >
                                     <div className="truncate text-sm font-semibold">{template.name}</div>
-                                    <div className={cx('mt-1 text-xs', selectedId === template.id ? 'text-zinc-200' : 'text-zinc-500')}>
+                                    <div className={cx('mt-1 text-xs', selectedId === template.id ? 'text-indigo-50' : 'text-zinc-500')}>
                                         {template.subject || 'Geen onderwerp'}
                                     </div>
                                 </button>
@@ -333,10 +342,13 @@ export default function Index({ templates, variables, urls }) {
                                     {form.errors.subject && <div className="mt-1 text-xs text-rose-600">{form.errors.subject}</div>}
                                 </div>
                             </div>
-                            <label className="mt-4 flex items-center gap-2 text-xs font-semibold text-zinc-600">
+                            <label htmlFor="email-template-active" className="mt-4 flex items-center gap-2 text-xs font-semibold text-zinc-600">
                                 <input
+                                    id="email-template-active"
+                                    name="is_active"
                                     type="checkbox"
-                                    className="rounded border-zinc-300"
+                                    aria-label="Actief"
+                                    className="rounded border-zinc-300 text-indigo-600 focus-visible:ring-indigo-600"
                                     checked={!!form.data.is_active}
                                     onChange={(e) => form.setData('is_active', e.target.checked ? 1 : 0)}
                                 />
@@ -345,7 +357,7 @@ export default function Index({ templates, variables, urls }) {
                         </div>
 
                         <div className="rounded-xl border border-zinc-200 bg-white p-4">
-                            <div className="text-xs font-semibold text-zinc-500">Template inhoud</div>
+                            <div id="email-template-body-label" className="text-xs font-semibold text-zinc-500">Template inhoud</div>
                             <div className="mt-2 rounded-lg border border-zinc-200">
                                 <div className="flex flex-wrap items-center gap-1 border-b border-zinc-100 bg-zinc-50 px-2 py-2">
                                     <ToolbarButton
@@ -428,7 +440,7 @@ export default function Index({ templates, variables, urls }) {
                         <div className="flex flex-wrap items-center gap-2">
                             <button
                                 type="submit"
-                                className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60"
                                 disabled={saving}
                             >
                                 {saving ? 'Opslaan...' : 'Opslaan'}
@@ -437,7 +449,7 @@ export default function Index({ templates, variables, urls }) {
                                 <button
                                     type="button"
                                     className={cx(
-                                        'rounded-md border px-3 py-2 text-sm font-semibold',
+                                        'rounded-md border px-3 py-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1',
                                         selectedTemplate.is_system && selectedTemplate.is_active
                                             ? 'cursor-not-allowed border-zinc-200 text-zinc-400'
                                             : 'border-rose-200 text-rose-600 hover:bg-rose-50'

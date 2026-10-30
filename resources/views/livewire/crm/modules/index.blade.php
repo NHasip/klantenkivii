@@ -1,8 +1,8 @@
 <div class="space-y-6">
-    <div class="flex items-end justify-between gap-3">
-        <div>
+    <div class="flex flex-wrap items-end justify-between gap-3">
+        <div class="min-w-0">
             <h1 class="text-2xl font-semibold tracking-tight">Modules</h1>
-            <div class="mt-1 text-sm text-zinc-600">Beheer de vaste lijst modules (admin).</div>
+            <div class="mt-1 text-sm text-zinc-600">Voeg modules toe of pas naam, standaardprijs en btw aan.</div>
         </div>
         <button type="button" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700" wire:click="startCreate">
             Nieuwe module
@@ -85,11 +85,15 @@
                     <tr class="hover:bg-zinc-50">
                         <td class="px-4 py-3 text-sm font-semibold">{{ $m->naam }}</td>
                         @if($supportsDefaultPricing)
-                            <td class="px-4 py-3 text-sm">EUR {{ number_format((float) $m->default_prijs_maand_excl, 2, ',', '.') }}</td>
-                            <td class="px-4 py-3 text-sm">{{ number_format((float) $m->default_btw_percentage, 2, ',', '.') }}%</td>
+                            <td class="whitespace-nowrap px-4 py-3 text-sm">&euro; {{ number_format((float) $m->default_prijs_maand_excl, 2, ',', '.') }}</td>
+                            @php
+                                $btw = (float) $m->default_btw_percentage;
+                                $btwDecimals = abs($btw - round($btw)) < 0.001 ? 0 : 2;
+                            @endphp
+                            <td class="whitespace-nowrap px-4 py-3 text-sm">{{ number_format($btw, $btwDecimals, ',', '.') }}%</td>
                         @endif
                         <td class="px-4 py-3 text-sm">{{ $m->default_visible ? 'Ja' : 'Nee' }}</td>
-                        <td class="px-4 py-3 text-sm text-zinc-600">{{ \Illuminate\Support\Str::limit($m->omschrijving ?? '', 80) ?: '—' }}</td>
+                        <td class="px-4 py-3 text-sm text-zinc-600">{{ \Illuminate\Support\Str::limit($m->omschrijving ?? '', 80) ?: '-' }}</td>
                         <td class="whitespace-nowrap px-4 py-3 text-right">
                             <button type="button" class="rounded-md border border-zinc-200 px-2 py-1 text-xs hover:bg-zinc-50" wire:click="startEdit({{ $m->id }})">Bewerken</button>
                             <button type="button" class="ml-2 rounded-md border border-rose-200 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50" wire:click="deleteModule({{ $m->id }})" wire:confirm="Weet je zeker dat je deze module wilt verwijderen?">Verwijderen</button>

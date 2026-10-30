@@ -29,3 +29,9 @@
     color: #2563eb;
     text-decoration: underline;
 }
+
+/* Zichtbare toetsenbordfocus als vangnet; :where() houdt de specificiteit op 0 zodat utility-klassen voorgaan. */
+:where(a, button, summary, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 2px solid theme('colors.indigo.600');
+    outline-offset: 2px;
+}

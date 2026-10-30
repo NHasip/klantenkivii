@@ -1,6 +1,7 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useConfirm } from '../../../components/ConfirmProvider';
+import StatusBadge, { FOCUS_SCOPE } from '../../../components/StatusBadge';
 
 function formatEuro(value) {
     try {
@@ -34,8 +35,9 @@ function cx(...parts) {
     return parts.filter(Boolean).join(' ');
 }
 
-function Pagination({ links }) {
+function Pagination({ links, lastPage }) {
     if (!Array.isArray(links) || links.length <= 1) return null;
+    if (lastPage !== undefined && lastPage !== null && Number(lastPage) <= 1) return null;
 
     return (
         <nav aria-label="Paginering" className="mt-6 flex flex-wrap gap-2">
@@ -63,6 +65,24 @@ function Pagination({ links }) {
                 )
             )}
         </nav>
+    );
+}
+
+function EmptyState({ isTrashView, hasActiveFilters, onClear }) {
+    if (isTrashView && !hasActiveFilters) return <span>Prullenbak is leeg.</span>;
+    return (
+        <div className="flex flex-col items-center gap-2">
+            <span>Geen klanten gevonden.</span>
+            {hasActiveFilters && (
+                <button
+                    type="button"
+                    onClick={onClear}
+                    className="text-sm font-semibold text-indigo-700 underline underline-offset-2 hover:text-indigo-900"
+                >
+                    Filters wissen
+                </button>
+            )}
+        </div>
     );
 }
 
@@ -165,15 +185,44 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
         });
     };
 
-    const submit = (event) => {
-        event.preventDefault();
-        router.get(safeUrls.index, data, {
+    const runFilter = (nextData) => {
+        router.get(safeUrls.index, nextData, {
             preserveState: true,
+            preserveScroll: true,
             replace: true,
             onStart: () => setFiltering(true),
             onFinish: () => setFiltering(false),
         });
     };
+
+    const submit = (event) => {
+        event.preventDefault();
+        runFilter(data);
+    };
+
+    // Live zoeken: na 300 ms zonder typen automatisch filteren (Filter-knop blijft werken).
+    const lastSearchRef = useRef(data.search);
+    useEffect(() => {
+        if (data.search === lastSearchRef.current) return undefined;
+        const timer = window.setTimeout(() => {
+            lastSearchRef.current = data.search;
+            runFilter(data);
+        }, 300);
+        return () => window.clearTimeout(timer);
+    }, [data.search]);
+
+    const hasActiveFilters = Boolean(
+        (data.search && data.search.trim() !== '') || (data.status && data.status !== 'alle') || (data.tag && data.tag.trim() !== '')
+    );
+
+    const clearFilters = () => {
+        const nextData = { ...data, search: '', status: 'alle', tag: '' };
+        lastSearchRef.current = '';
+        setData(nextData);
+        runFilter(nextData);
+    };
+
+    const [exportOpen, setExportOpen] = useState(false);
 
     const exportIncasso = () => {
         if (!safeUrls.export_incasso_batch || !exportForm.data.uitvoerdatum) return;
@@ -186,7 +235,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
     };
 
     return (
-        <div className="space-y-6">
+        <div className={cx('space-y-6', FOCUS_SCOPE)}>
             <Head title="Klanten" />
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -221,6 +270,17 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                             Prullenbak ({Number(trashCount || 0)})
                         </button>
                     </div>
+                    {!isTrashView && safeUrls.export_incasso_batch && (
+                        <button
+                            type="button"
+                            onClick={() => setExportOpen((open) => !open)}
+                            aria-expanded={exportOpen}
+                            aria-controls="incasso-export-panel"
+                            className="w-full rounded-md border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 sm:w-auto"
+                        >
+                            Incasso exporteren
+                        </button>
+                    )}
                     {!isTrashView && safeUrls.create && (
                         <Link
                             href={safeUrls.create}
@@ -241,8 +301,8 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                 </div>
             </div>
 
-            {!isTrashView && (
-                <div className="rounded-xl border border-zinc-200 bg-white p-4">
+            {!isTrashView && exportOpen && (
+                <div id="incasso-export-panel" className="rounded-xl border border-zinc-200 bg-white p-4">
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
                         <div className="md:col-span-2">
                             <div className="text-sm font-semibold text-zinc-900">Exporteer ING incasso</div>
@@ -291,7 +351,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                         <button
                             type="button"
                             onClick={exportIncasso}
-                            disabled={!exportForm.data.uitvoerdatum}
+                            disabled={!exportForm.data.uitvoerdatum || !safeUrls.export_incasso_batch}
                             className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60 md:self-end"
                         >
                             Exporteer alle actieve klanten
@@ -308,10 +368,12 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                             id="gc-search"
                             type="search"
                             className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                            aria-describedby="gc-search-hint"
                             value={data.search}
                             onChange={(e) => setData('search', e.target.value)}
-                            placeholder="Bedrijfsnaam, email, IBAN..."
+                            placeholder="Bedrijfsnaam, e-mail, IBAN..."
                         />
+                        <div id="gc-search-hint" className="sr-only">De lijst wordt bijgewerkt terwijl je typt.</div>
                     </div>
                     <div>
                         <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-status">Status</label>
@@ -372,7 +434,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                         <button
                             type="submit"
                             disabled={filtering}
-                            className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             {filtering ? 'Bezig...' : 'Filter'}
                         </button>
@@ -382,8 +444,8 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
 
             <div className="space-y-3 md:hidden">
                 {safeCompanies.data.length === 0 && (
-                    <div className="rounded-xl border border-zinc-200 bg-white px-4 py-10 text-center text-sm text-zinc-500">
-                        {isTrashView ? 'Prullenbak is leeg.' : 'Geen klanten gevonden.'}
+                    <div className="rounded-xl border border-zinc-200 bg-white px-4 py-10 text-center text-sm text-zinc-600">
+                        <EmptyState isTrashView={isTrashView} hasActiveFilters={hasActiveFilters} onClear={clearFilters} />
                     </div>
                 )}
                 {safeCompanies.data.map((company) => (
@@ -393,9 +455,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                                 <div className="text-sm font-semibold text-zinc-900">{company.bedrijfsnaam}</div>
                                 <div className="text-xs text-zinc-500">{company.plaats || '-'}</div>
                             </div>
-                            <span className="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
-                                {safeStatusLabels[company.status] || company.status}
-                            </span>
+                            <StatusBadge status={company.status} labels={safeStatusLabels} />
                         </div>
                         <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                             <div className="text-zinc-500">Contact</div>
@@ -465,8 +525,8 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                     <tbody className="divide-y divide-zinc-100">
                         {safeCompanies.data.length === 0 && (
                             <tr>
-                                <td colSpan={7} className="px-4 py-10 text-center text-sm text-zinc-500">
-                                    {isTrashView ? 'Prullenbak is leeg.' : 'Geen klanten gevonden.'}
+                                <td colSpan={7} className="px-4 py-10 text-center text-sm text-zinc-600">
+                                    <EmptyState isTrashView={isTrashView} hasActiveFilters={hasActiveFilters} onClear={clearFilters} />
                                 </td>
                             </tr>
                         )}
@@ -477,9 +537,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                                     <div className="text-xs text-zinc-500">{company.plaats || '-'}</div>
                                 </td>
                                 <td className="px-4 py-3 text-sm">
-                                    <span className="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
-                                        {safeStatusLabels[company.status] || company.status}
-                                    </span>
+                                    <StatusBadge status={company.status} labels={safeStatusLabels} />
                                 </td>
                                 <td className="px-4 py-3 text-sm">
                                     <div>{company.hoofd_email || '-'}</div>
@@ -528,7 +586,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                 </table>
             </div>
 
-            <Pagination links={safeCompanies.links} />
+            <Pagination links={safeCompanies.links} lastPage={safeCompanies.last_page} />
 
             <div className="rounded-xl border border-zinc-200 bg-white p-4">
                 <div className="mb-3 text-sm font-semibold text-zinc-900">Totaal overzicht</div>
@@ -540,7 +598,7 @@ export default function Index({ companies, totals, trashCount, filters, statusOp
                         </div>
                     </div>
                     <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3">
-                        <div className="text-xs font-medium text-zinc-500">Totale omzet excl. btw</div>
+                        <div className="text-xs font-medium text-zinc-500">MRR actieve klanten excl. btw</div>
                         <div className="mt-1 text-xl font-semibold text-zinc-900">{formatEuro(totals?.omzet_excl ?? 0)}</div>
                     </div>
                 </div>

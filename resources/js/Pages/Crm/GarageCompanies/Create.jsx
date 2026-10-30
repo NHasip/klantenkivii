@@ -1,5 +1,6 @@
 ﻿import React, { useMemo, useState } from 'react';
 import { Head, Link, useForm } from '@inertiajs/react';
+import { FOCUS_SCOPE } from '../../../components/StatusBadge';
 
 function formatEuro(value) {
     try {
@@ -147,7 +148,7 @@ export default function Create({ statusOptions: rawStatusOptions, statusLabels, 
     };
 
     return (
-        <div className="space-y-6">
+        <div className={`space-y-6 ${FOCUS_SCOPE}`}>
             <Head title="Nieuwe klant" />
 
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -385,7 +386,7 @@ export default function Create({ statusOptions: rawStatusOptions, statusLabels, 
                                     <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-opgezegd-op">Opgezegd op</label>
                                     <input
                                         id="gc-opgezegd-op"
-                                        type="datetime-local"
+                                        type="date"
                                         className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                         value={data.opgezegd_op}
                                         onChange={(e) => setData('opgezegd_op', e.target.value)}

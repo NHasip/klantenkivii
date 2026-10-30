@@ -21,6 +21,7 @@ use App\Models\Reminder;
 use App\Models\SepaMandate;
 use App\Models\SmtpSetting;
 use App\Models\User;
+use App\Services\Crm\RevenueCalculator;
 use App\Services\EmailTemplateRenderer;
 use App\Services\IncassoProrataCalculator;
 use Illuminate\Http\RedirectResponse;
@@ -99,7 +100,7 @@ class GarageCompaniesController
         $query = (clone $baseQuery)
             ->withCount(['customerPersons as klantpersonen_aantal'])
             ->withCount(['seats as actieve_seats' => fn ($q) => $q->where('actief', true)])
-            ->withSum(['modules as omzet_excl' => fn ($q) => $q->where('actief', true)], 'prijs_maand_excl');
+            ->withSum(['modules as omzet_excl' => fn ($q) => RevenueCalculator::constrainActiveModules($q)], RevenueCalculator::exclExpression());
 
         $query->when($filters['sort'] === 'actief_vanaf_desc', fn ($q) => $q->orderByDesc('actief_vanaf'))
             ->when($filters['sort'] === 'omzet_desc', fn ($q) => $q->orderByDesc('omzet_excl'))
@@ -107,14 +108,12 @@ class GarageCompaniesController
 
         $companies = $query->paginate($perPage)->withQueryString();
 
+        // Zelfde berekening als dashboard en rapportages: alleen klanten met status Actief.
+        // Demo-klanten worden apart als pijplijn meegegeven.
         $totals = [
             'bedrijven' => (int) (clone $baseQuery)->count(),
-            'omzet_excl' => (float) ((clone $baseQuery)
-                ->leftJoin('garage_company_modules as gcm', function ($join) {
-                    $join->on('gcm.garage_company_id', '=', 'garage_companies.id')
-                        ->where('gcm.actief', true);
-                })
-                ->sum('gcm.prijs_maand_excl')),
+            'omzet_excl' => RevenueCalculator::mrr($baseQuery)['excl'],
+            'omzet_demo_excl' => RevenueCalculator::demoPipeline($baseQuery)['excl'],
         ];
 
         $companies->through(fn (GarageCompany $company) => [
@@ -868,11 +867,11 @@ class GarageCompaniesController
                 ->update(['password' => $loginPassword]);
         }
 
-        if ($oldStatus !== $garageCompany->status->value) {
+        if (GarageCompanyStatus::normalize($oldStatus) !== GarageCompanyStatus::normalize($garageCompany->status->value)) {
             Activity::create([
                 'garage_company_id' => $garageCompany->id,
                 'type' => ActivityType::StatusWijziging,
-                'titel' => "Status gewijzigd: {$oldStatus} -> {$garageCompany->status->value}",
+                'titel' => 'Status gewijzigd: '.$this->statusLabel($oldStatus).' -> '.$this->statusLabel($garageCompany->status->value),
                 'inhoud' => null,
                 'created_by' => auth()->id(),
             ]);
@@ -1186,13 +1185,15 @@ class GarageCompaniesController
         $garageCompany->status = GarageCompanyStatus::from($to);
         $garageCompany->save();
 
-        Activity::create([
-            'garage_company_id' => $garageCompany->id,
-            'type' => ActivityType::StatusWijziging,
-            'titel' => "Status gewijzigd: {$from} -> {$to}",
-            'inhoud' => null,
-            'created_by' => auth()->id(),
-        ]);
+        if (GarageCompanyStatus::normalize($from) !== GarageCompanyStatus::normalize($to)) {
+            Activity::create([
+                'garage_company_id' => $garageCompany->id,
+                'type' => ActivityType::StatusWijziging,
+                'titel' => 'Status gewijzigd: '.$this->statusLabel($from).' -> '.$this->statusLabel($to),
+                'inhoud' => null,
+                'created_by' => auth()->id(),
+            ]);
+        }
 
         return back()->with('status', 'Status bijgewerkt.');
     }
@@ -1714,6 +1715,14 @@ class GarageCompaniesController
         }
     }
 
+    private function statusLabel(string $value): string
+    {
+        $status = GarageCompanyStatus::tryFrom($value);
+
+        return $status
+            ? (GarageCompanyStatus::tryFrom(GarageCompanyStatus::normalize($value)) ?? $status)->label()
+            : $value;
+    }
 
     /**
      * @return array{0:string,1:string}

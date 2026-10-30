@@ -7,8 +7,8 @@ use App\Enums\SepaMandateStatus;
 use App\Enums\TaskStatus;
 use App\Models\Activity;
 use App\Models\GarageCompany;
-use App\Models\GarageCompanyModule;
 use App\Models\Task;
+use App\Services\Crm\RevenueCalculator;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -40,31 +40,12 @@ class DashboardController
             ->whereBetween('opgezegd_op', [$last30Start, $now])
             ->count();
 
-        $today = $now->toDateString();
-        $activeModulesQuery = GarageCompanyModule::query()
-            ->where('actief', true)
-            ->where(function ($q) use ($today) {
-                $q->whereNull('startdatum')->orWhere('startdatum', '<=', $today);
-            })
-            ->where(function ($q) use ($today) {
-                $q->whereNull('einddatum')->orWhere('einddatum', '>=', $today);
-            });
-
-        if (GarageCompany::hasTrashColumn()) {
-            $activeModulesQuery->whereIn('garage_company_id', GarageCompany::query()->select('id'));
-        }
-
-        $mrrExclExpr = GarageCompanyModule::hasAantalColumn()
-            ? DB::raw('(prijs_maand_excl * aantal)')
-            : 'prijs_maand_excl';
-
-        $mrrBtwExpr = GarageCompanyModule::hasAantalColumn()
-            ? DB::raw('((prijs_maand_excl * aantal) * (btw_percentage / 100))')
-            : DB::raw('(prijs_maand_excl * (btw_percentage / 100))');
-
-        $mrrExcl = (float) (clone $activeModulesQuery)->sum($mrrExclExpr);
-        $mrrBtw = (float) (clone $activeModulesQuery)->sum($mrrBtwExpr);
-        $mrrIncl = $mrrExcl + $mrrBtw;
+        // Zelfde berekening als Rapportages en klantenlijst (alleen status Actief).
+        $mrr = RevenueCalculator::mrr();
+        $mrrExcl = $mrr['excl'];
+        $mrrBtw = $mrr['btw'];
+        $mrrIncl = $mrr['incl'];
+        $demoPipeline = RevenueCalculator::demoPipeline();
 
         $tasksOpen = Task::query()->where('status', '!=', TaskStatus::Afgerond)->count();
         $tasksOverdue = Task::query()
@@ -141,7 +122,7 @@ class DashboardController
         $todayStart = $now->startOfDay();
 
         $demoDurationRows = GarageCompany::query()
-            ->where('status', 'proefperiode')
+            ->whereIn('status', RevenueCalculator::demoStatuses())
             ->get(['id', 'bedrijfsnaam', 'proefperiode_start', 'created_at'])
             ->map(function (GarageCompany $company) use ($todayStart) {
                 $since = $company->proefperiode_start ?? $company->created_at;
@@ -237,6 +218,8 @@ class DashboardController
                 'mrr_excl' => $mrrExcl,
                 'mrr_btw' => $mrrBtw,
                 'mrr_incl' => $mrrIncl,
+                'demo_pipeline_excl' => $demoPipeline['excl'],
+                'demo_pipeline_incl' => $demoPipeline['incl'],
                 'tasks_open' => $tasksOpen,
                 'tasks_overdue' => $tasksOverdue,
                 'tasks_due_7' => $tasksDue7,

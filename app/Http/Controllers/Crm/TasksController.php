@@ -421,7 +421,16 @@ class TasksController
      */
     private function users(): Collection
     {
-        return User::query()->orderBy('name')->get(['id', 'name']);
+        // Alleen CRM-gebruikers als keuze; klantlogins blijven gekoppeld aan bestaande
+        // taken maar verschijnen niet in de keuzelijst. Dubbele namen tonen we één keer.
+        return User::query()
+            ->crmUsers()
+            ->orderBy('name')
+            ->orderByDesc('active')
+            ->orderBy('id')
+            ->get(['id', 'name', 'active'])
+            ->unique(fn (User $user) => Str::lower(trim((string) $user->name)))
+            ->values();
     }
 
     /**

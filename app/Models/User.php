@@ -4,11 +4,13 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Enums\UserRole;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Jetstream\HasProfilePhoto;
 use Laravel\Sanctum\HasApiTokens;
@@ -78,6 +80,41 @@ class User extends Authenticatable
     public function isAdmin(): bool
     {
         return $this->role === UserRole::Admin;
+    }
+
+    /**
+     * Klantlogins zijn gebruikers die als eigenaar aan een garagebedrijf hangen
+     * (ook als dat bedrijf in de prullenbak staat). Zij horen niet in het CRM.
+     * Admins worden nooit als klantlogin gezien.
+     */
+    public function isCustomerAccount(): bool
+    {
+        if ($this->isAdmin() || ! $this->getKey()) {
+            return false;
+        }
+
+        // DB::table omzeilt de 'not_deleted' scope, dus verwijderde bedrijven tellen mee.
+        return DB::table('garage_companies')
+            ->where('eigenaar_user_id', $this->getKey())
+            ->exists();
+    }
+
+    /**
+     * Alleen CRM-gebruikers: admins altijd, overige gebruikers als ze geen eigenaar
+     * van een (ook verwijderd) garagebedrijf zijn.
+     */
+    public function scopeCrmUsers(Builder $query): Builder
+    {
+        $table = $this->getTable();
+
+        return $query->where(function (Builder $q) use ($table) {
+            $q->where($table.'.role', UserRole::Admin->value)
+                ->orWhereNotExists(function ($sub) use ($table) {
+                    $sub->selectRaw('1')
+                        ->from('garage_companies')
+                        ->whereColumn('garage_companies.eigenaar_user_id', $table.'.id');
+                });
+        });
     }
 
     public function passkeys(): HasMany

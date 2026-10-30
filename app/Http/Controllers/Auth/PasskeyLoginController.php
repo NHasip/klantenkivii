@@ -59,7 +59,7 @@ class PasskeyLoginController extends Controller
             ->with('passkeys')
             ->first();
 
-        if (! $user) {
+        if (! $user || $user->isCustomerAccount()) {
             throw ValidationException::withMessages([
                 'email' => 'Gebruiker niet gevonden.',
             ]);

@@ -2,11 +2,12 @@
 
 namespace App\Livewire\Crm\Reports;
 
+use App\Enums\GarageCompanyStatus;
 use App\Models\GarageCompany;
 use App\Models\GarageCompanyModule;
-use App\Models\KiviiSeat;
 use App\Models\Module;
 use App\Models\SepaMandate;
+use App\Services\Crm\RevenueCalculator;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -87,26 +88,6 @@ class Index extends Component
         ];
     }
 
-    private function activeModulesQuery(): \Illuminate\Database\Eloquent\Builder
-    {
-        $today = CarbonImmutable::now('Europe/Amsterdam')->toDateString();
-
-        $query = GarageCompanyModule::query()
-            ->where('actief', true)
-            ->where(function ($q) use ($today) {
-                $q->whereNull('startdatum')->orWhere('startdatum', '<=', $today);
-            })
-            ->where(function ($q) use ($today) {
-                $q->whereNull('einddatum')->orWhere('einddatum', '>=', $today);
-            });
-
-        if (GarageCompany::hasTrashColumn()) {
-            $query->whereIn('garage_company_id', GarageCompany::query()->select('id'));
-        }
-
-        return $query;
-    }
-
     public function render()
     {
         [$start, $end] = $this->appliedRange();
@@ -126,8 +107,8 @@ class Index extends Component
             ->whereBetween('demo_aangevraagd_op', [$start, $end])
             ->count();
 
-        $demoScheduled = GarageCompany::query()
-            ->whereBetween('demo_gepland_op', [$start, $end])
+        $demoStarted = GarageCompany::query()
+            ->whereBetween('proefperiode_start', [$start, $end])
             ->count();
 
         $cancelled = GarageCompany::query()
@@ -138,12 +119,17 @@ class Index extends Component
             ->whereBetween('verloren_op', [$start, $end])
             ->count();
 
+        // Oude statuswaarden (lead, demo_gepland) tellen mee bij hun huidige tegenhanger.
         $funnel = GarageCompany::query()
             ->select('status', DB::raw('COUNT(*) as total'))
             ->groupBy('status')
-            ->pluck('total', 'status');
+            ->pluck('total', 'status')
+            ->reduce(function (array $carry, $total, $status) {
+                $key = GarageCompanyStatus::normalize((string) $status);
+                $carry[$key] = ($carry[$key] ?? 0) + (int) $total;
 
-        $activeSeats = KiviiSeat::query()->where('actief', true)->count();
+                return $carry;
+            }, []);
 
         $mandatesActive = SepaMandate::query()->where('status', 'actief')->count();
         $mandatesPending = SepaMandate::query()->where('status', 'pending')->count();
@@ -155,39 +141,20 @@ class Index extends Component
 
         $modulesTotal = Module::query()->count();
 
-        $modulesQuery = $this->activeModulesQuery();
+        // Zelfde berekening als dashboard en klantenlijst: alleen klanten met status Actief.
+        $mrr = RevenueCalculator::mrr();
+        $demoPipeline = RevenueCalculator::demoPipeline();
+        $modulesQuery = RevenueCalculator::activeModulesQuery(RevenueCalculator::activeStatuses());
 
-        $mrrExclExpr = GarageCompanyModule::hasAantalColumn()
-            ? DB::raw('(prijs_maand_excl * aantal)')
-            : 'prijs_maand_excl';
-
-        $mrrBtwExpr = GarageCompanyModule::hasAantalColumn()
-            ? DB::raw('((prijs_maand_excl * aantal) * (btw_percentage / 100))')
-            : DB::raw('(prijs_maand_excl * (btw_percentage / 100))');
-
-        $mrrExcl = (float) (clone $modulesQuery)->sum($mrrExclExpr);
-        $mrrBtw = (float) (clone $modulesQuery)->sum($mrrBtwExpr);
-        $mrrIncl = $mrrExcl + $mrrBtw;
-
-        $today = CarbonImmutable::now('Europe/Amsterdam')->toDateString();
-
+        // Modules per module, alleen voor klanten met status Actief (demo telt niet mee).
         $modulesOverview = Module::query()
-            ->leftJoin('garage_company_modules as gcm', function ($join) use ($today) {
-                $join->on('gcm.module_id', '=', 'modules.id')
-                    ->where('gcm.actief', true)
-                    ->where(function ($q) use ($today) {
-                        $q->whereNull('gcm.startdatum')->orWhere('gcm.startdatum', '<=', $today);
-                    })
-                    ->where(function ($q) use ($today) {
-                        $q->whereNull('gcm.einddatum')->orWhere('gcm.einddatum', '>=', $today);
-                    });
-
-                if (GarageCompany::hasTrashColumn()) {
-                    $join->whereIn('gcm.garage_company_id', GarageCompany::query()->select('id'));
-                }
+            ->leftJoin('garage_company_modules as gcm', function ($join) {
+                $join->on('gcm.module_id', '=', 'modules.id');
+                RevenueCalculator::constrainActiveModules($join, 'gcm.');
+                $join->whereIn('gcm.garage_company_id', RevenueCalculator::companyIdsWithStatus(RevenueCalculator::activeStatuses()));
             })
             ->select('modules.id', 'modules.naam')
-            ->selectRaw('COUNT(gcm.id) as active_subscriptions')
+            ->selectRaw('COUNT(DISTINCT gcm.garage_company_id) as active_customers')
             ->selectRaw(GarageCompanyModule::hasAantalColumn()
                 ? 'COALESCE(SUM(gcm.aantal), 0) as total_aantal'
                 : 'COUNT(gcm.id) as total_aantal')
@@ -200,8 +167,7 @@ class Index extends Component
             ->orderBy('modules.naam')
             ->get();
 
-        $modulesActive = (int) $modulesOverview->filter(fn ($row) => (int) $row->active_subscriptions > 0)->count();
-        $modulesActiveSubscriptions = (int) $modulesOverview->sum(fn ($row) => (int) $row->active_subscriptions);
+        $modulesActive = (int) $modulesOverview->filter(fn ($row) => (int) $row->total_aantal > 0)->count();
         $modulesTotalAantal = (int) $modulesOverview->sum(fn ($row) => (int) $row->total_aantal);
 
         $topCustomers = (clone $modulesQuery)
@@ -228,20 +194,20 @@ class Index extends Component
                 'leads_new' => $leadsNew,
                 'active_new' => $activeNew,
                 'demo_requested' => $demoRequested,
-                'demo_scheduled' => $demoScheduled,
+                'demo_started' => $demoStarted,
                 'cancelled' => $cancelled,
                 'lost' => $lost,
-                'active_seats' => $activeSeats,
                 'mandates_active' => $mandatesActive,
                 'mandates_pending' => $mandatesPending,
                 'active_without_mandate' => $activeWithoutMandate,
                 'modules_total' => $modulesTotal,
                 'modules_active' => $modulesActive,
-                'modules_active_subscriptions' => $modulesActiveSubscriptions,
                 'modules_total_aantal' => $modulesTotalAantal,
-                'mrr_excl' => $mrrExcl,
-                'mrr_btw' => $mrrBtw,
-                'mrr_incl' => $mrrIncl,
+                'mrr_excl' => $mrr['excl'],
+                'mrr_btw' => $mrr['btw'],
+                'mrr_incl' => $mrr['incl'],
+                'demo_pipeline_excl' => $demoPipeline['excl'],
+                'demo_pipeline_incl' => $demoPipeline['incl'],
             ],
             'funnel' => $funnel,
             'modulesOverview' => $modulesOverview,
