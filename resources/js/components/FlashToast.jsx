@@ -4,21 +4,41 @@ import { router } from '@inertiajs/react';
 /**
  * Toont de gedeelde flash-melding (props.flash.status / props.flash.error) na
  * Inertia-bezoeken (router.post/patch/delete + redirect). Bij de eerste volledige
- * paginalading toont de Blade-layout de melding al, daarom luisteren we alleen
- * naar 'success'-events van latere bezoeken.
+ * paginalading toont de Blade-layout de melding al; latere bezoeken (ook redirects)
+ * tonen hem via de 'success'- en 'navigate'-events.
  */
 export function FlashToast() {
     const [toast, setToast] = useState(null);
 
     useEffect(() => {
-        return router.on('success', (event) => {
-            const flash = event?.detail?.page?.props?.flash;
+        // Zowel 'success' (formulierbezoek) als 'navigate' (elke paginawissel, ook na een
+        // redirect) kan de flash dragen; per pagina-object maar een keer tonen.
+        const seen = new WeakSet();
+        let initial = true;
+        const show = (page) => {
+            if (!page || typeof page !== 'object' || seen.has(page)) return;
+            seen.add(page);
+            const flash = page?.props?.flash;
             if (!flash) return;
             const error = typeof flash.error === 'string' && flash.error.trim() ? flash.error : null;
             const status = typeof flash.status === 'string' && flash.status.trim() ? flash.status : null;
             if (!error && !status) return;
             setToast({ id: Date.now(), tone: error ? 'error' : 'success', text: error ?? status });
+        };
+        const offSuccess = router.on('success', (event) => show(event?.detail?.page));
+        const offNavigate = router.on('navigate', (event) => {
+            // De eerste volledige paginalading toont de Blade-layout al.
+            if (initial) {
+                initial = false;
+                if (event?.detail?.page) seen.add(event.detail.page);
+                return;
+            }
+            show(event?.detail?.page);
         });
+        return () => {
+            offSuccess();
+            offNavigate();
+        };
     }, []);
 
     useEffect(() => {

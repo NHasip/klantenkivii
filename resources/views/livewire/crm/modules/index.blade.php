@@ -1,4 +1,38 @@
-<div class="space-y-6">
+<div
+    class="space-y-6"
+    x-data="{
+        confirmOpen: false,
+        confirmTitle: '',
+        confirmMessage: '',
+        confirmLabel: '',
+        confirmDanger: false,
+        confirmAction: null,
+        confirmId: null,
+        lastFocus: null,
+        ask(action, id, title, message, label, danger = false) {
+            this.lastFocus = document.activeElement;
+            this.confirmAction = action;
+            this.confirmId = id;
+            this.confirmTitle = title;
+            this.confirmMessage = message;
+            this.confirmLabel = label;
+            this.confirmDanger = danger;
+            this.confirmOpen = true;
+            this.$nextTick(() => this.$refs.confirmCancel?.focus());
+        },
+        closeConfirm() {
+            this.confirmOpen = false;
+            this.$nextTick(() => this.lastFocus?.focus?.());
+        },
+        runConfirm() {
+            const action = this.confirmAction;
+            const id = this.confirmId;
+            this.closeConfirm();
+            if (action) $wire.call(action, id);
+        },
+    }"
+    @keydown.escape.window="if (confirmOpen) closeConfirm()"
+>
     <div class="flex flex-wrap items-end justify-between gap-3">
         <div class="min-w-0">
             <h1 class="text-2xl font-semibold tracking-tight">Modules</h1>
@@ -111,12 +145,15 @@
                                 <button type="button" class="ml-2 rounded-md border border-zinc-200 px-2 py-1 text-xs hover:bg-zinc-50" wire:click="restoreModule({{ $m->id }})">Herstellen</button>
                             @elseif($inUse > 0)
                                 @if($supportsArchive)
-                                    <button type="button" class="ml-2 rounded-md border border-amber-200 px-2 py-1 text-xs text-amber-800 hover:bg-amber-50" wire:click="archiveModule({{ $m->id }})" wire:confirm="Module archiveren? Bestaande klanten houden de module, maar je kunt hem niet meer kiezen bij nieuwe koppelingen.">Archiveren</button>
+                                    <button type="button" class="ml-2 rounded-md border border-amber-200 px-2 py-1 text-xs text-amber-800 hover:bg-amber-50" @click="ask('archiveModule', {{ $m->id }}, 'Module archiveren?', 'Bestaande klanten houden de module, maar je kunt hem niet meer kiezen bij nieuwe koppelingen.', 'Archiveren')">Archiveren</button>
                                 @else
                                     <span class="ml-2 text-xs text-zinc-500" title="Draai de nieuwste migraties om archiveren mogelijk te maken.">In gebruik</span>
                                 @endif
                             @else
-                                <button type="button" class="ml-2 rounded-md border border-rose-200 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50" wire:click="deleteModule({{ $m->id }})" wire:confirm="Weet je zeker dat je deze module wilt verwijderen?">Verwijderen</button>
+                                @if($supportsArchive)
+                                    <button type="button" class="ml-2 rounded-md border border-amber-200 px-2 py-1 text-xs text-amber-800 hover:bg-amber-50" @click="ask('archiveModule', {{ $m->id }}, 'Module archiveren?', 'Bestaande klanten houden de module, maar je kunt hem niet meer kiezen bij nieuwe koppelingen.', 'Archiveren')">Archiveren</button>
+                                @endif
+                                <button type="button" class="ml-2 rounded-md border border-rose-200 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50" @click="ask('deleteModule', {{ $m->id }}, 'Module verwijderen?', 'Weet je zeker dat je deze module wilt verwijderen? Dit kan niet ongedaan worden gemaakt.', 'Verwijderen', true)">Verwijderen</button>
                             @endif
                         </td>
                     </tr>
@@ -129,4 +166,31 @@
         </table>
     </div>
 
+    <div
+        x-cloak
+        x-show="confirmOpen"
+        x-transition.opacity
+        class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/30 px-4 py-8 backdrop-blur-sm"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="module-confirm-title"
+        aria-describedby="module-confirm-message"
+        @click.self="closeConfirm()"
+        style="display: none;"
+    >
+        <div class="w-full max-w-md rounded-2xl border border-zinc-200/70 bg-white p-5 shadow-2xl">
+            <h2 id="module-confirm-title" class="text-base font-semibold text-zinc-900" x-text="confirmTitle"></h2>
+            <p id="module-confirm-message" class="mt-2 text-sm text-zinc-600" x-text="confirmMessage"></p>
+            <div class="mt-5 flex justify-end gap-2">
+                <button type="button" x-ref="confirmCancel" class="rounded-md border border-zinc-200 px-3 py-1.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400" @click="closeConfirm()">Annuleren</button>
+                <button
+                    type="button"
+                    class="rounded-md px-3 py-1.5 text-sm font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
+                    :class="confirmDanger ? 'bg-rose-600 hover:bg-rose-700 focus-visible:ring-rose-500' : 'bg-amber-600 hover:bg-amber-700 focus-visible:ring-amber-500'"
+                    @click="runConfirm()"
+                    x-text="confirmLabel"
+                ></button>
+            </div>
+        </div>
+    </div>
 </div>

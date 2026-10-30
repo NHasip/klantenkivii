@@ -190,13 +190,15 @@ class Create extends Component
                 'created_by' => auth()->id(),
             ]);
 
-            Activity::create([
-                'garage_company_id' => $company->id,
-                'type' => ActivityType::Module,
-                'titel' => 'Modules ingesteld',
-                'inhoud' => null,
-                'created_by' => auth()->id(),
-            ]);
+            if (collect($moduleRows)->contains(fn ($row) => (bool) ($row['actief'] ?? false))) {
+                Activity::create([
+                    'garage_company_id' => $company->id,
+                    'type' => ActivityType::Module,
+                    'titel' => 'Modules ingesteld',
+                    'inhoud' => null,
+                    'created_by' => auth()->id(),
+                ]);
+            }
 
             return $company;
         });

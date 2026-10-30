@@ -66,7 +66,7 @@ class GarageCompaniesController
 
         $filters = [
             'view' => $view,
-            'search' => trim((string) $request->query('search', '')),
+            'search' => trim((string) ($request->query('search') ?? $request->query('zoek', ''))),
             'status' => GarageCompanyStatus::normalize((string) $request->query('status', 'alle')),
             'tag' => trim((string) $request->query('tag', '')),
             'bron' => (string) $request->query('bron', ''),
@@ -197,7 +197,7 @@ class GarageCompaniesController
             'omzet_demo_excl' => RevenueCalculator::demoPipeline($baseQuery)['excl'],
         ];
 
-        $demoVariants = $this->statusVariants(GarageCompanyStatus::Proefperiode->value);
+        $demoVariants = $this->demoStatusValues();
         $isDemo = fn (GarageCompany $company) => in_array($company->status?->value, $demoVariants, true);
 
         $companies->through(fn (GarageCompany $company) => [
@@ -207,7 +207,7 @@ class GarageCompaniesController
             'hoofd_email' => $company->hoofd_email,
             'hoofd_telefoon' => $company->hoofd_telefoon,
             'plaats' => $company->plaats,
-            'demo_eind_op' => $isDemo($company) ? $company->effectiveDemoEnd()?->toDateString() : $company->demo_eind_op?->toDateString(),
+            'demo_eind_op' => $isDemo($company) ? $company->effectiveDemoEnd()?->toDateString() : null,
             'demo_eind_berekend' => $isDemo($company) && $company->demoEndIsComputed(),
             'volgende_actie' => $nextActions[$company->id] ?? null,
             'updated_at' => $company->updated_at?->toIso8601String(),
@@ -505,13 +505,16 @@ class GarageCompaniesController
                 ]);
             }
 
-            Activity::create([
-                'garage_company_id' => $company->id,
-                'type' => ActivityType::Module,
-                'titel' => 'Modules ingesteld',
-                'inhoud' => null,
-                'created_by' => auth()->id(),
-            ]);
+            $activeModuleCount = collect($moduleRows)->filter(fn ($row) => (bool) ($row['actief'] ?? false))->count();
+            if ($activeModuleCount > 0) {
+                Activity::create([
+                    'garage_company_id' => $company->id,
+                    'type' => ActivityType::Module,
+                    'titel' => 'Modules ingesteld',
+                    'inhoud' => $activeModuleCount === 1 ? '1 actieve module' : "{$activeModuleCount} actieve modules",
+                    'created_by' => auth()->id(),
+                ]);
+            }
 
             return $company;
         });
@@ -565,9 +568,9 @@ class GarageCompaniesController
                     $safe($company->hoofd_email),
                     $safe($company->hoofd_telefoon),
                     number_format((float) ($company->omzet_excl ?? 0), 2, ',', ''),
-                    in_array($company->status?->value, $this->statusVariants(GarageCompanyStatus::Proefperiode->value), true)
-                        ? ($company->effectiveDemoEnd()?->format('d-m-Y').($company->demoEndIsComputed() ? ' (berekend)' : ''))
-                        : ($company->demo_eind_op?->format('d-m-Y') ?? ''),
+                    in_array($company->status?->value, $this->demoStatusValues(), true) && $company->effectiveDemoEnd()
+                        ? ($company->effectiveDemoEnd()->format('d-m-Y').($company->demoEndIsComputed() ? ' (berekend)' : ''))
+                        : '',
                 ], ';');
             }
             fclose($out);
@@ -741,6 +744,21 @@ class GarageCompaniesController
         return [
             'CASE WHEN garage_companies.demo_eind_op IS NOT NULL THEN garage_companies.demo_eind_op ELSE CASE garage_companies.id '.implode(' ', $cases).' ELSE NULL END END',
             $bindings,
+        ];
+    }
+
+    /**
+     * Statussen waarvoor een demo-einddatum relevant is.
+     *
+     * @return list<string>
+     */
+    private function demoStatusValues(): array
+    {
+        return [
+            GarageCompanyStatus::Lead->value,
+            GarageCompanyStatus::DemoAangevraagd->value,
+            GarageCompanyStatus::DemoGepland->value,
+            GarageCompanyStatus::Proefperiode->value,
         ];
     }
 
@@ -1588,9 +1606,14 @@ class GarageCompaniesController
 
         $garageCompany->fill($data);
 
-        if (($data['demo_aangevraagd_op'] ?? null) && ($data['demo_duur_dagen'] ?? null)) {
-            $garageCompany->demo_eind_op = Carbon::parse($data['demo_aangevraagd_op'])
-                ->addDays((int) $data['demo_duur_dagen']);
+        // Einddatum volgt start (proefperiode_start, anders demo_aangevraagd_op) + duur,
+        // gelijk aan GarageCompany::effectiveDemoEnd(). Herbereken bij wijziging van duur of start.
+        if ($garageCompany->isDirty(['demo_duur_dagen', 'proefperiode_start', 'demo_aangevraagd_op'])) {
+            $start = $garageCompany->proefperiode_start ?? $garageCompany->demo_aangevraagd_op;
+            if ($start) {
+                $dagen = (int) ($garageCompany->demo_duur_dagen ?: GarageCompany::DEFAULT_DEMO_DAYS);
+                $garageCompany->demo_eind_op = Carbon::parse($start)->startOfDay()->addDays($dagen);
+            }
         }
 
         $garageCompany->save();
@@ -1605,17 +1628,19 @@ class GarageCompaniesController
             'demo_verleng_notitie' => ['nullable', 'string'],
         ]);
 
-        if (! $garageCompany->demo_eind_op && $garageCompany->demo_aangevraagd_op) {
-            $basisDagen = $garageCompany->demo_duur_dagen ?? 0;
-            $garageCompany->demo_eind_op = $garageCompany->demo_aangevraagd_op->copy()->addDays($basisDagen);
-        }
-
-        if (! $garageCompany->demo_eind_op) {
+        $huidigEind = $garageCompany->effectiveDemoEnd();
+        if (! $huidigEind) {
             return back()->with('status', 'Stel eerst een demo einddatum in.');
         }
 
-        $garageCompany->demo_eind_op = $garageCompany->demo_eind_op->copy()->addDays((int) $data['demo_verleng_dagen']);
-        $garageCompany->demo_duur_dagen = (int) ($garageCompany->demo_duur_dagen ?? 0) + (int) $data['demo_verleng_dagen'];
+        $extraDagen = (int) $data['demo_verleng_dagen'];
+        $nieuwEind = $huidigEind->copy()->startOfDay()->addDays($extraDagen);
+        $garageCompany->demo_eind_op = $nieuwEind;
+
+        $start = $garageCompany->proefperiode_start ?? $garageCompany->demo_aangevraagd_op;
+        $garageCompany->demo_duur_dagen = $start
+            ? max(0, (int) Carbon::parse($start)->startOfDay()->diffInDays($nieuwEind, false))
+            : (int) ($garageCompany->demo_duur_dagen ?: GarageCompany::DEFAULT_DEMO_DAYS) + $extraDagen;
         $garageCompany->save();
 
         Activity::create([

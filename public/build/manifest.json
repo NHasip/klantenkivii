@@ -1,6 +1,6 @@
 {
-  "_StatusBadge-CA-uXx-w.js": {
-    "file": "assets/StatusBadge-CA-uXx-w.js",
+  "_StatusBadge-Cfi-a8Ef.js": {
+    "file": "assets/StatusBadge-Cfi-a8Ef.js",
     "name": "StatusBadge",
     "imports": [
       "_chunk-Dk7t3yRR.js",
@@ -25,8 +25,8 @@
     "file": "assets/chunk-Dk7t3yRR.js",
     "name": "chunk"
   },
-  "_dist-DrqWYw1g.js": {
-    "file": "assets/dist-DrqWYw1g.js",
+  "_dist-Bt-OGi9P.js": {
+    "file": "assets/dist-Bt-OGi9P.js",
     "name": "dist",
     "imports": [
       "_chunk-Dk7t3yRR.js",
@@ -34,7 +34,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-Bzenry5_.css",
+    "file": "assets/app-CJX0Hkxc.css",
     "name": "app",
     "names": [
       "app.css"
@@ -43,7 +43,7 @@
     "isEntry": true
   },
   "resources/js/Pages/Crm/Dashboard.jsx": {
-    "file": "assets/Dashboard-DqahzY3z.js",
+    "file": "assets/Dashboard-BdZcQCYj.js",
     "name": "Dashboard",
     "src": "resources/js/Pages/Crm/Dashboard.jsx",
     "isDynamicEntry": true,
@@ -53,54 +53,54 @@
     ]
   },
   "resources/js/Pages/Crm/EmailTemplates/Index.jsx": {
-    "file": "assets/Index-CG-gKGtM.js",
+    "file": "assets/Index-DIyoN7_r.js",
     "name": "Index",
     "src": "resources/js/Pages/Crm/EmailTemplates/Index.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_chunk-Dk7t3yRR.js",
       "resources/js/app.jsx",
-      "_dist-DrqWYw1g.js"
+      "_dist-Bt-OGi9P.js"
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/Create.jsx": {
-    "file": "assets/Create-laHRd-w6.js",
+    "file": "assets/Create-BeErX5VU.js",
     "name": "Create",
     "src": "resources/js/Pages/Crm/GarageCompanies/Create.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_chunk-Dk7t3yRR.js",
       "resources/js/app.jsx",
-      "_StatusBadge-CA-uXx-w.js"
+      "_StatusBadge-Cfi-a8Ef.js"
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/Index.jsx": {
-    "file": "assets/Index-BWvwye9V.js",
+    "file": "assets/Index-BxAiIKiU.js",
     "name": "Index",
     "src": "resources/js/Pages/Crm/GarageCompanies/Index.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_chunk-Dk7t3yRR.js",
       "resources/js/app.jsx",
-      "_StatusBadge-CA-uXx-w.js"
+      "_StatusBadge-Cfi-a8Ef.js"
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/Show.jsx": {
-    "file": "assets/Show-B4FP-t31.js",
+    "file": "assets/Show-Kab61Pjo.js",
     "name": "Show",
     "src": "resources/js/Pages/Crm/GarageCompanies/Show.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_chunk-Dk7t3yRR.js",
       "resources/js/app.jsx",
-      "_dist-DrqWYw1g.js",
+      "_dist-Bt-OGi9P.js",
       "resources/js/Pages/Crm/GarageCompanies/partials/CopyButton.jsx",
       "resources/js/Pages/Crm/GarageCompanies/partials/CustomerHeader.jsx",
-      "_StatusBadge-CA-uXx-w.js"
+      "_StatusBadge-Cfi-a8Ef.js"
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/partials/CopyButton.jsx": {
-    "file": "assets/CopyButton-BA_cM0tS.js",
+    "file": "assets/CopyButton-CtLiN_W3.js",
     "name": "CopyButton",
     "src": "resources/js/Pages/Crm/GarageCompanies/partials/CopyButton.jsx",
     "isDynamicEntry": true,
@@ -110,18 +110,18 @@
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/partials/CustomerHeader.jsx": {
-    "file": "assets/CustomerHeader-2q69QhFx.js",
+    "file": "assets/CustomerHeader-3XUxOH0l.js",
     "name": "CustomerHeader",
     "src": "resources/js/Pages/Crm/GarageCompanies/partials/CustomerHeader.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_chunk-Dk7t3yRR.js",
       "resources/js/app.jsx",
-      "_StatusBadge-CA-uXx-w.js"
+      "_StatusBadge-Cfi-a8Ef.js"
     ]
   },
   "resources/js/Pages/Crm/Tasks.jsx": {
-    "file": "assets/Tasks-D782tB03.js",
+    "file": "assets/Tasks-B3hMkO5X.js",
     "name": "Tasks",
     "src": "resources/js/Pages/Crm/Tasks.jsx",
     "isDynamicEntry": true,
@@ -141,7 +141,7 @@
     ]
   },
   "resources/js/app.jsx": {
-    "file": "assets/app-iPOG0lKJ.js",
+    "file": "assets/app-DT_D8IvO.js",
     "name": "app",
     "src": "resources/js/app.jsx",
     "isEntry": true,

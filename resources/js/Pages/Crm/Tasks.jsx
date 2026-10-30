@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { Head, router, usePage } from '@inertiajs/react';
-import { DndContext, DragOverlay, PointerSensor, closestCorners, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, DragOverlay, PointerSensor, closestCorners, useDroppable, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useDialog } from '../../components/useDialog';
@@ -330,7 +330,7 @@ function SortableTaskCard({ task, onOpen }) {
                         ) : (
                             <Pill className="text-zinc-400">Geen deadline</Pill>
                         )}
-                        {task.counts?.comments ? <Pill>{task.counts.comments} reacties</Pill> : null}
+                        {task.counts?.comments ? <Pill>{task.counts.comments} {task.counts.comments === 1 ? 'reactie' : 'reacties'}</Pill> : null}
                         {task.counts?.attachments ? <Pill>{task.counts.attachments} bijlagen</Pill> : null}
                     </div>
                     <div className="flex items-center gap-1">
@@ -364,7 +364,21 @@ function SortableTaskCard({ task, onOpen }) {
     );
 }
 
-function Column({ title, subtitle, count, children, footer }) {
+// Kolominhoud als drop-doel, zodat kaarten ook in een lege of andere kolom kunnen landen.
+// Het id is gelijk aan col.id, zodat findContainerId de kolom direct herkent.
+function DroppableBody({ id, children }) {
+    const { setNodeRef, isOver } = useDroppable({ id });
+    return (
+        <div
+            ref={setNodeRef}
+            className={cx('min-h-[6rem] flex-1 space-y-3 overflow-y-auto px-4 py-3 transition-colors', isOver && 'bg-indigo-50/60')}
+        >
+            {children}
+        </div>
+    );
+}
+
+function Column({ title, subtitle, count, children, footer, droppableId = null }) {
     return (
         <div className="flex w-[min(340px,85vw)] flex-col rounded-2xl border border-zinc-200 bg-zinc-50/60">
             <div className="flex items-start justify-between gap-3 border-b border-zinc-200 px-4 py-3">
@@ -374,7 +388,11 @@ function Column({ title, subtitle, count, children, footer }) {
                 </div>
                 <span className="shrink-0 rounded-full bg-zinc-200 px-2 py-0.5 text-xs font-semibold text-zinc-700">{count}</span>
             </div>
-            <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">{children}</div>
+            {droppableId ? (
+                <DroppableBody id={droppableId}>{children}</DroppableBody>
+            ) : (
+                <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">{children}</div>
+            )}
             {footer ? <div className="border-t border-zinc-200 px-4 py-3">{footer}</div> : null}
         </div>
     );
@@ -1397,7 +1415,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                                 </td>
                                                 <td className="px-4 py-3 text-zinc-600">
                                                     <div className="flex items-center gap-2">
-                                                        {task.counts?.comments ? <Pill>{task.counts.comments} reacties</Pill> : null}
+                                                        {task.counts?.comments ? <Pill>{task.counts.comments} {task.counts.comments === 1 ? 'reactie' : 'reacties'}</Pill> : null}
                                                         {task.counts?.attachments ? <Pill>{task.counts.attachments} bijlagen</Pill> : null}
                                                     </div>
                                                 </td>
@@ -1417,6 +1435,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                     return (
                                         <div key={col.id} className="shrink-0">
                                             <Column
+                                                droppableId={col.id}
                                                 title={col.title}
                                                 subtitle={col.subtitle}
                                                 count={taskIds.length}

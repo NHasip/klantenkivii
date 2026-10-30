@@ -54,6 +54,9 @@ function toLocalDateInput(date) {
     return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
 }
 
+// Keuze 'huidig concept' in de verstuurdialoog van de welkomstmail.
+const CURRENT_DRAFT = '__huidig__';
+
 function toLocalDateTimeInput(date) {
     return `${toLocalDateInput(date)}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
 }
@@ -657,16 +660,46 @@ export default function Show({
         actief_vanaf: toDateOnly(garageCompany.actief_vanaf),
     });
 
+    // Formulier opnieuw vullen zodra de server nieuwe demo-waarden levert (bijv. na "Demo verlengen").
+    useEffect(() => {
+        const fresh = {
+            demo_aangevraagd_op: garageCompany.demo_aangevraagd_op || '',
+            demo_gepland_op: garageCompany.demo_gepland_op || '',
+            demo_duur_dagen: garageCompany.demo_duur_dagen || '',
+            proefperiode_start: toDateOnly(garageCompany.proefperiode_start),
+            actief_vanaf: toDateOnly(garageCompany.actief_vanaf),
+        };
+        demoForm.setDefaults(fresh);
+        demoForm.setData(fresh);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [
+        garageCompany.demo_aangevraagd_op,
+        garageCompany.demo_gepland_op,
+        garageCompany.demo_duur_dagen,
+        garageCompany.demo_eind_op,
+        garageCompany.proefperiode_start,
+        garageCompany.actief_vanaf,
+    ]);
+
+    // Zelfde regel als de server: einde = start (proefperiode, anders aanvraag) + duur.
     const demoEndPreview = useMemo(() => {
-        if (demoForm.data.demo_aangevraagd_op && demoForm.data.demo_duur_dagen) {
-            const date = new Date(demoForm.data.demo_aangevraagd_op);
-            if (!Number.isNaN(date.getTime())) {
-                date.setDate(date.getDate() + Number(demoForm.data.demo_duur_dagen));
+        const startValue = demoForm.data.proefperiode_start || demoForm.data.demo_aangevraagd_op;
+        if (startValue) {
+            const m = String(startValue).match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (m) {
+                const date = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+                date.setDate(date.getDate() + (Number(demoForm.data.demo_duur_dagen) || 14));
                 return toLocalDateTimeInput(date);
             }
         }
-        return garageCompany.demo_eind_op || '';
-    }, [demoForm.data.demo_aangevraagd_op, demoForm.data.demo_duur_dagen, garageCompany.demo_eind_op]);
+        return garageCompany.demo_eind_effectief || garageCompany.demo_eind_op || '';
+    }, [
+        demoForm.data.proefperiode_start,
+        demoForm.data.demo_aangevraagd_op,
+        demoForm.data.demo_duur_dagen,
+        garageCompany.demo_eind_effectief,
+        garageCompany.demo_eind_op,
+    ]);
 
     const submitDemoDates = (event) => {
         event.preventDefault();
@@ -1041,7 +1074,16 @@ export default function Show({
         failed: 'bg-rose-50 text-rose-700',
     }[welcomeStatus] || 'bg-zinc-100 text-zinc-700';
 
-    const confirmSendWelcome = async (draftOverride = null) => {
+    const showSmtpMissing = () =>
+        confirm({
+            title: 'SMTP ontbreekt',
+            message: 'SMTP instellingen ontbreken. Voeg deze toe via profiel > systeem-instellingen.',
+            confirmText: 'Sluiten',
+            showCancel: false,
+            tone: 'primary',
+        });
+
+    const confirmSendWelcome = async (draftOverride = null, { skipConfirm = false } = {}) => {
         if (!welcomeEmail) return;
         if (!smtpConfigured) {
             await confirm({
@@ -1053,14 +1095,16 @@ export default function Show({
             });
             return;
         }
-        const ok = await confirm({
-            title: 'Welkomstmail versturen',
-            message: 'Weet je zeker dat je de welkomstmail wilt versturen?',
-            confirmText: 'Verstuur',
-            cancelText: 'Annuleren',
-            tone: 'success',
-        });
-        if (!ok) return;
+        if (!skipConfirm) {
+            const ok = await confirm({
+                title: 'Welkomstmail versturen',
+                message: `Welkomstmail versturen naar ${welcomeForm.data.to_email || 'de klant'}?`,
+                confirmText: 'Versturen',
+                cancelText: 'Annuleren',
+                tone: 'success',
+            });
+            if (!ok) return;
+        }
         const payload = draftOverride || {
             subject: welcomeForm.data.subject,
             body_html: welcomeForm.data.body_html,
@@ -1088,12 +1132,15 @@ export default function Show({
         setSelectedTemplateId(template.id);
         if (close) setTemplatePickerOpen(false);
         if (send) {
-            confirmSendWelcome({
-                subject: template.subject || '',
-                body_html: template.body_html || '',
-                to_email: welcomeForm.data.to_email,
-                template_id: template.id,
-            });
+            confirmSendWelcome(
+                {
+                    subject: template.subject || '',
+                    body_html: template.body_html || '',
+                    to_email: welcomeForm.data.to_email,
+                    template_id: template.id,
+                },
+                { skipConfirm: true }
+            );
         }
     };
 
@@ -1109,7 +1156,12 @@ export default function Show({
         return () => window.removeEventListener('keydown', onKeyDown);
     }, [templatePickerOpen]);
 
+    // Versturen: een dialoog met templatekeuze, ontvanger en Versturen/Annuleren.
     const openTemplatePicker = (sendAfter = false) => {
+        if (sendAfter && !smtpConfigured) {
+            showSmtpMissing();
+            return;
+        }
         if (!templates.length) {
             if (sendAfter) {
                 confirmSendWelcome();
@@ -1117,6 +1169,7 @@ export default function Show({
             return;
         }
         setPendingSend(sendAfter);
+        setSelectedTemplateId(sendAfter ? CURRENT_DRAFT : welcomeForm.data.template_id ?? null);
         setTemplatePickerOpen(true);
     };
 
@@ -1892,12 +1945,40 @@ export default function Show({
                         >
                             <div className="w-full max-w-lg rounded-2xl border border-zinc-200/70 bg-white/95 shadow-2xl">
                                 <div className="border-b border-zinc-100 px-5 py-4">
-                                    <div id="template-picker-title" className="text-sm font-semibold text-zinc-900">Kies een e-mail template</div>
-                                    <div className="mt-1 text-xs text-zinc-500">
-                                        Selecteer een template om het concept te vullen. Je kunt daarna nog aanpassen.
+                                    <div id="template-picker-title" className="text-sm font-semibold text-zinc-900">
+                                        {pendingSend ? 'Welkomstmail versturen' : 'Kies een e-mail template'}
                                     </div>
+                                    <div className="mt-1 text-xs text-zinc-500">
+                                        {pendingSend
+                                            ? 'Kies wat je verstuurt: het huidige concept of een template.'
+                                            : 'Selecteer een template om het concept te vullen. Je kunt daarna nog aanpassen.'}
+                                    </div>
+                                    {pendingSend && (
+                                        <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700">
+                                            <span className="font-semibold">Aan:</span>{' '}
+                                            {welcomeForm.data.to_email || <span className="text-rose-700">geen e-mailadres ingevuld</span>}
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="max-h-64 space-y-2 overflow-y-auto px-5 py-4">
+                                    {pendingSend && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedTemplateId(CURRENT_DRAFT)}
+                                            aria-pressed={selectedTemplateId === CURRENT_DRAFT}
+                                            className={cx(
+                                                'w-full rounded-xl border px-4 py-3 text-left transition',
+                                                selectedTemplateId === CURRENT_DRAFT
+                                                    ? 'border-zinc-900 bg-zinc-900 text-white'
+                                                    : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
+                                            )}
+                                        >
+                                            <div className="text-sm font-semibold">Huidig concept</div>
+                                            <div className={cx('mt-1 text-xs', selectedTemplateId === CURRENT_DRAFT ? 'text-zinc-200' : 'text-zinc-500')}>
+                                                {welcomeForm.data.subject || 'Geen onderwerp'}
+                                            </div>
+                                        </button>
+                                    )}
                                     {templates.map((template) => (
                                         <button
                                             key={template.id}
@@ -1924,6 +2005,8 @@ export default function Show({
                                             <div className="font-semibold">{selectedTemplate.subject || 'Geen onderwerp'}</div>
                                             <div className="mt-1 text-zinc-500">{selectedTemplate.preview || 'Geen voorbeeld'}</div>
                                         </div>
+                                    ) : pendingSend && selectedTemplateId === CURRENT_DRAFT ? (
+                                        <div className="text-xs text-zinc-500">Het concept wordt verstuurd zoals het nu is.</div>
                                     ) : (
                                         <div className="text-xs text-zinc-500">Kies een template om een voorbeeld te zien.</div>
                                     )}
@@ -1938,29 +2021,28 @@ export default function Show({
                                         >
                                             Annuleren
                                         </button>
-                                        {pendingSend && (
-                                            <button
-                                                type="button"
-                                                className="rounded-full border border-zinc-200 px-3 py-1.5 text-[11px] font-semibold text-zinc-700 hover:bg-zinc-50"
-                                                onClick={() => {
-                                                    setTemplatePickerOpen(false);
-                                                    setPendingSend(false);
-                                                    confirmSendWelcome();
-                                                }}
-                                            >
-                                                Verstuur huidige
-                                            </button>
-                                        )}
                                         <button
                                             type="button"
-                                            className="rounded-full bg-indigo-600 px-3.5 py-1.5 text-[11px] font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-                                            disabled={!selectedTemplate}
+                                            className={cx(
+                                                'rounded-full px-3.5 py-1.5 text-[11px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50',
+                                                pendingSend ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'
+                                            )}
+                                            disabled={
+                                                pendingSend
+                                                    ? !welcomeForm.data.to_email || (!selectedTemplate && selectedTemplateId !== CURRENT_DRAFT)
+                                                    : !selectedTemplate
+                                            }
                                             onClick={() => {
-                                                applyTemplate(selectedTemplate, { close: true, send: pendingSend });
+                                                if (pendingSend && !selectedTemplate) {
+                                                    setTemplatePickerOpen(false);
+                                                    confirmSendWelcome(null, { skipConfirm: true });
+                                                } else {
+                                                    applyTemplate(selectedTemplate, { close: true, send: pendingSend });
+                                                }
                                                 setPendingSend(false);
                                             }}
                                         >
-                                            {pendingSend ? 'Gebruik & verstuur' : 'Gebruik template'}
+                                            {pendingSend ? 'Versturen' : 'Gebruik template'}
                                         </button>
                                     </div>
                                 </div>

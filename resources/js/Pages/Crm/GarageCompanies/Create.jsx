@@ -176,7 +176,11 @@ export default function Create({ statusOptions: rawStatusOptions, statusLabels, 
 
     const submit = (event) => {
         event.preventDefault();
-        post(urls.store, { preserveScroll: true });
+        // Bij validatiefouten blijven staan; na aanmaken bovenaan het klantdossier beginnen.
+        post(urls.store, {
+            preserveScroll: (page) => Object.keys(page?.props?.errors || {}).length > 0,
+            onSuccess: () => window.scrollTo({ top: 0 }),
+        });
     };
 
     const hasErrors = Object.keys(errors || {}).length > 0;

@@ -119,7 +119,7 @@ function MailIcon() {
 }
 
 function DemoEnd({ value, status, computed = false }) {
-    const date = parseDateOnly(value);
+    const date = ['proefperiode', 'demo_gepland', 'demo_aangevraagd'].includes(status) ? parseDateOnly(value) : null;
     if (!date) return <span className="text-zinc-400">-</span>;
     const computedNote = computed ? (
         <span className="text-xs font-normal text-zinc-400" title="Niet opgeslagen: berekend uit startdatum en demoduur">(berekend)</span>
