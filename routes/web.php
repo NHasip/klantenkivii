@@ -4,6 +4,7 @@ use App\Http\Controllers\Crm\DashboardController;
 use App\Http\Controllers\Crm\EmailTemplatesController;
 use App\Http\Controllers\Crm\GarageCompaniesController;
 use App\Http\Controllers\Crm\ImportController;
+use App\Http\Controllers\Crm\SepaImportController;
 use App\Http\Controllers\Crm\SearchController;
 use App\Http\Controllers\Crm\TasksController;
 use App\Http\Controllers\Crm\UsersController;
@@ -99,6 +100,16 @@ Route::middleware(['auth', 'active', 'admin.2fa'])->group(function () {
     Route::post('/importeren', [ImportController::class, 'store'])
         ->middleware(['admin', 'throttle:10,1'])
         ->name('crm.import.store');
+
+    Route::get('/sepa-importeren', [SepaImportController::class, 'index'])
+        ->middleware('admin')
+        ->name('crm.sepa_import.index');
+    Route::post('/sepa-importeren/controleren', [SepaImportController::class, 'preview'])
+        ->middleware(['admin', 'throttle:30,1'])
+        ->name('crm.sepa_import.preview');
+    Route::post('/sepa-importeren', [SepaImportController::class, 'store'])
+        ->middleware(['admin', 'throttle:10,1'])
+        ->name('crm.sepa_import.store');
 
     Route::get('/email-templates', [EmailTemplatesController::class, 'index'])
         ->middleware('admin')

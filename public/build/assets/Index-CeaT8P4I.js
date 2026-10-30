@@ -1,4 +1,4 @@
-import{r as e}from"./chunk-Dk7t3yRR.js";import{i as t}from"./axios-BZIRBdnS.js";import{l as n,n as r,r as i,t as a}from"./app-BEqjcQ-f.js";import{C as o,T as s,a as c,i as l,l as u,o as d,p as f,s as p}from"./ui--gmBfAki.js";var m=e(n(),1),h=r(),g=`[
+import{r as e}from"./chunk-Dk7t3yRR.js";import{i as t}from"./axios-BZIRBdnS.js";import{l as n,n as r,r as i,t as a}from"./app-BFGh7KX_.js";import{C as o,T as s,a as c,i as l,l as u,o as d,p as f,s as p}from"./ui-DlKSArhy.js";var m=e(n(),1),h=r(),g=`[
   {
     "bedrijfsnaam": "Voorbeeld Garage B.V.",
     "status": "actief",

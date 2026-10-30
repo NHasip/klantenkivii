@@ -12,6 +12,7 @@
         ['route' => 'crm.modules.index', 'match' => 'crm.modules.*', 'label' => 'Modules', 'icon' => 'package'],
         ['route' => 'crm.email_templates.index', 'match' => 'crm.email_templates.*', 'label' => 'E-mail templates', 'icon' => 'mail'],
         ['route' => 'crm.import.index', 'match' => 'crm.import.*', 'label' => 'Importeren', 'icon' => 'upload'],
+        ['route' => 'crm.sepa_import.index', 'match' => 'crm.sepa_import.*', 'label' => 'SEPA importeren', 'icon' => 'upload'],
     ] : [];
     $kiviiNeeds2fa = $kiviiIsAdmin && ! \App\Http\Middleware\RequireTwoFactorForAdmin::userHasTwoFactor($kiviiUser);
     $kiviiFocus = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1';
