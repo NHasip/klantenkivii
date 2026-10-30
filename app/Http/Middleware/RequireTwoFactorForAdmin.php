@@ -23,10 +23,7 @@ class RequireTwoFactorForAdmin
             return $next($request);
         }
 
-        $mustConfirm = (bool) config('fortify-options.two-factor-authentication.confirm', false);
-        $twoFactorEnabled = $mustConfirm
-            ? filled($user->two_factor_confirmed_at)
-            : filled($user->two_factor_secret);
+        $twoFactorEnabled = self::userHasTwoFactor($user);
 
         if (! $twoFactorEnabled && ! $request->routeIs('profile.show')) {
             return redirect()->to('/user/profile')
@@ -34,5 +31,21 @@ class RequireTwoFactorForAdmin
         }
 
         return $next($request);
+    }
+
+    /**
+     * Zelfde definitie als de middleware: 2FA telt als ingeschakeld (en bevestigd indien vereist).
+     */
+    public static function userHasTwoFactor(?object $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        $mustConfirm = (bool) config('fortify-options.two-factor-authentication.confirm', false);
+
+        return $mustConfirm
+            ? filled($user->two_factor_confirmed_at ?? null)
+            : filled($user->two_factor_secret ?? null);
     }
 }

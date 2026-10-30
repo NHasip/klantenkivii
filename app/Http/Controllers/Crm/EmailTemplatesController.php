@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Crm;
 
 use App\Models\EmailTemplate;
+use App\Models\GarageCompany;
 use App\Services\EmailTemplateRenderer;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -24,7 +26,7 @@ class EmailTemplatesController
         if (! Schema::hasTable('email_templates')) {
             return Inertia::render('Crm/EmailTemplates/Index', [
                 'templates' => [],
-                'variables' => EmailTemplateRenderer::sampleData(),
+                'variables' => $this->orderedVariables(),
                 'urls' => [
                     'back' => route('dashboard'),
                     'store' => route('crm.email_templates.store'),
@@ -53,7 +55,7 @@ class EmailTemplatesController
 
         return Inertia::render('Crm/EmailTemplates/Index', [
             'templates' => $templates,
-            'variables' => EmailTemplateRenderer::sampleData(),
+            'variables' => $this->orderedVariables(),
             'urls' => [
                 'back' => route('dashboard'),
                 'store' => route('crm.email_templates.store'),
@@ -61,8 +63,67 @@ class EmailTemplatesController
                 'update_post' => route('crm.email_templates.update_post', ['emailTemplate' => '__TEMPLATE__']),
                 'delete' => route('crm.email_templates.delete', ['emailTemplate' => '__TEMPLATE__']),
                 'delete_post' => route('crm.email_templates.delete_post', ['emailTemplate' => '__TEMPLATE__']),
+                'preview' => route('crm.email_templates.preview'),
             ],
+            'previewCustomers' => GarageCompany::query()
+                ->orderBy('bedrijfsnaam')
+                ->limit(1000)
+                ->get(['id', 'bedrijfsnaam', 'plaats'])
+                ->map(fn (GarageCompany $company) => [
+                    'id' => $company->id,
+                    'label' => $company->bedrijfsnaam.($company->plaats ? ' ('.$company->plaats.')' : ''),
+                ])
+                ->values(),
         ]);
+    }
+
+    /**
+     * Alleen-lezen voorbeeld: rendert het (niet opgeslagen) onderwerp en de inhoud met
+     * gegevens van een echte klant. Er wordt niets opgeslagen en geen token aangemaakt.
+     */
+    public function preview(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'garage_company_id' => ['required', 'integer'],
+            'subject' => ['nullable', 'string', 'max:255'],
+            'body_html' => ['nullable', 'string', 'max:200000'],
+        ]);
+
+        $company = GarageCompany::query()->with('primaryPerson')->findOrFail($data['garage_company_id']);
+        $primary = $company->primaryPerson;
+        $naam = $primary ? trim("{$primary->voornaam} {$primary->achternaam}") : '';
+        // Activatielink wordt pas bij verzenden aangemaakt; hier een niet-werkende voorbeeldlink.
+        $activatielink = rtrim(config('app.url') ?: url('/'), '/').'/reset-password/VOORBEELD-TOKEN?email='.urlencode((string) ($company->login_email ?: $company->hoofd_email));
+
+        $values = [
+            'naam' => $naam !== '' ? $naam : (string) $company->bedrijfsnaam,
+            'bedrijfsnaam' => (string) $company->bedrijfsnaam,
+            'loginnaam' => $company->login_email ?: '-',
+            'wachtwoord' => '(verborgen in voorbeeld)',
+            'activatielink' => $activatielink,
+            'reset_link' => $activatielink,
+            'weblink' => 'https://web.kivii.nl/',
+        ];
+        $escaped = array_map(fn ($value) => e($value), $values);
+
+        return response()->json([
+            'subject' => EmailTemplateRenderer::renderString((string) ($data['subject'] ?? ''), $values),
+            'html' => EmailTemplateRenderer::renderString((string) ($data['body_html'] ?? ''), $escaped),
+            'to' => $company->hoofd_email,
+        ]);
+    }
+
+    /**
+     * Variabelen met de activatielink bovenaan (meest gebruikt in welkomstmails).
+     *
+     * @return array<string, string>
+     */
+    private function orderedVariables(): array
+    {
+        $variables = EmailTemplateRenderer::sampleData();
+        $first = array_intersect_key($variables, array_flip(['activatielink']));
+
+        return $first + $variables;
     }
 
     public function store(Request $request): RedirectResponse

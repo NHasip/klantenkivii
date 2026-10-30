@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Crm;
 
 use App\Http\Controllers\Controller;
+use App\Livewire\Crm\Users\Index as UsersIndex;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,6 +17,10 @@ class UsersController extends Controller
 
         if ($request->user()?->id === $user->id) {
             return back()->with('status', 'Je kunt jezelf niet verwijderen.');
+        }
+
+        if (UsersIndex::isLastActiveAdmin($user)) {
+            return back()->with('status', 'Dit is de laatste actieve admin en kan niet worden verwijderd.');
         }
 
         try {

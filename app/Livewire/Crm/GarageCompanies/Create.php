@@ -231,7 +231,7 @@ class Create extends Component
 
     private function loadModuleRows(): void
     {
-        $modules = Module::query()->orderBy('naam')->get();
+        $modules = Module::query()->available()->orderBy('naam')->get();
 
         $this->moduleRows = $modules->map(function (Module $module) {
             $resolvedDefaults = $this->resolveModulePricingDefaults($module);

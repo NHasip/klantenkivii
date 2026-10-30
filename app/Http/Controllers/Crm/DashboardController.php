@@ -3,14 +3,13 @@
 namespace App\Http\Controllers\Crm;
 
 use App\Enums\ActivityType;
-use App\Enums\SepaMandateStatus;
 use App\Enums\TaskStatus;
 use App\Models\Activity;
 use App\Models\GarageCompany;
 use App\Models\Task;
 use App\Services\Crm\RevenueCalculator;
+use App\Services\Crm\SepaChecklist;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -47,17 +46,92 @@ class DashboardController
         $mrrIncl = $mrr['incl'];
         $demoPipeline = RevenueCalculator::demoPipeline();
 
-        $tasksOpen = Task::query()->where('status', '!=', TaskStatus::Afgerond)->count();
-        $tasksOverdue = Task::query()
-            ->where('status', '!=', TaskStatus::Afgerond)
+        $openTaskStatuses = fn ($q) => $q->where('status', '!=', TaskStatus::Afgerond);
+        $customerTaskTypes = [ActivityType::Taak->value, ActivityType::Afspraak->value];
+        $openCustomerActivities = fn () => Activity::query()
+            ->whereIn('type', $customerTaskTypes)
+            ->whereNull('done_at')
+            ->whereHas('garageCompany');
+
+        // Taken uit de takenlijst plus open klant-taken/afspraken (tijdlijn) tellen samen.
+        $tasksOpen = $openTaskStatuses(Task::query())->count()
+            + $openCustomerActivities()->count();
+        $tasksOverdue = $openTaskStatuses(Task::query())
             ->whereNotNull('deadline')
             ->where('deadline', '<', $now)
-            ->count();
-        $tasksDue7 = Task::query()
-            ->where('status', '!=', TaskStatus::Afgerond)
+            ->count()
+            + $openCustomerActivities()->whereNotNull('due_at')->where('due_at', '<', $now)->count();
+        $tasksDue7 = $openTaskStatuses(Task::query())
             ->whereNotNull('deadline')
             ->whereBetween('deadline', [$now, $now->addDays(7)->endOfDay()])
-            ->count();
+            ->count()
+            + $openCustomerActivities()->whereBetween('due_at', [$now, $now->addDays(7)->endOfDay()])->count();
+
+        $userId = auth()->id();
+        $todayEnd = $now->endOfDay();
+
+        $myTasksToday = $openTaskStatuses(Task::query())
+            ->where(function ($q) use ($userId) {
+                $q->whereHas('assignees', fn ($a) => $a->where('users.id', $userId))
+                    ->orWhere(function ($own) use ($userId) {
+                        $own->whereDoesntHave('assignees')->where('created_by', $userId);
+                    });
+            })
+            ->whereNotNull('deadline')
+            ->where('deadline', '<=', $todayEnd)
+            ->orderBy('deadline')
+            ->limit(20)
+            ->get(['id', 'titel', 'deadline', 'prioriteit'])
+            ->map(fn (Task $task) => [
+                'id' => $task->id,
+                'titel' => $task->titel,
+                'deadline' => $task->deadline?->toIso8601String(),
+                'overdue' => $task->deadline !== null && $task->deadline->lt($now->startOfDay()),
+                'prioriteit' => $task->prioriteit?->value,
+                'url' => route('crm.tasks.show', ['task' => $task->id]),
+            ])
+            ->values();
+
+        $customerToday = $openCustomerActivities()
+            ->with('garageCompany:id,bedrijfsnaam')
+            ->whereNotNull('due_at')
+            ->where('due_at', '<=', $todayEnd)
+            ->orderBy('due_at')
+            ->limit(20)
+            ->get(['id', 'garage_company_id', 'type', 'titel', 'due_at'])
+            ->map(fn (Activity $activity) => [
+                'id' => $activity->id,
+                'type' => $activity->type?->value,
+                'titel' => $activity->titel,
+                'due_at' => $activity->due_at?->toIso8601String(),
+                'overdue' => $activity->due_at !== null && $activity->due_at->lt($now->startOfDay()),
+                'garage_company' => [
+                    'id' => $activity->garageCompany->id,
+                    'bedrijfsnaam' => $activity->garageCompany->bedrijfsnaam,
+                    'url' => route('crm.garage_companies.show', ['garageCompany' => $activity->garageCompany->id, 'tab' => 'taken_afspraken']),
+                ],
+            ])
+            ->values();
+
+        $demoEnding = GarageCompany::query()
+            ->whereIn('status', RevenueCalculator::demoStatuses())
+            ->whereNotNull('demo_eind_op')
+            ->where('demo_eind_op', '<=', $now->addDays(7)->endOfDay())
+            ->orderBy('demo_eind_op')
+            ->limit(20)
+            ->get(['id', 'bedrijfsnaam', 'demo_eind_op'])
+            ->map(function (GarageCompany $company) use ($now) {
+                $end = CarbonImmutable::parse($company->demo_eind_op)->setTimezone('Europe/Amsterdam')->startOfDay();
+
+                return [
+                    'id' => $company->id,
+                    'bedrijfsnaam' => $company->bedrijfsnaam,
+                    'demo_eind_op' => $end->toDateString(),
+                    'days_left' => (int) $now->startOfDay()->diffInDays($end, false),
+                    'url' => route('crm.garage_companies.show', ['garageCompany' => $company->id, 'tab' => 'demo_status']),
+                ];
+            })
+            ->values();
 
         $taskItems = Task::query()
             ->with(['project:id,naam'])
@@ -161,56 +235,13 @@ class DashboardController
                 ];
             });
 
-        $hasIncassoKenmerkColumn = DB::getSchemaBuilder()->hasColumn('garage_companies', 'incasso_kenmerk_machtiging');
-
-        $activeSepaIssues = GarageCompany::query()
-            ->where('status', 'actief')
-            ->with(['mandates' => fn ($q) => $q->orderByDesc('created_at')])
-            ->orderBy('bedrijfsnaam')
-            ->get(['id', 'bedrijfsnaam'])
-            ->map(function (GarageCompany $company) use ($hasIncassoKenmerkColumn) {
-                $activeMandate = $company->mandates->firstWhere('status', SepaMandateStatus::Actief);
-                $missing = [];
-
-                if (! $activeMandate) {
-                    $missing[] = 'Geen actief SEPA mandaat';
-                } else {
-                    if (! filled($activeMandate->iban)) {
-                        $missing[] = 'IBAN ontbreekt';
-                    }
-                    if (! $activeMandate->datum_van_tekenen) {
-                        $missing[] = 'Machtigingsdatum ontbreekt';
-                    }
-                }
-
-                if (! $hasIncassoKenmerkColumn) {
-                    $missing[] = 'Incasso velden nog niet gemigreerd';
-                } elseif (! filled($company->getAttribute('incasso_kenmerk_machtiging'))) {
-                    $missing[] = 'Kenmerk machtiging ontbreekt';
-                }
-
-                if (round((float) $company->active_mrr_incl, 2) <= 0) {
-                    $missing[] = 'Maandbedrag incl. btw is 0';
-                }
-
-                if ($missing === []) {
-                    return null;
-                }
-
-                return [
-                    'id' => $company->id,
-                    'bedrijfsnaam' => $company->bedrijfsnaam,
-                    'url' => route('crm.garage_companies.show', ['garageCompany' => $company->id, 'tab' => 'incasso']),
-                    'missing' => $missing,
-                ];
-            })
-            ->filter()
-            ->values();
+        $activeSepaIssues = SepaChecklist::activeCompaniesWithIssues();
 
         return Inertia::render('Crm/Dashboard', [
             'kpis' => [
                 'companies_total' => $companiesTotal,
                 'companies_active' => $companiesActive,
+                'companies_demo_requested' => GarageCompany::query()->where('status', 'demo_aangevraagd')->count(),
                 'leads_last_30' => $leadsLast30,
                 'active_new_last_30' => $activeNewLast30,
                 'demo_requested_last_30' => $demoRequestedLast30,
@@ -238,7 +269,12 @@ class DashboardController
                     'demo' => $demoDurationRows->sortByDesc('days')->take(12)->values(),
                     'active' => $activeDurationRows->sortByDesc('days')->take(12)->values(),
                 ],
-                'active_missing_sepa' => $activeSepaIssues->take(12)->values(),
+                'active_missing_sepa' => $activeSepaIssues->take(50)->values(),
+                'today' => [
+                    'tasks' => $myTasksToday,
+                    'customer' => $customerToday,
+                ],
+                'demo_ending' => $demoEnding,
             ],
             'urls' => [
                 'tasks' => route('crm.tasks.index'),

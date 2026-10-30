@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { FOCUS_SCOPE } from '../../../components/StatusBadge';
 
@@ -30,6 +30,48 @@ const SOURCE_LABELS = {
     referral: 'Doorverwijzing',
     anders: 'Anders',
 };
+
+function addDaysToDateInput(value, days) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
+    const amount = Number(days);
+    if (!match || !Number.isFinite(amount) || amount < 1) return null;
+    const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    date.setDate(date.getDate() + amount);
+    return date;
+}
+
+function formatDateNl(date) {
+    if (!date) return '';
+    try {
+        return new Intl.DateTimeFormat('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(date);
+    } catch {
+        return toLocalDateInput(date);
+    }
+}
+
+function DuplicateWarning({ matches }) {
+    if (!Array.isArray(matches) || matches.length === 0) return null;
+    return (
+        <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+            <div className="font-semibold">Mogelijk bestaat deze klant al</div>
+            <ul className="mt-2 space-y-1">
+                {matches.map((match) => (
+                    <li key={match.id}>
+                        <a href={match.url} target="_blank" rel="noopener noreferrer" className="font-semibold underline underline-offset-2 hover:text-amber-950">
+                            {match.bedrijfsnaam}
+                        </a>
+                        {match.plaats ? ` (${match.plaats})` : ''}
+                        {': '}
+                        {match.status_label}
+                        {match.in_prullenbak ? ', in prullenbak' : ''}
+                        {Array.isArray(match.redenen) && match.redenen.length > 0 ? `. Zelfde ${match.redenen.join(', ')}.` : ''}
+                    </li>
+                ))}
+            </ul>
+            <div className="mt-2 text-xs text-amber-800">Je kunt de klant toch opslaan als dit een andere klant is.</div>
+        </div>
+    );
+}
 
 function generatePassword(length = 12) {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
@@ -71,6 +113,7 @@ export default function Create({ statusOptions: rawStatusOptions, statusLabels, 
         bron: sourceOptions?.[0] || 'website_formulier',
         tags: '',
         proefperiode_start: defaults.proefperiode_start || toLocalDateInput(new Date()),
+        demo_duur_dagen: defaults.demo_duur_dagen || 14,
         actief_vanaf: '',
         opgezegd_op: '',
         opzegreden: '',
@@ -137,6 +180,44 @@ export default function Create({ statusOptions: rawStatusOptions, statusLabels, 
     };
 
     const hasErrors = Object.keys(errors || {}).length > 0;
+    // Bij een demo-aanvraag zijn alleen bedrijfsnaam, naam en e-mail verplicht.
+    const isLead = data.status === 'demo_aangevraagd' || data.status === 'lead';
+    const isDemo = data.status === 'proefperiode';
+    const req = isLead ? '' : ' *';
+    const demoEnd = isDemo ? addDaysToDateInput(data.proefperiode_start, data.demo_duur_dagen) : null;
+
+    // Dubbele klanten controleren tijdens het typen (niet blokkerend).
+    const [duplicates, setDuplicates] = useState([]);
+    const duplicateAbort = useRef(null);
+    useEffect(() => {
+        if (!urls?.duplicates) return undefined;
+        const email = data.email.trim();
+        const kvk = data.kvk_nummer.trim();
+        const naam = data.bedrijfsnaam.trim();
+        if (!email && kvk.length < 6 && naam.length < 3) {
+            setDuplicates([]);
+            return undefined;
+        }
+        const timer = window.setTimeout(async () => {
+            if (duplicateAbort.current) duplicateAbort.current.abort();
+            const controller = new AbortController();
+            duplicateAbort.current = controller;
+            try {
+                const query = new URLSearchParams({ email, kvk, naam });
+                const response = await fetch(`${urls.duplicates}?${query.toString()}`, {
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                    signal: controller.signal,
+                });
+                if (!response.ok) return;
+                const json = await response.json();
+                setDuplicates(Array.isArray(json?.matches) ? json.matches : []);
+            } catch {
+                // Netwerkfout of afgebroken verzoek: geen waarschuwing tonen.
+            }
+        }, 400);
+        return () => window.clearTimeout(timer);
+    }, [data.email, data.kvk_nummer, data.bedrijfsnaam, urls?.duplicates]);
 
     const handleStatusChange = (value) => {
         setData((prev) => ({
@@ -167,6 +248,14 @@ export default function Create({ statusOptions: rawStatusOptions, statusLabels, 
             </div>
 
             <form onSubmit={submit} className="space-y-6">
+                <div aria-live="polite">
+                    <DuplicateWarning matches={duplicates} />
+                </div>
+                {isLead && (
+                    <div className="rounded-md border border-sky-200 bg-sky-50 px-4 py-2 text-sm text-sky-900">
+                        Status Demo aangevraagd: alleen bedrijfsnaam, naam en e-mail zijn verplicht. Telefoon en adres kun je later aanvullen.
+                    </div>
+                )}
                 <div className="rounded-xl border border-zinc-200 bg-white p-5">
                     <div className="text-sm font-semibold">Bedrijf</div>
                     <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -192,7 +281,7 @@ export default function Create({ statusOptions: rawStatusOptions, statusLabels, 
                             {errors.kvk_nummer && <div className="mt-1 text-xs text-rose-600">{errors.kvk_nummer}</div>}
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-land">Land *</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-land">Land{req}</label>
                             <input
                                 id="gc-land"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
@@ -231,7 +320,7 @@ export default function Create({ statusOptions: rawStatusOptions, statusLabels, 
                             {errors.email && <div className="mt-1 text-xs text-rose-600">{errors.email}</div>}
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-telefoonnummer">Telefoon *</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-telefoonnummer">Telefoon{req}</label>
                             <input
                                 id="gc-telefoonnummer"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
@@ -249,7 +338,7 @@ export default function Create({ statusOptions: rawStatusOptions, statusLabels, 
                     <div className="text-sm font-semibold">Adres</div>
                     <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="sm:col-span-2">
-                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-straatnaam-en-nummer">Straat + nummer *</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-straatnaam-en-nummer">Straat + nummer{req}</label>
                             <input
                                 id="gc-straatnaam-en-nummer"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
@@ -261,7 +350,7 @@ export default function Create({ statusOptions: rawStatusOptions, statusLabels, 
                             )}
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-postcode">Postcode *</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-postcode">Postcode{req}</label>
                             <input
                                 id="gc-postcode"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
@@ -271,7 +360,7 @@ export default function Create({ statusOptions: rawStatusOptions, statusLabels, 
                             {errors.postcode && <div className="mt-1 text-xs text-rose-600">{errors.postcode}</div>}
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-plaats">Plaats *</label>
+                            <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-plaats">Plaats{req}</label>
                             <input
                                 id="gc-plaats"
                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
@@ -367,6 +456,27 @@ export default function Create({ statusOptions: rawStatusOptions, statusLabels, 
                                 <div className="mt-1 text-xs text-rose-600">{errors.proefperiode_start}</div>
                             )}
                         </div>
+                        {isDemo && (
+                            <div>
+                                <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-demo-duur">Demo duur (dagen)</label>
+                                <input
+                                    id="gc-demo-duur"
+                                    type="number"
+                                    min="1"
+                                    max="365"
+                                    className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                    aria-describedby="gc-demo-eind"
+                                    value={data.demo_duur_dagen}
+                                    onChange={(e) => setData('demo_duur_dagen', e.target.value)}
+                                />
+                                <div id="gc-demo-eind" className="mt-1 text-xs text-zinc-600">
+                                    {demoEnd ? `Demo eindigt op ${formatDateNl(demoEnd)}.` : 'Vul een startdatum en duur in.'}
+                                </div>
+                                {errors.demo_duur_dagen && (
+                                    <div className="mt-1 text-xs text-rose-600">{errors.demo_duur_dagen}</div>
+                                )}
+                            </div>
+                        )}
                         <div>
                             <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-actief-vanaf">Actief vanaf</label>
                             <input

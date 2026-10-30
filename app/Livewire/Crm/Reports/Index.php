@@ -8,11 +8,13 @@ use App\Models\GarageCompanyModule;
 use App\Models\Module;
 use App\Models\SepaMandate;
 use App\Services\Crm\RevenueCalculator;
+use App\Services\Crm\SepaChecklist;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class Index extends Component
 {
@@ -134,54 +136,21 @@ class Index extends Component
         $mandatesActive = SepaMandate::query()->where('status', 'actief')->count();
         $mandatesPending = SepaMandate::query()->where('status', 'pending')->count();
 
-        $activeWithoutMandate = GarageCompany::query()
-            ->where('status', 'actief')
-            ->whereDoesntHave('activeMandate')
-            ->count();
+        // Zelfde definitie als de SEPA-lijst op het dashboard.
+        $activeWithoutMandate = SepaChecklist::activeCompaniesWithIssues()->count();
 
         $modulesTotal = Module::query()->count();
 
         // Zelfde berekening als dashboard en klantenlijst: alleen klanten met status Actief.
         $mrr = RevenueCalculator::mrr();
         $demoPipeline = RevenueCalculator::demoPipeline();
-        $modulesQuery = RevenueCalculator::activeModulesQuery(RevenueCalculator::activeStatuses());
 
-        // Modules per module, alleen voor klanten met status Actief (demo telt niet mee).
-        $modulesOverview = Module::query()
-            ->leftJoin('garage_company_modules as gcm', function ($join) {
-                $join->on('gcm.module_id', '=', 'modules.id');
-                RevenueCalculator::constrainActiveModules($join, 'gcm.');
-                $join->whereIn('gcm.garage_company_id', RevenueCalculator::companyIdsWithStatus(RevenueCalculator::activeStatuses()));
-            })
-            ->select('modules.id', 'modules.naam')
-            ->selectRaw('COUNT(DISTINCT gcm.garage_company_id) as active_customers')
-            ->selectRaw(GarageCompanyModule::hasAantalColumn()
-                ? 'COALESCE(SUM(gcm.aantal), 0) as total_aantal'
-                : 'COUNT(gcm.id) as total_aantal')
-            ->selectRaw(GarageCompanyModule::hasAantalColumn()
-                ? 'COALESCE(SUM(gcm.prijs_maand_excl * gcm.aantal), 0) as mrr_excl'
-                : 'COALESCE(SUM(gcm.prijs_maand_excl), 0) as mrr_excl')
-            ->selectRaw('COALESCE(MIN(gcm.btw_percentage), 21.00) as btw_min')
-            ->selectRaw('COALESCE(MAX(gcm.btw_percentage), 21.00) as btw_max')
-            ->groupBy('modules.id', 'modules.naam')
-            ->orderBy('modules.naam')
-            ->get();
+        $modulesOverview = $this->modulesOverview();
 
         $modulesActive = (int) $modulesOverview->filter(fn ($row) => (int) $row->total_aantal > 0)->count();
         $modulesTotalAantal = (int) $modulesOverview->sum(fn ($row) => (int) $row->total_aantal);
 
-        $topCustomers = (clone $modulesQuery)
-            ->join('garage_companies', 'garage_companies.id', '=', 'garage_company_modules.garage_company_id')
-            ->select('garage_companies.id', 'garage_companies.bedrijfsnaam', 'garage_companies.plaats', 'garage_companies.status')
-            ->selectRaw(GarageCompanyModule::hasAantalColumn()
-                ? 'SUM(garage_company_modules.prijs_maand_excl * garage_company_modules.aantal) as mrr_excl'
-                : 'SUM(garage_company_modules.prijs_maand_excl) as mrr_excl')
-            ->groupBy('garage_companies.id', 'garage_companies.bedrijfsnaam', 'garage_companies.plaats', 'garage_companies.status')
-            ->orderByDesc('mrr_excl')
-            ->limit(10)
-            ->get();
-
-        $cancellationsByMonth = $this->cancellationsByMonth($start->subMonths(5)->startOfMonth());
+        $topCustomers = $this->topCustomers();
 
         return view('livewire.crm.reports.index', [
             'range' => [
@@ -212,42 +181,140 @@ class Index extends Component
             'funnel' => $funnel,
             'modulesOverview' => $modulesOverview,
             'topCustomers' => $topCustomers,
-            'cancellationsByMonth' => $cancellationsByMonth,
+            'mrrHistory' => RevenueCalculator::mrrHistory(12),
+            'flowByMonth' => $this->flowByMonth(12),
+            'customersUrl' => route('crm.garage_companies.index'),
         ])->layout('layouts.crm', ['title' => 'Rapportages']);
     }
 
-    /**
-     * @return Collection<int, array{month: CarbonImmutable, total: int}>
-     */
-    private function cancellationsByMonth(CarbonImmutable $fromMonth): Collection
+    private function modulesOverview(): Collection
     {
-        $start = $fromMonth->startOfMonth();
-        $end = CarbonImmutable::now('Europe/Amsterdam')->endOfMonth();
+        // Modules per module, alleen voor klanten met status Actief (demo telt niet mee).
+        return Module::query()
+            ->leftJoin('garage_company_modules as gcm', function ($join) {
+                $join->on('gcm.module_id', '=', 'modules.id');
+                RevenueCalculator::constrainActiveModules($join, 'gcm.');
+                $join->whereIn('gcm.garage_company_id', RevenueCalculator::companyIdsWithStatus(RevenueCalculator::activeStatuses()));
+            })
+            ->select('modules.id', 'modules.naam')
+            ->selectRaw('COUNT(DISTINCT gcm.garage_company_id) as active_customers')
+            ->selectRaw(GarageCompanyModule::hasAantalColumn()
+                ? 'COALESCE(SUM(gcm.aantal), 0) as total_aantal'
+                : 'COUNT(gcm.id) as total_aantal')
+            ->selectRaw(GarageCompanyModule::hasAantalColumn()
+                ? 'COALESCE(SUM(gcm.prijs_maand_excl * gcm.aantal), 0) as mrr_excl'
+                : 'COALESCE(SUM(gcm.prijs_maand_excl), 0) as mrr_excl')
+            ->selectRaw('COALESCE(MIN(gcm.btw_percentage), 21.00) as btw_min')
+            ->selectRaw('COALESCE(MAX(gcm.btw_percentage), 21.00) as btw_max')
+            ->groupBy('modules.id', 'modules.naam')
+            ->orderBy('modules.naam')
+            ->get();
+    }
 
-        $rows = GarageCompany::query()
-            ->whereNotNull('opgezegd_op')
-            ->whereBetween('opgezegd_op', [$start, $end])
-            ->get(['opgezegd_op']);
+    private function topCustomers(?int $limit = 10): Collection
+    {
+        $query = RevenueCalculator::activeModulesQuery(RevenueCalculator::activeStatuses())
+            ->join('garage_companies', 'garage_companies.id', '=', 'garage_company_modules.garage_company_id')
+            ->select('garage_companies.id', 'garage_companies.bedrijfsnaam', 'garage_companies.plaats', 'garage_companies.status')
+            ->selectRaw(GarageCompanyModule::hasAantalColumn()
+                ? 'SUM(garage_company_modules.prijs_maand_excl * garage_company_modules.aantal) as mrr_excl'
+                : 'SUM(garage_company_modules.prijs_maand_excl) as mrr_excl')
+            ->groupBy('garage_companies.id', 'garage_companies.bedrijfsnaam', 'garage_companies.plaats', 'garage_companies.status')
+            ->orderByDesc('mrr_excl');
+
+        if ($limit !== null) {
+            $query->limit($limit);
+        }
+
+        return $query->get();
+    }
+
+    /**
+     * Instroom (nieuw actief op actief_vanaf) en uitstroom (opgezegd_op / verloren_op) per maand.
+     *
+     * @return list<array{month: string, label: string, in: int, opgezegd: int, verloren: int}>
+     */
+    private function flowByMonth(int $months): array
+    {
+        $now = CarbonImmutable::now('Europe/Amsterdam');
+        $start = $now->startOfMonth()->subMonthsNoOverflow($months - 1);
+        $end = $now->endOfMonth();
 
         $buckets = [];
-        $cursor = $start;
-        while ($cursor <= $end) {
-            $buckets[$cursor->format('Y-m')] = 0;
-            $cursor = $cursor->addMonth();
-        }
-
-        foreach ($rows as $row) {
-            $key = CarbonImmutable::parse($row->opgezegd_op, 'Europe/Amsterdam')->format('Y-m');
-            if (array_key_exists($key, $buckets)) {
-                $buckets[$key]++;
-            }
-        }
-
-        return collect($buckets)->map(function (int $total, string $key) {
-            return [
-                'month' => CarbonImmutable::parse($key.'-01', 'Europe/Amsterdam')->startOfMonth(),
-                'total' => $total,
+        for ($i = 0; $i < $months; $i++) {
+            $month = $start->addMonthsNoOverflow($i);
+            $buckets[$month->format('Y-m')] = [
+                'month' => $month->format('Y-m'),
+                'label' => $month->locale('nl')->translatedFormat('M Y'),
+                'in' => 0,
+                'opgezegd' => 0,
+                'verloren' => 0,
             ];
-        })->values();
+        }
+
+        foreach (['actief_vanaf' => 'in', 'opgezegd_op' => 'opgezegd', 'verloren_op' => 'verloren'] as $column => $key) {
+            GarageCompany::query()
+                ->whereNotNull($column)
+                ->whereBetween($column, [$start, $end])
+                ->pluck($column)
+                ->each(function ($value) use (&$buckets, $key) {
+                    $monthKey = CarbonImmutable::parse($value)->setTimezone('Europe/Amsterdam')->format('Y-m');
+                    if (isset($buckets[$monthKey])) {
+                        $buckets[$monthKey][$key]++;
+                    }
+                });
+        }
+
+        return array_values($buckets);
+    }
+
+    /**
+     * CSV-export van een tabel uit de rapportage.
+     */
+    public function export(string $table): StreamedResponse
+    {
+        $money = fn ($value) => number_format((float) $value, 2, ',', '');
+
+        [$filename, $header, $rows] = match ($table) {
+            'modules' => [
+                'modules-prestaties',
+                ['Module', 'Klanten', 'Aantal', 'MRR excl. btw'],
+                $this->modulesOverview()->map(fn ($row) => [$row->naam, (int) $row->active_customers, (int) $row->total_aantal, $money($row->mrr_excl)])->all(),
+            ],
+            'klanten' => [
+                'klanten-op-mrr',
+                ['Klant', 'Plaats', 'MRR excl. btw'],
+                $this->topCustomers(null)->map(fn ($row) => [$row->bedrijfsnaam, $row->plaats, $money($row->mrr_excl)])->all(),
+            ],
+            'mrr' => [
+                'mrr-per-maand',
+                ['Maand', 'MRR excl. btw'],
+                collect(RevenueCalculator::mrrHistory(12))->map(fn ($row) => [$row['month'], $money($row['excl'])])->all(),
+            ],
+            'instroom' => [
+                'instroom-uitstroom',
+                ['Maand', 'Nieuw actief', 'Opgezegd', 'Verloren'],
+                collect($this->flowByMonth(12))->map(fn ($row) => [$row['month'], $row['in'], $row['opgezegd'], $row['verloren']])->all(),
+            ],
+            default => abort(404),
+        };
+
+        $filename .= '-'.CarbonImmutable::now('Europe/Amsterdam')->format('Y-m-d').'.csv';
+
+        return response()->streamDownload(function () use ($header, $rows) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, $header, ';');
+            foreach ($rows as $row) {
+                // Voorkom formule-injectie in spreadsheetprogramma's.
+                $row = array_map(function ($value) {
+                    $value = (string) $value;
+
+                    return preg_match('/^[=+\-@\t\r]/', $value) && ! is_numeric(str_replace(',', '.', $value)) ? "'".$value : $value;
+                }, $row);
+                fputcsv($out, $row, ';');
+            }
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 }

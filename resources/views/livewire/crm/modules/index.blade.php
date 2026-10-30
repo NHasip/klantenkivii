@@ -75,6 +75,7 @@
                         <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Prijs (excl.)</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">BTW %</th>
                     @endif
+                    <th class="px-4 py-3 text-right text-xs font-semibold text-zinc-600">Klanten</th>
                     <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Standaard zichtbaar</th>
                     <th class="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Omschrijving</th>
                     <th class="px-4 py-3"></th>
@@ -82,8 +83,17 @@
             </thead>
             <tbody class="divide-y divide-zinc-100">
                 @forelse($modules as $m)
-                    <tr class="hover:bg-zinc-50">
-                        <td class="px-4 py-3 text-sm font-semibold">{{ $m->naam }}</td>
+                    @php
+                        $inUse = (int) ($usage[$m->id] ?? 0);
+                        $archived = $supportsArchive && $m->archived_at !== null;
+                    @endphp
+                    <tr @class(['hover:bg-zinc-50', 'bg-zinc-50/60 text-zinc-500' => $archived]) wire:key="module-{{ $m->id }}">
+                        <td class="px-4 py-3 text-sm font-semibold">
+                            {{ $m->naam }}
+                            @if($archived)
+                                <span class="ml-1 inline-flex items-center rounded-full bg-zinc-200 px-2 py-0.5 text-[11px] font-semibold text-zinc-700">Gearchiveerd</span>
+                            @endif
+                        </td>
                         @if($supportsDefaultPricing)
                             <td class="whitespace-nowrap px-4 py-3 text-sm">&euro; {{ number_format((float) $m->default_prijs_maand_excl, 2, ',', '.') }}</td>
                             @php
@@ -92,16 +102,27 @@
                             @endphp
                             <td class="whitespace-nowrap px-4 py-3 text-sm">{{ number_format($btw, $btwDecimals, ',', '.') }}%</td>
                         @endif
+                        <td class="whitespace-nowrap px-4 py-3 text-right text-sm">{{ number_format($inUse, 0, ',', '.') }}</td>
                         <td class="px-4 py-3 text-sm">{{ $m->default_visible ? 'Ja' : 'Nee' }}</td>
                         <td class="px-4 py-3 text-sm text-zinc-600">{{ \Illuminate\Support\Str::limit($m->omschrijving ?? '', 80) ?: '-' }}</td>
                         <td class="whitespace-nowrap px-4 py-3 text-right">
                             <button type="button" class="rounded-md border border-zinc-200 px-2 py-1 text-xs hover:bg-zinc-50" wire:click="startEdit({{ $m->id }})">Bewerken</button>
-                            <button type="button" class="ml-2 rounded-md border border-rose-200 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50" wire:click="deleteModule({{ $m->id }})" wire:confirm="Weet je zeker dat je deze module wilt verwijderen?">Verwijderen</button>
+                            @if($archived)
+                                <button type="button" class="ml-2 rounded-md border border-zinc-200 px-2 py-1 text-xs hover:bg-zinc-50" wire:click="restoreModule({{ $m->id }})">Herstellen</button>
+                            @elseif($inUse > 0)
+                                @if($supportsArchive)
+                                    <button type="button" class="ml-2 rounded-md border border-amber-200 px-2 py-1 text-xs text-amber-800 hover:bg-amber-50" wire:click="archiveModule({{ $m->id }})" wire:confirm="Module archiveren? Bestaande klanten houden de module, maar je kunt hem niet meer kiezen bij nieuwe koppelingen.">Archiveren</button>
+                                @else
+                                    <span class="ml-2 text-xs text-zinc-500" title="Draai de nieuwste migraties om archiveren mogelijk te maken.">In gebruik</span>
+                                @endif
+                            @else
+                                <button type="button" class="ml-2 rounded-md border border-rose-200 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50" wire:click="deleteModule({{ $m->id }})" wire:confirm="Weet je zeker dat je deze module wilt verwijderen?">Verwijderen</button>
+                            @endif
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="{{ $supportsDefaultPricing ? 6 : 4 }}" class="px-4 py-10 text-center text-sm text-zinc-600">Nog geen modules.</td>
+                        <td colspan="{{ $supportsDefaultPricing ? 7 : 5 }}" class="px-4 py-10 text-center text-sm text-zinc-600">Nog geen modules.</td>
                     </tr>
                 @endforelse
             </tbody>

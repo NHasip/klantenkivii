@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers\Crm;
 
+use App\Enums\ActivityType;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Models\Activity;
+use App\Models\GarageCompany;
 use App\Models\Task;
 use App\Models\TaskAttachment;
 use App\Models\TaskComment;
@@ -51,6 +54,7 @@ class TasksController
         return Inertia::render('Crm/Tasks', [
             'initial' => $this->buildTasksPayload($request),
             'filters' => $this->filtersFromRequest($request),
+            'customerFilter' => $this->customerOption($request->query('klant')),
             'urls' => [],
         ]);
     }
@@ -65,6 +69,7 @@ class TasksController
         $task->load([
             'project:id,naam,kleur',
             'assignees:id,name',
+            ...$this->customerRelation(),
             'attachments',
             'comments.author:id,name',
         ]);
@@ -108,6 +113,7 @@ class TasksController
             'titel' => ['required', 'string', 'max:255'],
             'omschrijving' => ['nullable', 'string'],
             'task_project_id' => ['nullable', 'integer', 'exists:task_projects,id'],
+            'garage_company_id' => ['nullable', 'integer', 'exists:garage_companies,id'],
             'status' => ['required', Rule::enum(TaskStatus::class)],
             'prioriteit' => ['required', Rule::enum(TaskPriority::class)],
             'deadline' => ['nullable', 'date'],
@@ -124,6 +130,7 @@ class TasksController
 
         $task = Task::create([
             'task_project_id' => $data['task_project_id'] ?? null,
+            ...(Task::supportsCustomer() ? ['garage_company_id' => $data['garage_company_id'] ?? null] : []),
             'titel' => $data['titel'],
             'omschrijving' => $data['omschrijving'] ?? null,
             'status' => TaskStatus::from($data['status']),
@@ -144,7 +151,7 @@ class TasksController
             $this->storeTaskAttachment($task, $file, (int) $request->user()->id);
         }
 
-        $task->load(['project:id,naam,kleur', 'assignees:id,name']);
+        $task->load(['project:id,naam,kleur', 'assignees:id,name', ...$this->customerRelation()]);
         $task->loadCount(['comments', 'attachments']);
 
         return response()->json([
@@ -163,7 +170,7 @@ class TasksController
         $task->loadCount(['comments', 'attachments']);
 
         return response()->json([
-            'task' => $this->taskSummary($task->load(['project:id,naam,kleur', 'assignees:id,name'])),
+            'task' => $this->taskSummary($task->load(['project:id,naam,kleur', 'assignees:id,name', ...$this->customerRelation()])),
         ]);
     }
 
@@ -175,6 +182,7 @@ class TasksController
             'labels' => ['nullable', 'string', 'max:1000'],
             'prioriteit' => ['nullable', Rule::enum(TaskPriority::class)],
             'task_project_id' => ['nullable', 'integer', 'exists:task_projects,id'],
+            'garage_company_id' => ['nullable', 'integer', 'exists:garage_companies,id'],
             'deadline' => ['nullable', 'date'],
             'status' => ['nullable', Rule::enum(TaskStatus::class)],
             'assignees' => ['nullable', 'array'],
@@ -200,6 +208,10 @@ class TasksController
 
         if (array_key_exists('task_project_id', $data)) {
             $task->task_project_id = $data['task_project_id'] ?: null;
+        }
+
+        if (array_key_exists('garage_company_id', $data) && Task::supportsCustomer()) {
+            $task->garage_company_id = $data['garage_company_id'] ?: null;
         }
 
         if (array_key_exists('deadline', $data)) {
@@ -229,7 +241,7 @@ class TasksController
         $task->loadCount(['comments', 'attachments']);
 
         return response()->json([
-            'task' => $this->taskSummary($task->load(['project:id,naam,kleur', 'assignees:id,name'])),
+            'task' => $this->taskSummary($task->load(['project:id,naam,kleur', 'assignees:id,name', ...$this->customerRelation()])),
         ]);
     }
 
@@ -341,6 +353,33 @@ class TasksController
     }
 
     /**
+     * Kleine zoekfunctie voor de klantkiezer (max 20 resultaten).
+     */
+    public function customers(Request $request): JsonResponse
+    {
+        $term = trim((string) $request->query('q', ''));
+
+        $results = GarageCompany::query()
+            ->when($term !== '', function ($q) use ($term) {
+                $like = '%'.$term.'%';
+                $q->where(function ($inner) use ($like, $term) {
+                    $inner->where('bedrijfsnaam', 'like', $like)
+                        ->orWhere('plaats', 'like', $like);
+                    if (ctype_digit($term)) {
+                        $inner->orWhere('id', (int) $term);
+                    }
+                });
+            })
+            ->orderBy('bedrijfsnaam')
+            ->limit(20)
+            ->get(['id', 'bedrijfsnaam', 'plaats'])
+            ->map(fn (GarageCompany $company) => $this->customerPayload($company))
+            ->values();
+
+        return response()->json(['customers' => $results]);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function buildTasksPayload(Request $request): array
@@ -348,6 +387,7 @@ class TasksController
         $tasks = $this->filteredTasks($request);
 
         return [
+            'appointments' => $request->boolean('afspraken') ? $this->openAppointments($request) : null,
             'projects' => TaskProject::query()
                 ->orderBy('naam')
                 ->get(['id', 'naam', 'kleur', 'deadline'])
@@ -382,6 +422,90 @@ class TasksController
             'priority' => $request->query('priority'),
             'search' => $request->query('search', ''),
             'sort' => $request->query('sort', 'deadline'),
+            'klant' => $request->query('klant'),
+        ];
+    }
+
+    /**
+     * Open klanttaken en -afspraken (Activity type taak/afspraak), alleen-lezen overzicht.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function openAppointments(Request $request): Collection
+    {
+        $now = now();
+
+        return Activity::query()
+            ->with(['garageCompany:id,bedrijfsnaam,plaats'])
+            ->whereIn('type', [ActivityType::Taak->value, ActivityType::Afspraak->value])
+            ->whereNull('done_at')
+            ->whereHas('garageCompany')
+            ->when($request->query('klant'), fn ($q, $klant) => $q->where('garage_company_id', (int) $klant))
+            ->when($request->filled('search'), function ($q) use ($request) {
+                $term = '%'.trim((string) $request->query('search')).'%';
+                $q->where(fn ($inner) => $inner->where('titel', 'like', $term)->orWhere('inhoud', 'like', $term));
+            })
+            ->orderByRaw('case when due_at is null then 1 else 0 end, due_at asc')
+            ->orderBy('id')
+            ->limit(200)
+            ->get()
+            ->map(fn (Activity $activity) => [
+                'id' => $activity->id,
+                'type' => $activity->type?->value,
+                'titel' => $activity->titel,
+                'inhoud' => $activity->inhoud,
+                'due_at' => $activity->due_at?->toIso8601String(),
+                'overdue' => $activity->due_at !== null && $activity->due_at->lt($now),
+                'customer' => $activity->garageCompany ? $this->customerPayload($activity->garageCompany) : null,
+                'done_url' => route('crm.garage_companies.tasks.done', [
+                    'garageCompany' => $activity->garage_company_id,
+                    'activity' => $activity->id,
+                ]),
+            ])
+            ->values();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function customerPayload(GarageCompany $company): array
+    {
+        return [
+            'id' => $company->id,
+            'naam' => $company->bedrijfsnaam,
+            'plaats' => $company->plaats,
+            'url' => route('crm.garage_companies.show', ['garageCompany' => $company->id]),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function customerOption(mixed $id): ?array
+    {
+        $id = (int) $id;
+        if ($id <= 0) {
+            return null;
+        }
+
+        $company = GarageCompany::query()->withoutGlobalScope('not_deleted')->find($id, ['id', 'bedrijfsnaam', 'plaats']);
+
+        return $company ? $this->customerPayload($company) : null;
+    }
+
+    /**
+     * Eager-load voor de klant, alleen als de kolom al bestaat (migratie gedraaid).
+     *
+     * @return array<string, \Closure>
+     */
+    private function customerRelation(): array
+    {
+        if (! Task::supportsCustomer()) {
+            return [];
+        }
+
+        return [
+            'garageCompany' => fn ($q) => $q->withoutGlobalScope('not_deleted')->select(['id', 'bedrijfsnaam', 'plaats']),
         ];
     }
 
@@ -393,8 +517,9 @@ class TasksController
         $sort = (string) $request->query('sort', 'deadline');
 
         $query = Task::query()
-            ->with(['project:id,naam,kleur', 'assignees:id,name'])
+            ->with(['project:id,naam,kleur', 'assignees:id,name', ...$this->customerRelation()])
             ->withCount(['comments', 'attachments'])
+            ->when(Task::supportsCustomer() && $request->query('klant'), fn ($q) => $q->where('garage_company_id', (int) $request->query('klant')))
             ->when($request->query('project'), fn ($q, $project) => $q->where('task_project_id', $project))
             ->when($request->query('assignee'), fn ($q, $assignee) => $q->whereHas('assignees', fn ($sub) => $sub->where('users.id', $assignee)))
             ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
@@ -405,6 +530,9 @@ class TasksController
                     $inner->where('titel', 'like', $term)
                         ->orWhere('omschrijving', 'like', $term)
                         ->orWhere('labels', 'like', $term);
+                    if (Task::supportsCustomer()) {
+                        $inner->orWhereHas('garageCompany', fn ($c) => $c->where('bedrijfsnaam', 'like', $term));
+                    }
                 });
             })
             ->when($sort === 'nieuwste', fn ($q) => $q->orderByDesc('created_at'))
@@ -478,6 +606,10 @@ class TasksController
             'deadline' => $task->deadline?->toIso8601String(),
             'labels' => $task->labels,
             'task_project_id' => $task->task_project_id,
+            'garage_company_id' => Task::supportsCustomer() ? $task->garage_company_id : null,
+            'customer' => Task::supportsCustomer() && $task->relationLoaded('garageCompany') && $task->garageCompany
+                ? $this->customerPayload($task->garageCompany)
+                : null,
             'sort_order' => (int) $task->sort_order,
             'created_at' => $task->created_at?->toIso8601String(),
             'project' => $task->project ? [
@@ -589,6 +721,7 @@ class TasksController
             'kleur' => 'kleur',
             'titel' => 'titel',
             'task_project_id' => 'project',
+            'garage_company_id' => 'klant',
             'status' => 'status',
             'prioriteit' => 'prioriteit',
             'labels' => 'labels',

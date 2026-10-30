@@ -49,9 +49,15 @@
                     @error('role') <div class="mt-1 text-xs text-rose-600">{{ $message }}</div> @enderror
                 </div>
 
-                <div class="flex items-center gap-2 pt-6">
-                    <input type="checkbox" class="rounded border-zinc-300" wire:model="active" id="user_active">
-                    <label for="user_active" class="text-sm">Actief</label>
+                <div class="pt-6">
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" class="rounded border-zinc-300 disabled:opacity-50" wire:model="active" id="user_active" @disabled($userId !== null && $userId === $currentUserId)>
+                        <label for="user_active" class="text-sm">Actief</label>
+                    </div>
+                    @if($userId !== null && $userId === $currentUserId)
+                        <div class="mt-1 text-xs text-zinc-500">Je kunt je eigen account niet deactiveren.</div>
+                    @endif
+                    @error('active') <div class="mt-1 text-xs text-rose-600">{{ $message }}</div> @enderror
                 </div>
 
                 <div>
@@ -89,14 +95,24 @@
                         <td class="px-4 py-3 text-sm">{{ $u->email }}</td>
                         <td class="px-4 py-3 text-sm">{{ ucfirst($u->role->value) }}</td>
                         <td class="px-4 py-3 text-sm">{{ $u->active ? 'Ja' : 'Nee' }}</td>
-                        <td class="px-4 py-3 text-sm text-zinc-600">{{ $u->last_login_at?->format('d-m-Y H:i') ?? '—' }}</td>
+                        <td class="px-4 py-3 text-sm text-zinc-600">{{ $u->last_login_at?->format('d-m-Y H:i') ?? '-' }}</td>
                         <td class="whitespace-nowrap px-4 py-3 text-right">
                             <button type="button" class="rounded-md border border-zinc-200 px-2 py-1 text-xs hover:bg-zinc-50" wire:click="startEdit({{ $u->id }})">Bewerken</button>
-                            <form method="POST" action="{{ route('crm.users.delete', ['user' => $u->id]) }}" class="ml-2 inline" onsubmit="return confirm('Weet je zeker dat je deze gebruiker wilt verwijderen?')">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="rounded-md border border-rose-200 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50">Verwijderen</button>
-                            </form>
+                            @php
+                                $isSelf = $u->id === $currentUserId;
+                                $isLastAdmin = $u->isAdmin() && $u->active && $activeAdminCount <= 1;
+                            @endphp
+                            @if($isSelf || $isLastAdmin)
+                                <span class="ml-2 inline-block text-xs text-zinc-500" title="{{ $isSelf ? 'Je kunt je eigen account niet verwijderen.' : 'De laatste actieve admin kan niet worden verwijderd.' }}">
+                                    {{ $isSelf ? 'Eigen account' : 'Laatste admin' }}
+                                </span>
+                            @else
+                                <form method="POST" action="{{ route('crm.users.delete', ['user' => $u->id]) }}" class="ml-2 inline" onsubmit="return confirm('Weet je zeker dat je deze gebruiker wilt verwijderen?')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="rounded-md border border-rose-200 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50">Verwijderen</button>
+                                </form>
+                            @endif
                         </td>
                     </tr>
                 @endforeach

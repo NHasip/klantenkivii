@@ -1,0 +1,35 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Additief: modules die in gebruik zijn kunnen worden gearchiveerd in plaats van verwijderd.
+     * Bestaande data blijft ongewijzigd (archived_at is standaard null).
+     */
+    public function up(): void
+    {
+        if (Schema::hasColumn('modules', 'archived_at')) {
+            return;
+        }
+
+        Schema::table('modules', function (Blueprint $table) {
+            $table->timestamp('archived_at')->nullable()->index();
+        });
+    }
+
+    public function down(): void
+    {
+        if (! Schema::hasColumn('modules', 'archived_at')) {
+            return;
+        }
+
+        Schema::table('modules', function (Blueprint $table) {
+            $table->dropIndex(['archived_at']);
+            $table->dropColumn('archived_at');
+        });
+    }
+};

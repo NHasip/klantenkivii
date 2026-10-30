@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Crm\Modules;
 
+use App\Models\GarageCompany;
+use App\Models\GarageCompanyModule;
 use App\Models\Module;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
@@ -93,13 +95,56 @@ class Index extends Component
 
     public function deleteModule(int $id): void
     {
+        $module = Module::findOrFail($id);
+
+        if ($this->usageCount($module->id) > 0) {
+            session()->now('livewire_error', 'Deze module is in gebruik bij klanten. Archiveer de module in plaats van verwijderen.');
+
+            return;
+        }
+
         try {
-            Module::findOrFail($id)->delete();
+            $module->delete();
             session()->now('livewire_status', 'Module verwijderd.');
         } catch (Throwable $e) {
             report($e);
             session()->now('livewire_error', 'Verwijderen mislukt. Deze module wordt mogelijk nog gebruikt.');
         }
+    }
+
+    public function archiveModule(int $id): void
+    {
+        if (! Module::hasArchivedColumn()) {
+            session()->now('livewire_error', 'Archiveren is nog niet beschikbaar. Draai eerst de nieuwste migraties.');
+
+            return;
+        }
+
+        Module::findOrFail($id)->update(['archived_at' => now()]);
+        session()->now('livewire_status', 'Module gearchiveerd. Bestaande klantkoppelingen blijven ongewijzigd.');
+    }
+
+    public function restoreModule(int $id): void
+    {
+        if (! Module::hasArchivedColumn()) {
+            return;
+        }
+
+        Module::findOrFail($id)->update(['archived_at' => null]);
+        session()->now('livewire_status', 'Module hersteld.');
+    }
+
+    /**
+     * Aantal klanten (niet in prullenbak) met een actieve koppeling aan deze module.
+     */
+    private function usageCount(int $moduleId): int
+    {
+        return (int) GarageCompanyModule::query()
+            ->where('module_id', $moduleId)
+            ->where('actief', true)
+            ->whereIn('garage_company_id', GarageCompany::query()->select('garage_companies.id'))
+            ->distinct()
+            ->count('garage_company_id');
     }
 
     private function resetForm(): void
@@ -115,8 +160,17 @@ class Index extends Component
     {
         $modules = Module::query()->orderBy('naam')->get();
 
+        $usage = GarageCompanyModule::query()
+            ->where('actief', true)
+            ->whereIn('garage_company_id', GarageCompany::query()->select('garage_companies.id'))
+            ->selectRaw('module_id, COUNT(DISTINCT garage_company_id) as total')
+            ->groupBy('module_id')
+            ->pluck('total', 'module_id');
+
         return view('livewire.crm.modules.index', [
             'modules' => $modules,
+            'usage' => $usage,
+            'supportsArchive' => Module::hasArchivedColumn(),
         ])->layout('layouts.crm', ['title' => 'Modules']);
     }
 }

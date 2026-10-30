@@ -37,12 +37,20 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use ZipArchive;
 
 class GarageCompaniesController
 {
     private static ?array $incassoColumns = null;
+
+    private const DEFAULT_DEMO_DAYS = 14;
+
+    private const LIST_STATUS_TABS = ['alle', 'demo_aangevraagd', 'proefperiode', 'actief', 'opgezegd', 'verloren'];
+
+    private const LIST_SORT_FIELDS = ['naam', 'status', 'plaats', 'omzet', 'demo_eind', 'volgende_actie', 'bijgewerkt', 'actief_vanaf'];
 
     public function index(Request $request): Response
     {
@@ -54,47 +62,91 @@ class GarageCompaniesController
             $view = 'actief';
         }
 
+        $sourceValues = array_map(fn ($s) => $s->value, GarageCompanySource::cases());
+
         $filters = [
             'view' => $view,
-            'search' => (string) $request->query('search', ''),
-            'status' => (string) $request->query('status', 'alle'),
-            'tag' => (string) $request->query('tag', ''),
-            'sort' => (string) $request->query('sort', 'updated_desc'),
+            'search' => trim((string) $request->query('search', '')),
+            'status' => GarageCompanyStatus::normalize((string) $request->query('status', 'alle')),
+            'tag' => trim((string) $request->query('tag', '')),
+            'bron' => (string) $request->query('bron', ''),
+            'sort' => (string) $request->query('sort', 'bijgewerkt'),
+            'dir' => strtolower((string) $request->query('dir', '')),
             'perPage' => (int) $request->query('perPage', 15),
         ];
 
-        // Alleen de waarden uit de keuzelijst toestaan; voorkomt lege of extreem grote pagina's.
+        // Ongeldige waarden negeren en terugvallen op de standaard, zodat de UI en de query overeenkomen.
+        if (! in_array($filters['status'], self::LIST_STATUS_TABS, true)) {
+            $filters['status'] = 'alle';
+        }
+        if (! in_array($filters['bron'], $sourceValues, true)) {
+            $filters['bron'] = '';
+        }
         if (! in_array($filters['perPage'], [10, 15, 25, 50], true)) {
             $filters['perPage'] = 15;
         }
-        if (! in_array($filters['sort'], ['updated_desc', 'actief_vanaf_desc', 'omzet_desc'], true)) {
-            $filters['sort'] = 'updated_desc';
+        // Oude sorteerwaarden uit bestaande links blijven werken.
+        $legacySort = [
+            'updated_desc' => ['bijgewerkt', 'desc'],
+            'actief_vanaf_desc' => ['actief_vanaf', 'desc'],
+            'omzet_desc' => ['omzet', 'desc'],
+        ];
+        if (isset($legacySort[$filters['sort']])) {
+            [$filters['sort'], $filters['dir']] = $legacySort[$filters['sort']];
+        }
+        if (! in_array($filters['sort'], self::LIST_SORT_FIELDS, true)) {
+            $filters['sort'] = 'bijgewerkt';
+        }
+        if (! in_array($filters['dir'], ['asc', 'desc'], true)) {
+            $filters['dir'] = in_array($filters['sort'], ['bijgewerkt', 'omzet', 'actief_vanaf'], true) ? 'desc' : 'asc';
         }
 
         $perPage = $filters['perPage'];
+        $hasTaskLink = $this->tasksHaveCompanyColumn();
 
-        $baseQuery = $view === 'prullenbak'
+        $filterQuery = $view === 'prullenbak'
             ? GarageCompany::query()->onlyDeleted()
             : GarageCompany::query();
 
-        if ($filters['status'] !== 'alle') {
-            $baseQuery->where('status', $filters['status']);
+        if ($filters['tag'] !== '') {
+            $filterQuery->where('tags', 'like', '%'.$filters['tag'].'%');
         }
 
-        if (! empty($filters['tag'])) {
-            $baseQuery->where('tags', 'like', '%'.$filters['tag'].'%');
+        if ($filters['bron'] !== '') {
+            $filterQuery->where('bron', $filters['bron']);
         }
 
-        if (! empty($filters['search'])) {
-            $search = trim($filters['search']);
-            $baseQuery->where(function ($q) use ($search) {
+        if ($filters['search'] !== '') {
+            $search = $filters['search'];
+            $filterQuery->where(function ($q) use ($search) {
                 $q->where('bedrijfsnaam', 'like', '%'.$search.'%')
                     ->orWhere('hoofd_email', 'like', '%'.$search.'%')
                     ->orWhere('hoofd_telefoon', 'like', '%'.$search.'%')
+                    ->orWhere('plaats', 'like', '%'.$search.'%')
                     ->orWhere('status', 'like', '%'.$search.'%')
                     ->orWhereHas('customerPersons', fn ($p) => $p->where('email', 'like', '%'.$search.'%'))
                     ->orWhereHas('mandates', fn ($m) => $m->where('iban', 'like', '%'.$search.'%'));
             });
+        }
+
+        // Tellingen per status-tab in een enkele gegroepeerde query (zonder het statusfilter zelf).
+        $rawCounts = (clone $filterQuery)
+            ->toBase()
+            ->selectRaw('status, COUNT(*) as aantal')
+            ->groupBy('status')
+            ->pluck('aantal', 'status');
+        $statusCounts = array_fill_keys(self::LIST_STATUS_TABS, 0);
+        foreach ($rawCounts as $status => $aantal) {
+            $normalized = GarageCompanyStatus::normalize((string) $status);
+            if (array_key_exists($normalized, $statusCounts)) {
+                $statusCounts[$normalized] += (int) $aantal;
+            }
+            $statusCounts['alle'] += (int) $aantal;
+        }
+
+        $baseQuery = clone $filterQuery;
+        if ($filters['status'] !== 'alle') {
+            $baseQuery->whereIn('status', $this->statusVariants($filters['status']));
         }
 
         $query = (clone $baseQuery)
@@ -102,11 +154,39 @@ class GarageCompaniesController
             ->withCount(['seats as actieve_seats' => fn ($q) => $q->where('actief', true)])
             ->withSum(['modules as omzet_excl' => fn ($q) => RevenueCalculator::constrainActiveModules($q)], RevenueCalculator::exclExpression());
 
-        $query->when($filters['sort'] === 'actief_vanaf_desc', fn ($q) => $q->orderByDesc('actief_vanaf'))
-            ->when($filters['sort'] === 'omzet_desc', fn ($q) => $q->orderByDesc('omzet_excl'))
-            ->when($filters['sort'] === 'updated_desc', fn ($q) => $q->orderByDesc('updated_at'));
+        $dir = $filters['dir'];
+        switch ($filters['sort']) {
+            case 'naam':
+                $query->orderBy('bedrijfsnaam', $dir);
+                break;
+            case 'status':
+                $query->orderBy('status', $dir)->orderBy('bedrijfsnaam');
+                break;
+            case 'plaats':
+                $query->orderBy('plaats', $dir)->orderBy('bedrijfsnaam');
+                break;
+            case 'omzet':
+                $query->orderBy('omzet_excl', $dir);
+                break;
+            case 'demo_eind':
+                $query->orderByRaw('garage_companies.demo_eind_op IS NULL')->orderBy('demo_eind_op', $dir);
+                break;
+            case 'actief_vanaf':
+                $query->orderBy('actief_vanaf', $dir);
+                break;
+            case 'volgende_actie':
+                [$expr, $bindings] = $this->nextActionSortExpression($hasTaskLink);
+                $query->orderByRaw("({$expr}) IS NULL", $bindings)->orderByRaw("({$expr}) {$dir}", $bindings);
+                break;
+            default:
+                $query->orderBy('updated_at', $dir);
+        }
+        $query->orderBy('garage_companies.id', $dir);
 
         $companies = $query->paginate($perPage)->withQueryString();
+
+        // Volgende actie per bedrijf: twee queries voor de hele pagina in plaats van een per rij.
+        $nextActions = $this->nextActionsForCompanies($companies->getCollection()->pluck('id')->all(), $hasTaskLink);
 
         // Zelfde berekening als dashboard en rapportages: alleen klanten met status Actief.
         // Demo-klanten worden apart als pijplijn meegegeven.
@@ -123,6 +203,8 @@ class GarageCompaniesController
             'hoofd_email' => $company->hoofd_email,
             'hoofd_telefoon' => $company->hoofd_telefoon,
             'plaats' => $company->plaats,
+            'demo_eind_op' => $company->demo_eind_op?->toDateString(),
+            'volgende_actie' => $nextActions[$company->id] ?? null,
             'updated_at' => $company->updated_at?->toIso8601String(),
             'deleted_at' => $company->deleted_at?->toIso8601String(),
             'actieve_seats' => (int) ($company->actieve_seats ?? 0),
@@ -144,18 +226,21 @@ class GarageCompaniesController
         return Inertia::render('Crm/GarageCompanies/Index', [
             'companies' => $companies,
             'totals' => $totals,
+            'statusCounts' => $statusCounts,
             'trashCount' => GarageCompany::hasTrashColumn()
                 ? GarageCompany::query()->onlyDeleted()->count()
                 : 0,
             'filters' => $filters,
             'statusOptions' => collect(GarageCompanyStatus::selectableValues())->values(),
             'statusLabels' => GarageCompanyStatus::labelMap(),
-            'sourceOptions' => collect(GarageCompanySource::cases())->map(fn ($s) => $s->value)->values(),
+            'sourceOptions' => collect($sourceValues)->values(),
             'urls' => [
                 'index' => route('crm.garage_companies.index'),
                 'create' => route('crm.garage_companies.create'),
                 'purge_trash' => route('crm.garage_companies.purge_trash'),
                 'export_incasso_batch' => route('crm.incasso.export'),
+                'export_csv' => route('crm.garage_companies.export_csv'),
+                'bulk_tag' => route('crm.garage_companies.bulk_tag'),
             ],
         ]);
     }
@@ -173,27 +258,36 @@ class GarageCompaniesController
                 'land' => 'Nederland',
                 'datum_van_tekenen' => now()->toDateString(),
                 'proefperiode_start' => now()->toDateString(),
+                'demo_duur_dagen' => self::DEFAULT_DEMO_DAYS,
             ],
             'urls' => [
                 'index' => route('crm.garage_companies.index'),
                 'store' => route('crm.garage_companies.store'),
+                'duplicates' => route('crm.garage_companies.duplicates'),
             ],
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
+        // Bij een demo-aanvraag (lead) zijn alleen bedrijfsnaam, naam en e-mail verplicht.
+        $isLead = GarageCompanyStatus::normalize((string) $request->input('status')) === GarageCompanyStatus::DemoAangevraagd->value;
+        $leadOptional = fn (array $rules) => $isLead ? array_merge(['nullable'], $rules) : array_merge(['required'], $rules);
+
         $data = $request->validate([
             'bedrijfsnaam' => ['required', 'string', 'max:255'],
-            'land' => ['required', 'string', 'max:255'],
+            'land' => $leadOptional(['string', 'max:255']),
 
-            'voor_en_achternaam' => ['required', 'string', 'max:255', 'regex:/\\s+/'],
+            'voor_en_achternaam' => $isLead
+                ? ['required', 'string', 'max:255']
+                : ['required', 'string', 'max:255', 'regex:/\\s+/'],
             'email' => ['required', 'email', 'max:255'],
-            'telefoonnummer' => ['required', 'string', 'max:50'],
+            'telefoonnummer' => $leadOptional(['string', 'max:50']),
 
-            'straatnaam_en_nummer' => ['required', 'string', 'max:255'],
-            'postcode' => ['required', 'string', 'max:20'],
-            'plaats' => ['required', 'string', 'max:255'],
+            'straatnaam_en_nummer' => $isLead ? ['nullable', 'required_with:iban', 'string', 'max:255'] : ['required', 'string', 'max:255'],
+            'postcode' => $isLead ? ['nullable', 'required_with:iban', 'string', 'max:20'] : ['required', 'string', 'max:20'],
+            'plaats' => $isLead ? ['nullable', 'required_with:iban', 'string', 'max:255'] : ['required', 'string', 'max:255'],
+            'demo_duur_dagen' => ['nullable', 'integer', 'min:1', 'max:365'],
             'kvk_nummer' => ['nullable', 'string', 'max:50'],
 
             'iban' => ['nullable', 'string', 'max:34'],
@@ -212,10 +306,28 @@ class GarageCompaniesController
             'login_password' => ['nullable', 'string', 'min:8'],
         ], [
             'voor_en_achternaam.regex' => 'Vul zowel voor- als achternaam in, gescheiden door een spatie.',
+            'straatnaam_en_nummer.required_with' => 'Vul het adres in als je een IBAN opgeeft.',
+            'postcode.required_with' => 'Vul de postcode in als je een IBAN opgeeft.',
+            'plaats.required_with' => 'Vul de plaats in als je een IBAN opgeeft.',
         ]);
 
         $data['login_email'] = $data['login_email'] ?: null;
         $data['login_password'] = $data['login_password'] ?: null;
+        // Kolommen plaats en hoofd_telefoon zijn verplicht in de database; bij een lead lege tekst opslaan.
+        $data['land'] = ($data['land'] ?? null) ?: 'Nederland';
+        $data['telefoonnummer'] = $data['telefoonnummer'] ?? null;
+        $data['straatnaam_en_nummer'] = $data['straatnaam_en_nummer'] ?? null;
+        $data['postcode'] = $data['postcode'] ?? null;
+        $data['plaats'] = $data['plaats'] ?? '';
+
+        // Demo-periode: standaardduur vanaf de demo startdatum.
+        $data['demo_duur_dagen'] = null;
+        $data['demo_eind_op'] = null;
+        if ($data['status'] === GarageCompanyStatus::Proefperiode->value) {
+            $data['demo_duur_dagen'] = (int) ($request->input('demo_duur_dagen') ?: self::DEFAULT_DEMO_DAYS);
+            $start = ! empty($data['proefperiode_start']) ? Carbon::parse($data['proefperiode_start']) : now();
+            $data['demo_eind_op'] = $start->copy()->startOfDay()->addDays($data['demo_duur_dagen']);
+        }
 
         $moduleRows = $request->input('moduleRows', []);
         $rules = [];
@@ -272,10 +384,12 @@ class GarageCompaniesController
                 'land' => $data['land'],
                 'kvk_nummer' => $data['kvk_nummer'] ?? null,
                 'hoofd_email' => $data['email'],
-                'hoofd_telefoon' => $data['telefoonnummer'],
+                'hoofd_telefoon' => $data['telefoonnummer'] ?? '',
                 'status' => $data['status'],
                 'bron' => $data['bron'],
                 'tags' => $data['tags'] ?? null,
+                'demo_duur_dagen' => $data['demo_duur_dagen'],
+                'demo_eind_op' => $data['demo_eind_op'],
                 'proefperiode_start' => $data['proefperiode_start'] ?? null,
                 'actief_vanaf' => $data['actief_vanaf'] ?? null,
                 'opgezegd_op' => $data['opgezegd_op'] ?? null,
@@ -317,7 +431,7 @@ class GarageCompaniesController
                     'iban' => $data['iban'],
                     'bic' => $data['bic'] ?? null,
                     'email' => $data['email'],
-                    'telefoonnummer' => $data['telefoonnummer'],
+                    'telefoonnummer' => $data['telefoonnummer'] ?? '',
                     'plaats_van_tekenen' => $data['plaats_van_tekenen'],
                     'datum_van_tekenen' => $data['datum_van_tekenen'],
                     'mandaat_id' => $this->generateMandaatId($company->id),
@@ -402,6 +516,297 @@ class GarageCompaniesController
         return redirect()
             ->route('crm.garage_companies.show', ['garageCompany' => $company->id])
             ->with('status', 'Klant aangemaakt.');
+    }
+
+    /**
+     * CSV-export van geselecteerde klanten (alleen niet-gevoelige kolommen, geen IBAN).
+     */
+    public function exportCsv(Request $request): StreamedResponse|RedirectResponse
+    {
+        $ids = $this->idsFromRequest($request);
+        if ($ids === []) {
+            return back()->with('status', 'Selecteer eerst een of meer klanten.');
+        }
+
+        $companies = GarageCompany::query()
+            ->whereIn('id', $ids)
+            ->withSum(['modules as omzet_excl' => fn ($q) => RevenueCalculator::constrainActiveModules($q)], RevenueCalculator::exclExpression())
+            ->orderBy('bedrijfsnaam')
+            ->get(['id', 'bedrijfsnaam', 'status', 'plaats', 'hoofd_email', 'hoofd_telefoon', 'demo_eind_op']);
+
+        $labels = GarageCompanyStatus::labelMap();
+        $safe = function ($value): string {
+            $value = (string) ($value ?? '');
+            // Voorkom formule-injectie in spreadsheetprogramma's (telefoonnummers als +31 blijven intact).
+            if ($value !== '' && (in_array($value[0], ['=', '@', "\t", "\r"], true) || preg_match('/^[+-][^0-9\s]/', $value))) {
+                return "'".$value;
+            }
+
+            return $value;
+        };
+
+        $filename = 'klanten-'.now()->format('Y-m-d').'.csv';
+
+        return response()->streamDownload(function () use ($companies, $labels, $safe) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, ['Naam', 'Status', 'Plaats', 'E-mail', 'Telefoon', 'MRR excl. btw', 'Demo eindigt'], ';');
+            foreach ($companies as $company) {
+                $status = GarageCompanyStatus::normalize($company->status?->value ?? '');
+                fputcsv($out, [
+                    $safe($company->bedrijfsnaam),
+                    $labels[$status] ?? $status,
+                    $safe($company->plaats),
+                    $safe($company->hoofd_email),
+                    $safe($company->hoofd_telefoon),
+                    number_format((float) ($company->omzet_excl ?? 0), 2, ',', ''),
+                    $company->demo_eind_op?->format('d-m-Y') ?? '',
+                ], ';');
+            }
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /**
+     * Voegt een tag toe aan de geselecteerde klanten (bestaande tags blijven behouden).
+     */
+    public function bulkTag(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:200'],
+            'ids.*' => ['integer'],
+            'tag' => ['required', 'string', 'max:50', 'not_regex:/,/'],
+        ], [
+            'tag.not_regex' => 'Een tag mag geen komma bevatten.',
+        ]);
+
+        $tag = trim($data['tag']);
+        $updated = 0;
+
+        GarageCompany::query()->whereIn('id', $data['ids'])->get(['id', 'tags'])
+            ->each(function (GarageCompany $company) use ($tag, &$updated) {
+                $current = collect(preg_split('/\s*,\s*/', (string) $company->tags) ?: [])
+                    ->map(fn ($t) => trim($t))
+                    ->filter(fn ($t) => $t !== '');
+                if ($current->contains(fn ($t) => mb_strtolower($t) === mb_strtolower($tag))) {
+                    return;
+                }
+                $company->tags = $current->push($tag)->implode(', ');
+                $company->save();
+                $updated++;
+            });
+
+        return back()->with('status', $updated === 1
+            ? "Tag \"{$tag}\" toegevoegd aan 1 klant."
+            : "Tag \"{$tag}\" toegevoegd aan {$updated} klanten.");
+    }
+
+    /**
+     * Zoekt mogelijke dubbele klanten (ook in de prullenbak) op e-mail, KVK en bedrijfsnaam.
+     */
+    public function duplicateCheck(Request $request): JsonResponse
+    {
+        $email = mb_strtolower(trim((string) $request->query('email', '')));
+        $kvk = preg_replace('/\s+/', '', (string) $request->query('kvk', '')) ?? '';
+        $naam = mb_strtolower(trim((string) $request->query('naam', '')));
+
+        if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $email = '';
+        }
+        if (mb_strlen($kvk) < 6) {
+            $kvk = '';
+        }
+        if (mb_strlen($naam) < 3) {
+            $naam = '';
+        }
+
+        if ($email === '' && $kvk === '' && $naam === '') {
+            return response()->json(['matches' => []]);
+        }
+
+        $companies = GarageCompany::query()
+            ->withDeleted()
+            ->where(function ($q) use ($email, $kvk, $naam) {
+                if ($email !== '') {
+                    $q->orWhereRaw('LOWER(hoofd_email) = ?', [$email])
+                        ->orWhereHas('customerPersons', fn ($p) => $p->whereRaw('LOWER(email) = ?', [$email]));
+                }
+                if ($kvk !== '') {
+                    $q->orWhereRaw("REPLACE(kvk_nummer, ' ', '') = ?", [$kvk]);
+                }
+                if ($naam !== '') {
+                    $q->orWhereRaw('LOWER(TRIM(bedrijfsnaam)) = ?', [$naam]);
+                }
+            })
+            ->with(['customerPersons:id,garage_company_id,email'])
+            ->limit(5)
+            ->get();
+
+        $labels = GarageCompanyStatus::labelMap();
+        $hasTrash = GarageCompany::hasTrashColumn();
+
+        $matches = $companies->map(function (GarageCompany $company) use ($email, $kvk, $naam, $labels, $hasTrash) {
+            $redenen = [];
+            if ($email !== '' && (mb_strtolower((string) $company->hoofd_email) === $email
+                || $company->customerPersons->contains(fn ($p) => mb_strtolower((string) $p->email) === $email))) {
+                $redenen[] = 'e-mail';
+            }
+            if ($kvk !== '' && str_replace(' ', '', (string) $company->kvk_nummer) === $kvk) {
+                $redenen[] = 'KVK';
+            }
+            if ($naam !== '' && mb_strtolower(trim((string) $company->bedrijfsnaam)) === $naam) {
+                $redenen[] = 'bedrijfsnaam';
+            }
+            $trashed = $hasTrash && $company->deleted_at !== null;
+            $status = GarageCompanyStatus::normalize($company->status?->value ?? '');
+
+            return [
+                'id' => $company->id,
+                'bedrijfsnaam' => $company->bedrijfsnaam,
+                'plaats' => $company->plaats,
+                'status_label' => $labels[$status] ?? $status,
+                'in_prullenbak' => $trashed,
+                'redenen' => $redenen,
+                'url' => $trashed
+                    ? route('crm.garage_companies.index', ['view' => 'prullenbak', 'search' => $company->bedrijfsnaam])
+                    : route('crm.garage_companies.show', ['garageCompany' => $company->id]),
+            ];
+        })->values();
+
+        return response()->json(['matches' => $matches]);
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function idsFromRequest(Request $request): array
+    {
+        $raw = $request->input('ids', []);
+        if (is_string($raw)) {
+            $raw = explode(',', $raw);
+        }
+
+        return collect(is_array($raw) ? $raw : [])
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->take(500)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Interne statuswaarde plus oude waarden die er naartoe normaliseren.
+     *
+     * @return list<string>
+     */
+    private function statusVariants(string $status): array
+    {
+        return match ($status) {
+            GarageCompanyStatus::DemoAangevraagd->value => [$status, GarageCompanyStatus::Lead->value],
+            GarageCompanyStatus::Proefperiode->value => [$status, GarageCompanyStatus::DemoGepland->value],
+            default => [$status],
+        };
+    }
+
+    private function tasksHaveCompanyColumn(): bool
+    {
+        static $has = null;
+        if ($has === null) {
+            try {
+                $has = Schema::hasColumn('tasks', 'garage_company_id');
+            } catch (\Throwable) {
+                $has = false;
+            }
+        }
+
+        return $has;
+    }
+
+    /**
+     * SQL-expressie (met bindings) voor de eerstvolgende open actie-datum, voor sorteren.
+     *
+     * @return array{0: string, 1: list<string>}
+     */
+    private function nextActionSortExpression(bool $withTasks): array
+    {
+        $activity = '(select min(a.due_at) from activities a where a.garage_company_id = garage_companies.id and a.done_at is null and a.type in (?, ?))';
+        $activityBindings = [ActivityType::Taak->value, ActivityType::Afspraak->value];
+
+        if (! $withTasks) {
+            return [$activity, $activityBindings];
+        }
+
+        $task = '(select min(t.deadline) from tasks t where t.garage_company_id = garage_companies.id and t.afgerond_op is null and t.status <> ?)';
+        $taskBindings = ['afgerond'];
+
+        $expr = "case when {$activity} is null then {$task} when {$task} is null then {$activity} when {$activity} < {$task} then {$activity} else {$task} end";
+        $bindings = array_merge(
+            $activityBindings, $taskBindings,
+            $taskBindings, $activityBindings,
+            $activityBindings, $taskBindings,
+            $activityBindings, $taskBindings,
+        );
+
+        return [$expr, $bindings];
+    }
+
+    /**
+     * Eerstvolgende open taak/afspraak (en gekoppelde taak indien beschikbaar) per bedrijf.
+     *
+     * @param  list<int>  $companyIds
+     * @return array<int, array{soort: string, titel: string, due_at: ?string}>
+     */
+    private function nextActionsForCompanies(array $companyIds, bool $withTasks): array
+    {
+        if ($companyIds === []) {
+            return [];
+        }
+
+        $candidates = [];
+
+        Activity::query()
+            ->whereIn('garage_company_id', $companyIds)
+            ->whereNull('done_at')
+            ->whereIn('type', [ActivityType::Taak->value, ActivityType::Afspraak->value])
+            ->get(['id', 'garage_company_id', 'type', 'titel', 'due_at'])
+            ->each(function (Activity $activity) use (&$candidates) {
+                $candidates[$activity->garage_company_id][] = [
+                    'soort' => $activity->type === ActivityType::Afspraak ? 'Afspraak' : 'Taak',
+                    'titel' => (string) $activity->titel,
+                    'due_at' => $activity->due_at?->toIso8601String(),
+                ];
+            });
+
+        if ($withTasks) {
+            DB::table('tasks')
+                ->whereIn('garage_company_id', $companyIds)
+                ->whereNull('afgerond_op')
+                ->where('status', '<>', 'afgerond')
+                ->get(['garage_company_id', 'titel', 'deadline'])
+                ->each(function ($task) use (&$candidates) {
+                    $candidates[(int) $task->garage_company_id][] = [
+                        'soort' => 'Taak',
+                        'titel' => (string) $task->titel,
+                        'due_at' => $task->deadline ? Carbon::parse($task->deadline)->toIso8601String() : null,
+                    ];
+                });
+        }
+
+        $result = [];
+        foreach ($candidates as $companyId => $items) {
+            // Eerst items met datum (vroegste eerst), daarna items zonder datum.
+            usort($items, function ($a, $b) {
+                if ($a['due_at'] === null || $b['due_at'] === null) {
+                    return ($a['due_at'] === null) <=> ($b['due_at'] === null);
+                }
+
+                return strtotime($a['due_at']) <=> strtotime($b['due_at']);
+            });
+            $result[$companyId] = $items[0];
+        }
+
+        return $result;
     }
 
     public function show(Request $request, GarageCompany $garageCompany): Response|RedirectResponse
@@ -532,6 +937,31 @@ class GarageCompaniesController
                 'due_at' => optional($activity->due_at)->toIso8601String(),
             ]);
 
+        // Alleen-lezen samenvatting voor Overzicht: laatste 3 notities, los van de tijdlijn-paginering.
+        $recentNotes = Activity::query()
+            ->where('garage_company_id', $garageCompany->id)
+            ->where('type', ActivityType::Notitie)
+            ->with('creator')
+            ->latest()
+            ->limit(3)
+            ->get()
+            ->map(fn (Activity $activity) => [
+                'id' => $activity->id,
+                'titel' => $activity->titel,
+                'inhoud' => $activity->inhoud,
+                'created_at' => optional($activity->created_at)->toIso8601String(),
+                'creator' => $activity->creator?->name,
+            ]);
+
+        // Welkomstmail al verstuurd volgens de tijdlijn (ook als die buiten de huidige pagina valt).
+        $welcomeSentActivityAt = optional(
+            Activity::query()
+                ->where('garage_company_id', $garageCompany->id)
+                ->where('titel', 'Welkomstmail verstuurd')
+                ->latest()
+                ->first()
+        )->created_at?->toIso8601String();
+
         $emailTemplates = collect();
         if (Schema::hasTable('email_templates')) {
             $templateData = $this->welcomeTemplateData($garageCompany);
@@ -629,6 +1059,8 @@ class GarageCompaniesController
             'activities' => $activities,
             'tasks' => $taken,
             'appointments' => $afspraken,
+            'recentNotes' => $recentNotes,
+            'welcomeSentActivityAt' => $welcomeSentActivityAt,
             'reminderChannels' => collect(ReminderChannel::cases())->map(fn ($c) => $c->value)->values(),
             'hasActiveMandate' => $activeMandate !== null,
             'statusErrors' => $this->statusErrors($garageCompany),
@@ -1110,7 +1542,7 @@ class GarageCompaniesController
 
         $garageCompany->fill($data);
 
-        if ($data['demo_aangevraagd_op'] ?? null && $data['demo_duur_dagen'] ?? null) {
+        if (($data['demo_aangevraagd_op'] ?? null) && ($data['demo_duur_dagen'] ?? null)) {
             $garageCompany->demo_eind_op = Carbon::parse($data['demo_aangevraagd_op'])
                 ->addDays((int) $data['demo_duur_dagen']);
         }
@@ -1883,7 +2315,7 @@ class GarageCompaniesController
 
     private function ensureAssignmentsExist(int $garageCompanyId): void
     {
-        $modules = Module::query()->get();
+        $modules = Module::query()->available()->get();
         $hasAantalColumn = GarageCompanyModule::hasAantalColumn();
 
         foreach ($modules as $module) {
@@ -1968,6 +2400,7 @@ class GarageCompaniesController
     private function defaultModuleRows(): array
     {
         return Module::query()
+            ->available()
             ->orderBy('naam')
             ->get()
             ->map(function (Module $module) {

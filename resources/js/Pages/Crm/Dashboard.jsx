@@ -98,31 +98,60 @@ function Panel({ title, subtitle, action, children }) {
     );
 }
 
-function MetricCard({ label, value, sub, tone = 'default' }) {
+function MetricCard({ label, value, sub, tone = 'default', href }) {
     const toneClasses = {
         default: 'border-zinc-200 bg-white',
         info: 'border-sky-200 bg-sky-50',
         danger: 'border-rose-200 bg-rose-50',
     };
-
-    return (
-        <div className={cx('min-w-0 rounded-xl border p-4', toneClasses[tone] || toneClasses.default)}>
+    const className = cx(
+        'block min-w-0 rounded-xl border p-4',
+        toneClasses[tone] || toneClasses.default,
+        href && 'transition hover:border-indigo-300 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1'
+    );
+    const content = (
+        <>
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">{label}</div>
             <div className="mt-2 break-words text-2xl font-semibold tracking-tight text-zinc-950">{value}</div>
             {sub ? <div className="mt-1 text-sm text-zinc-600">{sub}</div> : null}
-        </div>
+        </>
+    );
+
+    return href ? (
+        <a href={href} className={className}>
+            {content}
+        </a>
+    ) : (
+        <div className={className}>{content}</div>
     );
 }
 
-function QuickLink({ href, title, subtitle }) {
+function daysLeftLabel(days) {
+    if (days < 0) return `${Math.abs(days)} ${Math.abs(days) === 1 ? 'dag' : 'dagen'} verlopen`;
+    if (days === 0) return 'Verloopt vandaag';
+    return `Nog ${days} ${days === 1 ? 'dag' : 'dagen'}`;
+}
+
+function TodayRow({ href, title, meta, overdue, badge }) {
     return (
-        <a
-            href={href}
-            className="min-w-0 rounded-xl border border-zinc-200 bg-white p-4 transition hover:-translate-y-px hover:border-zinc-300 hover:shadow-sm"
-        >
-            <div className="text-sm font-semibold text-zinc-900">{title}</div>
-            <div className="mt-1 text-xs leading-5 text-zinc-600">{subtitle}</div>
-        </a>
+        <li>
+            <a
+                href={href}
+                className={cx(
+                    'flex min-w-0 items-start justify-between gap-3 rounded-xl border bg-white p-3 transition hover:border-zinc-300',
+                    overdue ? 'border-rose-300' : 'border-zinc-200'
+                )}
+            >
+                <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-semibold text-zinc-950" title={title}>{title}</div>
+                    <div className="mt-1 text-xs text-zinc-600">{meta}</div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                    {badge ? <Badge>{badge}</Badge> : null}
+                    {overdue ? <Badge tone="danger">Te laat</Badge> : null}
+                </div>
+            </a>
+        </li>
     );
 }
 
@@ -204,6 +233,10 @@ function DurationRow({ item, typeLabel }) {
 }
 
 export default function Dashboard({ kpis, urls, meta, lists }) {
+    const todayTasks = lists?.today?.tasks ?? [];
+    const todayCustomer = lists?.today?.customer ?? [];
+    const demoEnding = lists?.demo_ending ?? [];
+    const customersUrl = (status) => `${urls.customers}?status=${encodeURIComponent(status)}`;
     const taskItems = lists?.tasks ?? [];
     const appointmentItems = lists?.appointments?.items ?? [];
     const appointmentsByCompany = lists?.appointments?.by_company ?? [];
@@ -229,14 +262,50 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                                 Helder overzicht van taken, afspraken, omzet en statusduur van je klanten.
                             </p>
 
-                            <div className="mt-6 grid gap-3 md:grid-cols-3">
-                                <QuickLink
-                                    href={urls.customers}
-                                    title="Klanten"
-                                    subtitle="Beheer klanten, statussen en contactpersonen."
-                                />
-                                <QuickLink href={urls.tasks} title="Taken" subtitle="Open je takenlijst en werk direct door." />
-                                <QuickLink href={urls.reports} title="Rapportages" subtitle="Bekijk omzet en trends over tijd." />
+                            <div className="mt-6">
+                                <h2 className="text-base font-semibold text-zinc-950">Vandaag</h2>
+                                <div className="mt-3 grid min-w-0 gap-4 lg:grid-cols-2">
+                                    <div className="min-w-0">
+                                        <div className="mb-2 flex items-center justify-between gap-2">
+                                            <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Mijn taken</div>
+                                            <a href={urls.tasks} className="text-xs font-semibold text-indigo-700 hover:underline">Alle taken</a>
+                                        </div>
+                                        {todayTasks.length === 0 ? (
+                                            <EmptyState text="Geen taken voor vandaag of te laat." />
+                                        ) : (
+                                            <ul className="space-y-2">
+                                                {todayTasks.map((task) => (
+                                                    <TodayRow
+                                                        key={`t-${task.id}`}
+                                                        href={task.url}
+                                                        title={task.titel}
+                                                        meta={`Deadline: ${formatDateTime(task.deadline)}`}
+                                                        overdue={task.overdue}
+                                                    />
+                                                ))}
+                                            </ul>
+                                        )}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Klantafspraken en klanttaken</div>
+                                        {todayCustomer.length === 0 ? (
+                                            <EmptyState text="Geen klantafspraken voor vandaag of te laat." />
+                                        ) : (
+                                            <ul className="space-y-2">
+                                                {todayCustomer.map((item) => (
+                                                    <TodayRow
+                                                        key={`a-${item.id}`}
+                                                        href={item.garage_company.url}
+                                                        title={item.titel}
+                                                        meta={`${item.garage_company.bedrijfsnaam} | ${formatDateTime(item.due_at)}`}
+                                                        overdue={item.overdue}
+                                                        badge={item.type === 'afspraak' ? 'Afspraak' : 'Taak'}
+                                                    />
+                                                ))}
+                                            </ul>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -246,6 +315,7 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                                 value={formatInt(kpis.tasks_open)}
                                 sub={`Te laat: ${formatInt(kpis.tasks_overdue)} | Binnen 7 dagen: ${formatInt(kpis.tasks_due_7)}`}
                                 tone={tasksTone}
+                                href={urls.tasks}
                             />
                             <MetricCard
                                 label="MRR excl. btw"
@@ -263,26 +333,68 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                 </section>
 
                 <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <MetricCard label="Klanten totaal" value={formatInt(kpis.companies_total)} sub={`Actief: ${formatInt(kpis.companies_active)}`} />
-                    <MetricCard label="Demo klanten" value={formatInt(kpis.demo_customers)} sub={`Gem. ${formatInt(kpis.demo_avg_days)} dagen`} tone="info" />
-                    <MetricCard label="Gem. actief duur" value={`${formatInt(kpis.active_avg_days)} dagen`} sub="Gemiddelde tijd in actieve status" tone="info" />
+                    <MetricCard label="Klanten totaal" value={formatInt(kpis.companies_total)} sub={`Actief: ${formatInt(kpis.companies_active)}`} href={urls.customers} />
+                    <MetricCard label="Demo klanten" value={formatInt(kpis.demo_customers)} sub={`Gem. ${formatInt(kpis.demo_avg_days)} dagen`} tone="info" href={customersUrl('proefperiode')} />
+                    <MetricCard label="Actieve klanten" value={formatInt(kpis.companies_active)} sub={`Gem. ${formatInt(kpis.active_avg_days)} dagen actief`} tone="info" href={customersUrl('actief')} />
                     <MetricCard
                         label="Opzeggingen (30d)"
                         value={formatInt(kpis.cancelled_last_30)}
                         sub={`Nieuw actief: ${formatInt(kpis.active_new_last_30)} | Demo aangevraagd: ${formatInt(kpis.demo_requested_last_30)}`}
                         tone={cancelledTone}
+                        href={customersUrl('opgezegd')}
                     />
                 </div>
 
+                <Panel
+                    title="Demo's die aflopen"
+                    subtitle="Demo's die binnen 7 dagen eindigen of al verlopen zijn."
+                    action={<ButtonLink href={customersUrl('proefperiode')}>Alle demo klanten</ButtonLink>}
+                >
+                    {demoEnding.length === 0 ? (
+                        <EmptyState text="Geen demo's die binnenkort aflopen." />
+                    ) : (
+                        <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                            {demoEnding.map((item) => (
+                                <li key={item.id}>
+                                    <a
+                                        href={item.url}
+                                        className={cx(
+                                            'flex min-w-0 items-start justify-between gap-3 rounded-xl border bg-white p-4 transition hover:border-zinc-300',
+                                            item.days_left < 0 ? 'border-rose-300' : 'border-zinc-200'
+                                        )}
+                                    >
+                                        <div className="min-w-0 flex-1">
+                                            <div className="truncate text-sm font-semibold text-zinc-950">{item.bedrijfsnaam}</div>
+                                            <div className="mt-1 text-xs text-zinc-600">Einddatum {formatDate(item.demo_eind_op)}</div>
+                                        </div>
+                                        <Badge tone={item.days_left < 0 ? 'danger' : item.days_left <= 2 ? 'info' : 'neutral'}>
+                                            {daysLeftLabel(item.days_left)}
+                                        </Badge>
+                                    </a>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </Panel>
+
                 {kpis.active_missing_sepa > 0 && (
-                    <Panel
-                        title="Actieve klanten zonder complete SEPA"
-                        subtitle="Vul de ontbrekende gegevens aan in de Incasso-tab per klant."
-                        action={
-                            <ButtonLink href={`${urls.customers}?status=actief`}>Actieve klanten</ButtonLink>
-                        }
-                    >
-                        <div className="space-y-3">
+                    <details className="group min-w-0 rounded-2xl border border-amber-200 bg-white p-4 shadow-sm sm:p-5">
+                        <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
+                            <div className="min-w-0">
+                                <h2 className="text-base font-semibold text-zinc-950">
+                                    Actieve klanten zonder complete SEPA{' '}
+                                    <span className="ml-1 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900">
+                                        {formatInt(kpis.active_missing_sepa)}
+                                    </span>
+                                </h2>
+                                <p className="mt-1 text-sm text-zinc-600">Klik om de lijst te tonen. Vul de gegevens aan in de Incasso-tab per klant.</p>
+                            </div>
+                            <span className="text-sm font-semibold text-indigo-700">
+                                <span className="group-open:hidden">Tonen</span>
+                                <span className="hidden group-open:inline">Verbergen</span>
+                            </span>
+                        </summary>
+                        <div className="mt-4 space-y-3">
                             {activeMissingSepaItems.map((item) => (
                                 <a
                                     key={item.id}
@@ -293,8 +405,13 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                                     <div className="mt-1 text-xs text-amber-900">{item.missing.join(', ')}</div>
                                 </a>
                             ))}
+                            {kpis.active_missing_sepa > activeMissingSepaItems.length ? (
+                                <div className="text-xs text-zinc-500">
+                                    En nog {formatInt(kpis.active_missing_sepa - activeMissingSepaItems.length)} andere klanten.
+                                </div>
+                            ) : null}
                         </div>
-                    </Panel>
+                    </details>
                 )}
 
                 <div className="grid min-w-0 gap-6 xl:grid-cols-2">
@@ -338,7 +455,7 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                 <div className="grid min-w-0 gap-6 xl:grid-cols-[1.3fr_0.7fr]">
                     <Panel
                         title="Urgente taken"
-                        subtitle="Open taken gesorteerd op deadline."
+                        subtitle="Open taken uit de takenlijst, gesorteerd op deadline. Klantafspraken staan bij Vandaag."
                         action={
                             <ButtonLink href={urls.tasks}>Naar taken</ButtonLink>
                         }

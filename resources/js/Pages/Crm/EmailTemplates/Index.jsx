@@ -30,13 +30,19 @@ function ToolbarButton({ active, disabled, onClick, children, title }) {
     );
 }
 
-export default function Index({ templates, variables, urls }) {
+export default function Index({ templates, variables, urls, previewCustomers = [] }) {
     const confirm = useConfirm();
     const [selectedId, setSelectedId] = useState(templates?.[0]?.id ?? 'new');
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [flash, setFlash] = useState(null);
     const bodyTouchedRef = useRef(false);
+    const lastFieldRef = useRef('body');
+    const subjectInputRef = useRef(null);
+    const [previewCompanyId, setPreviewCompanyId] = useState('');
+    const [preview, setPreview] = useState(null);
+    const [previewLoading, setPreviewLoading] = useState(false);
+    const [previewError, setPreviewError] = useState('');
     const baselineRef = useRef({ name: '', subject: '', is_active: 1 });
 
     const selectedTemplate = useMemo(
@@ -98,6 +104,9 @@ export default function Index({ templates, variables, urls }) {
                 'aria-multiline': 'true',
                 'aria-label': 'Template inhoud',
             },
+        },
+        onFocus: () => {
+            lastFieldRef.current = 'body';
         },
         onUpdate: ({ editor: ed }) => {
             bodyTouchedRef.current = true;
@@ -222,6 +231,50 @@ export default function Index({ templates, variables, urls }) {
         router.delete(urls.delete.replace('__TEMPLATE__', selectedTemplate.id), options);
     };
 
+    const insertVariable = (token) => {
+        const text = `{{ ${token} }}`;
+        if (lastFieldRef.current === 'subject' && subjectInputRef.current) {
+            const input = subjectInputRef.current;
+            const value = form.data.subject || '';
+            const start = input.selectionStart ?? value.length;
+            const end = input.selectionEnd ?? value.length;
+            const next = value.slice(0, start) + text + value.slice(end);
+            form.setData('subject', next.slice(0, 255));
+            requestAnimationFrame(() => {
+                input.focus();
+                const caret = Math.min(start + text.length, 255);
+                input.setSelectionRange(caret, caret);
+            });
+            return;
+        }
+        editor?.chain().focus().insertContent(text).run();
+    };
+
+    const loadPreview = async (companyId = previewCompanyId) => {
+        if (!companyId || !urls.preview) return;
+        setPreviewLoading(true);
+        setPreviewError('');
+        try {
+            const response = await window.axios.post(urls.preview, {
+                garage_company_id: Number(companyId),
+                subject: form.data.subject || '',
+                body_html: editor ? editor.getHTML() : form.data.body_html || '',
+            });
+            setPreview(response.data);
+        } catch (error) {
+            setPreview(null);
+            setPreviewError('Voorbeeld laden mislukt. Probeer opnieuw.');
+        } finally {
+            setPreviewLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        setPreview(null);
+    }, [selectedId]);
+
+    const variableKeys = Object.keys(variables || {});
+
     const flashText = typeof flash === 'string' ? flash : flash?.text;
     const flashIsError = typeof flash === 'object' && flash?.tone === 'error';
 
@@ -303,11 +356,25 @@ export default function Index({ templates, variables, urls }) {
 
                     <div className="rounded-xl border border-zinc-200 bg-white p-4">
                         <div className="text-xs font-semibold text-zinc-500">Beschikbare velden</div>
+                        <p className="mt-1 text-xs text-zinc-500">Klik om in te voegen op de cursor (onderwerp of inhoud).</p>
                         <div className="mt-2 space-y-1 text-xs text-zinc-600">
-                            {Object.keys(variables || {}).map((token) => (
-                                <div key={token} className="rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1 font-mono">
-                                    {`{{ ${token} }}`}
-                                </div>
+                            {variableKeys.map((token, index) => (
+                                <button
+                                    key={token}
+                                    type="button"
+                                    onMouseDown={(event) => event.preventDefault()}
+                                    onClick={() => insertVariable(token)}
+                                    title={`Voorbeeld: ${variables[token]}`}
+                                    className={cx(
+                                        'flex w-full items-center justify-between gap-2 rounded-md border px-2 py-1 text-left font-mono transition hover:border-indigo-300 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1',
+                                        index === 0 && token === 'activatielink' ? 'border-indigo-200 bg-indigo-50/60' : 'border-zinc-200 bg-zinc-50'
+                                    )}
+                                >
+                                    <span>{`{{ ${token} }}`}</span>
+                                    {index === 0 && token === 'activatielink' ? (
+                                        <span className="font-sans text-[10px] font-semibold uppercase tracking-wide text-indigo-700">Aanbevolen</span>
+                                    ) : null}
+                                </button>
                             ))}
                         </div>
                     </div>
@@ -333,6 +400,10 @@ export default function Index({ templates, variables, urls }) {
                                     <label htmlFor="email-template-subject" className="text-xs font-semibold text-zinc-500">Onderwerp</label>
                                     <input
                                         id="email-template-subject"
+                                        ref={subjectInputRef}
+                                        onFocus={() => {
+                                            lastFieldRef.current = 'subject';
+                                        }}
                                         maxLength={255}
                                         aria-invalid={form.errors.subject ? 'true' : undefined}
                                         className="mt-2 w-full rounded-md border-zinc-300 text-sm"
@@ -465,6 +536,75 @@ export default function Index({ templates, variables, urls }) {
                             )}
                         </div>
                     </form>
+
+                    <section className="rounded-xl border border-zinc-200 bg-white p-4" aria-labelledby="email-template-preview-title">
+                        <div className="flex flex-wrap items-end justify-between gap-3">
+                            <div className="min-w-0">
+                                <h2 id="email-template-preview-title" className="text-sm font-semibold text-zinc-900">Voorbeeld met klantgegevens</h2>
+                                <p className="mt-1 text-xs text-zinc-500">
+                                    Alleen lezen. Gebruikt de huidige (ook niet opgeslagen) inhoud. Er wordt niets verstuurd of opgeslagen.
+                                </p>
+                            </div>
+                            <div className="flex flex-wrap items-end gap-2">
+                                <div>
+                                    <label htmlFor="email-template-preview-customer" className="block text-xs font-semibold text-zinc-500">Klant</label>
+                                    <select
+                                        id="email-template-preview-customer"
+                                        className="mt-1 w-64 max-w-full rounded-md border-zinc-300 text-sm"
+                                        value={previewCompanyId}
+                                        onChange={(e) => {
+                                            setPreviewCompanyId(e.target.value);
+                                            if (e.target.value) loadPreview(e.target.value);
+                                        }}
+                                    >
+                                        <option value="">Kies een klant</option>
+                                        {previewCustomers.map((customer) => (
+                                            <option key={customer.id} value={customer.id}>
+                                                {customer.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <button
+                                    type="button"
+                                    className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60"
+                                    disabled={!previewCompanyId || previewLoading}
+                                    onClick={() => loadPreview()}
+                                >
+                                    {previewLoading ? 'Laden...' : 'Voorbeeld vernieuwen'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {previewError ? (
+                            <div role="alert" className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+                                {previewError}
+                            </div>
+                        ) : null}
+
+                        {preview ? (
+                            <div className="mt-4 overflow-hidden rounded-lg border border-zinc-200">
+                                <div className="space-y-1 border-b border-zinc-100 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
+                                    <div>
+                                        <span className="font-semibold text-zinc-700">Aan:</span> {preview.to || '-'}
+                                    </div>
+                                    <div>
+                                        <span className="font-semibold text-zinc-700">Onderwerp:</span> {preview.subject || '-'}
+                                    </div>
+                                </div>
+                                <iframe
+                                    title="Voorbeeld van de e-mail"
+                                    sandbox=""
+                                    className="h-96 w-full bg-white"
+                                    srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:system-ui,sans-serif;font-size:14px;line-height:1.6;color:#18181b;margin:16px;}a{color:#4f46e5;}</style></head><body>${preview.html || ''}</body></html>`}
+                                />
+                            </div>
+                        ) : !previewError ? (
+                            <div className="mt-4 rounded-lg border border-dashed border-zinc-200 bg-zinc-50 px-3 py-6 text-center text-xs text-zinc-500">
+                                Kies een klant om het voorbeeld te tonen.
+                            </div>
+                        ) : null}
+                    </section>
                 </div>
             </div>
         </div>

@@ -66,6 +66,31 @@ class Index extends Component
 
         $data = $this->validate($rules);
 
+        if ($this->userId) {
+            $existing = User::query()->findOrFail($this->userId);
+            $willBeAdmin = $data['role'] === UserRole::Admin->value;
+            $willBeActive = (bool) $data['active'];
+
+            if ($existing->id === auth()->id()) {
+                if (! $willBeActive) {
+                    $this->addError('active', 'Je kunt je eigen account niet deactiveren.');
+
+                    return;
+                }
+                if ($existing->isAdmin() && ! $willBeAdmin) {
+                    $this->addError('role', 'Je kunt je eigen adminrol niet verwijderen.');
+
+                    return;
+                }
+            }
+
+            if (self::isLastActiveAdmin($existing) && (! $willBeAdmin || ! $willBeActive)) {
+                $this->addError($willBeActive ? 'role' : 'active', 'Dit is de laatste actieve admin. Maak eerst een andere admin aan.');
+
+                return;
+            }
+        }
+
         $values = [
             'name' => $data['name'],
             'email' => $data['email'],
@@ -89,6 +114,22 @@ class Index extends Component
         session()->now('livewire_status', 'Gebruiker opgeslagen.');
     }
 
+    /**
+     * Waar als deze gebruiker de enige actieve admin is.
+     */
+    public static function isLastActiveAdmin(User $user): bool
+    {
+        if (! $user->isAdmin() || ! $user->active) {
+            return false;
+        }
+
+        return ! User::query()
+            ->where('role', UserRole::Admin->value)
+            ->where('active', true)
+            ->whereKeyNot($user->getKey())
+            ->exists();
+    }
+
     private function resetForm(): void
     {
         $this->name = '';
@@ -109,8 +150,12 @@ class Index extends Component
             ->orderBy('name')
             ->get();
 
+        $activeAdminCount = $users->filter(fn (User $u) => $u->isAdmin() && $u->active)->count();
+
         return view('livewire.crm.users.index', [
             'users' => $users,
+            'currentUserId' => auth()->id(),
+            'activeAdminCount' => $activeAdminCount,
             'roles' => UserRole::cases(),
         ])->layout('layouts.crm', ['title' => 'Gebruikers']);
     }

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
-import { Head } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { DndContext, DragOverlay, PointerSensor, closestCorners, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -114,6 +114,160 @@ function toLocalInputValue(isoString) {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+function isOverdue(task) {
+    if (!task?.deadline || task.status === 'afgerond') return false;
+    const date = new Date(task.deadline);
+    return !Number.isNaN(date.getTime()) && date.getTime() < Date.now();
+}
+
+function OverdueBadge() {
+    return <span className="inline-flex shrink-0 items-center rounded-full bg-rose-600 px-2 py-0.5 text-[11px] font-semibold text-white">Te laat</span>;
+}
+
+const VIEW_TO_URL = { list: 'lijst', board: 'bord', team: 'team' };
+const URL_TO_VIEW = { lijst: 'list', bord: 'board', team: 'team' };
+
+function readUrlState() {
+    if (typeof window === 'undefined') return {};
+    const params = new URLSearchParams(window.location.search);
+    const group = params.get('groep');
+    return {
+        view: URL_TO_VIEW[params.get('weergave')] ?? null,
+        group: group === 'project' || group === 'status' ? group : null,
+        appointments: params.get('afspraken') === '1',
+        taskId: parseId(params.get('taak') ?? '') || null,
+    };
+}
+
+function shortcutDate(kind) {
+    const date = new Date();
+    if (kind === 'vandaag') {
+        date.setHours(17, 0, 0, 0);
+    } else if (kind === 'morgen') {
+        date.setDate(date.getDate() + 1);
+        date.setHours(9, 0, 0, 0);
+    } else {
+        date.setDate(date.getDate() + 7);
+        date.setHours(9, 0, 0, 0);
+    }
+    return toLocalInputValue(date.toISOString());
+}
+
+function CustomerPicker({ id, value, onChange, placeholder = 'Zoek een klant...', clearLabel = 'Wijzigen' }) {
+    const [query, setQuery] = useState('');
+    const [results, setResults] = useState([]);
+    const [open, setOpen] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [active, setActive] = useState(-1);
+    const seqRef = useRef(0);
+
+    useEffect(() => {
+        if (!open || value) return undefined;
+        const handler = setTimeout(async () => {
+            const seq = ++seqRef.current;
+            setLoading(true);
+            try {
+                const response = await axios.get('/taken/klanten', { params: { q: query.trim() || undefined } });
+                if (seq === seqRef.current) setResults(response.data.customers ?? []);
+            } catch {
+                if (seq === seqRef.current) setResults([]);
+            } finally {
+                if (seq === seqRef.current) setLoading(false);
+            }
+        }, 200);
+        return () => clearTimeout(handler);
+    }, [query, open, value]);
+
+    const choose = (customer) => {
+        onChange(customer);
+        setQuery('');
+        setOpen(false);
+        setActive(-1);
+    };
+
+    if (value) {
+        return (
+            <div className="mt-1 flex items-center justify-between gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm">
+                <a href={value.url} className="truncate font-semibold text-indigo-700 hover:underline">
+                    {value.naam}
+                </a>
+                <button
+                    type="button"
+                    className="shrink-0 rounded text-xs font-semibold text-zinc-600 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
+                    aria-label={`${clearLabel}: klant ${value.naam}`}
+                    onClick={() => onChange(null)}
+                >
+                    {clearLabel}
+                </button>
+            </div>
+        );
+    }
+
+    const listId = `${id}-opties`;
+    return (
+        <div className="relative mt-1">
+            <input
+                id={id}
+                role="combobox"
+                aria-expanded={open}
+                aria-controls={listId}
+                aria-autocomplete="list"
+                aria-activedescendant={active >= 0 ? `${listId}-${active}` : undefined}
+                autoComplete="off"
+                className="w-full rounded-md border-zinc-300 text-sm"
+                placeholder={placeholder}
+                value={query}
+                onFocus={() => setOpen(true)}
+                onBlur={() => setTimeout(() => setOpen(false), 150)}
+                onChange={(e) => {
+                    setQuery(e.target.value);
+                    setOpen(true);
+                    setActive(-1);
+                }}
+                onKeyDown={(e) => {
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        setOpen(true);
+                        setActive((i) => Math.min(i + 1, results.length - 1));
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        setActive((i) => Math.max(i - 1, 0));
+                    } else if (e.key === 'Enter' && open && results[active]) {
+                        e.preventDefault();
+                        choose(results[active]);
+                    } else if (e.key === 'Escape' && open) {
+                        // Alleen de lijst sluiten, niet de omliggende modal.
+                        e.stopPropagation();
+                        setOpen(false);
+                    }
+                }}
+            />
+            {open ? (
+                <ul id={listId} role="listbox" className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-zinc-200 bg-white py-1 text-sm shadow-lg">
+                    {loading && results.length === 0 ? <li className="px-3 py-2 text-zinc-500">Zoeken...</li> : null}
+                    {!loading && results.length === 0 ? <li className="px-3 py-2 text-zinc-500">Geen klanten gevonden.</li> : null}
+                    {results.map((customer, idx) => (
+                        <li
+                            key={customer.id}
+                            id={`${listId}-${idx}`}
+                            role="option"
+                            aria-selected={idx === active}
+                            className={cx('cursor-pointer px-3 py-2', idx === active ? 'bg-indigo-50 text-indigo-900' : 'hover:bg-zinc-50')}
+                            onMouseDown={(e) => {
+                                e.preventDefault();
+                                choose(customer);
+                            }}
+                        >
+                            <span className="font-semibold">{customer.naam}</span>
+                            {customer.plaats ? <span className="ml-2 text-xs text-zinc-500">{customer.plaats}</span> : null}
+                        </li>
+                    ))}
+                </ul>
+            ) : null}
+        </div>
+    );
+}
+
 function Button({ tone = 'primary', className = '', ...props }) {
     const base =
         'inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60';
@@ -160,7 +314,12 @@ function SortableTaskCard({ task, onOpen }) {
                 </div>
                 <div className="mt-3 flex items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2">
-                        {task.deadline ? <Pill>{formatDateTime(task.deadline)}</Pill> : <Pill className="text-zinc-400">Geen deadline</Pill>}
+                        {isOverdue(task) ? <OverdueBadge /> : null}
+                        {task.deadline ? (
+                            <Pill className={isOverdue(task) ? 'bg-rose-50 text-rose-700' : ''}>{formatDateTime(task.deadline)}</Pill>
+                        ) : (
+                            <Pill className="text-zinc-400">Geen deadline</Pill>
+                        )}
                         {task.counts?.comments ? <Pill>{task.counts.comments} reacties</Pill> : null}
                         {task.counts?.attachments ? <Pill>{task.counts.attachments} bijlagen</Pill> : null}
                     </div>
@@ -182,6 +341,15 @@ function SortableTaskCard({ task, onOpen }) {
                     </div>
                 </div>
             </button>
+            {task.customer ? (
+                <a
+                    href={task.customer.url}
+                    className="mt-2 block truncate rounded text-xs font-semibold text-indigo-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
+                    onPointerDown={(e) => e.stopPropagation()}
+                >
+                    Klant: {task.customer.naam}
+                </a>
+            ) : null}
         </div>
     );
 }
@@ -286,15 +454,21 @@ function findContainerId(itemsByColumn, id) {
     return Object.keys(itemsByColumn).find((key) => itemsByColumn[key].includes(id)) ?? null;
 }
 
-export default function Tasks({ initial, filters, urls }) {
+export default function Tasks({ initial, filters, customerFilter, urls }) {
+    const currentUserId = Number(usePage().props?.auth?.user?.id) || null;
+    const [urlInit] = useState(() => readUrlState());
     const [tasks, setTasks] = useState(initial?.tasks ?? []);
     const [projects, setProjects] = useState(initial?.projects ?? []);
     const [users, setUsers] = useState(() => dedupeById(initial?.users));
     const [statusOptions, setStatusOptions] = useState(initial?.statusOptions ?? []);
     const [priorityOptions, setPriorityOptions] = useState(initial?.priorityOptions ?? []);
 
-    const [view, setView] = useState('board'); // board | list | team
-    const [groupBoardBy, setGroupBoardBy] = useState('project'); // project | status
+    const [view, setView] = useState(urlInit.view ?? 'board'); // board | list | team
+    const [groupBoardBy, setGroupBoardBy] = useState(urlInit.group ?? 'status'); // project | status
+    const [filterCustomer, setFilterCustomer] = useState(customerFilter ?? null);
+    const [showAppointments, setShowAppointments] = useState(Boolean(urlInit.appointments));
+    const [appointments, setAppointments] = useState(Array.isArray(initial?.appointments) ? initial.appointments : []);
+    const [appointmentBusy, setAppointmentBusy] = useState({});
     const [sortMode, setSortMode] = useState(filters?.sort ?? 'deadline');
     const [filterProject, setFilterProject] = useState(filters?.project ?? '');
     const [filterAssignee, setFilterAssignee] = useState(filters?.assignee ?? '');
@@ -319,6 +493,7 @@ export default function Tasks({ initial, filters, urls }) {
         deadline: '',
         labels: '',
         assignees: [],
+        customer: null,
     });
     const [taskFiles, setTaskFiles] = useState([]);
     const [taskErrors, setTaskErrors] = useState({});
@@ -353,6 +528,8 @@ export default function Tasks({ initial, filters, urls }) {
                     priority: filterPriority || undefined,
                     search: search || undefined,
                     sort: sortMode || undefined,
+                    klant: filterCustomer?.id || undefined,
+                    afspraken: showAppointments ? 1 : undefined,
                 },
             });
             // Negeer verouderde antwoorden als de filters intussen zijn gewijzigd.
@@ -362,13 +539,14 @@ export default function Tasks({ initial, filters, urls }) {
             setUsers(dedupeById(response.data.users));
             setStatusOptions(response.data.statusOptions ?? []);
             setPriorityOptions(response.data.priorityOptions ?? []);
+            if (Array.isArray(response.data.appointments)) setAppointments(response.data.appointments);
         } catch {
             if (seq !== fetchSeqRef.current) return;
             setNotice({ tone: 'error', text: 'Taken laden mislukt. Probeer opnieuw.' });
         } finally {
             if (seq === fetchSeqRef.current) setLoading(false);
         }
-    }, [filterProject, filterAssignee, filterStatus, filterPriority, search, sortMode]);
+    }, [filterProject, filterAssignee, filterStatus, filterPriority, search, sortMode, filterCustomer, showAppointments]);
 
     useEffect(() => {
         const handler = setTimeout(() => fetchTasks(), 250);
@@ -428,6 +606,79 @@ export default function Tasks({ initial, filters, urls }) {
         setDetailErrors({});
     }, []);
 
+    // Weergave, filters en open taak in de URL bewaren (deelbaar en herlaadbaar).
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const params = new URLSearchParams();
+        params.set('weergave', VIEW_TO_URL[view] ?? 'bord');
+        if (view === 'board') params.set('groep', groupBoardBy);
+        if (filterProject) params.set('project', filterProject);
+        if (filterAssignee) params.set('assignee', filterAssignee);
+        if (filterStatus) params.set('status', filterStatus);
+        if (filterPriority) params.set('priority', filterPriority);
+        if (search) params.set('search', search);
+        if (sortMode && sortMode !== 'deadline') params.set('sort', sortMode);
+        if (filterCustomer?.id) params.set('klant', String(filterCustomer.id));
+        if (showAppointments) params.set('afspraken', '1');
+        if (selectedTaskId) params.set('taak', String(selectedTaskId));
+        const qs = params.toString();
+        const next = `${window.location.pathname}${qs ? `?${qs}` : ''}`;
+        if (next !== `${window.location.pathname}${window.location.search}`) {
+            window.history.replaceState(window.history.state, '', next);
+        }
+    }, [view, groupBoardBy, filterProject, filterAssignee, filterStatus, filterPriority, search, sortMode, filterCustomer, showAppointments, selectedTaskId]);
+
+    useEffect(() => {
+        if (urlInit.taskId) openTask(urlInit.taskId);
+        // Alleen bij het laden van de pagina.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const completeSelectedTask = useCallback(async () => {
+        if (!selectedTask) return;
+        setDetailSaving(true);
+        try {
+            const response = await axios.patch(`/taken/tasks/${selectedTask.id}/status`, { status: 'afgerond' });
+            const updated = response.data.task;
+            setTasks((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
+            setSelectedTask((prev) => (prev && prev.id === updated.id ? { ...prev, status: updated.status } : prev));
+            setNotice({ tone: 'success', text: 'Taak afgerond.' });
+        } catch (error) {
+            setNotice({ tone: 'error', text: firstError(error, 'Afronden mislukt.') });
+        } finally {
+            setDetailSaving(false);
+        }
+    }, [selectedTask]);
+
+    const completeAppointment = useCallback((appointment) => {
+        if (!appointment?.done_url) return;
+        // Hergebruikt de bestaande route op de klantpagina (markTaskDone).
+        router.patch(
+            appointment.done_url,
+            {},
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onStart: () => setAppointmentBusy((prev) => ({ ...prev, [appointment.id]: true })),
+                onSuccess: () => setAppointments((prev) => prev.filter((a) => a.id !== appointment.id)),
+                onError: () => setNotice({ tone: 'error', text: 'Afronden mislukt.' }),
+                onFinish: () => setAppointmentBusy((prev) => ({ ...prev, [appointment.id]: false })),
+            },
+        );
+    }, []);
+
+    const openNewTaskModal = useCallback(() => {
+        setTaskForm((t) => {
+            const next = { ...t };
+            if (next.assignees.length === 0 && currentUserId && users.some((u) => Number(u.id) === currentUserId)) {
+                next.assignees = [currentUserId];
+            }
+            if (!next.customer && filterCustomer) next.customer = filterCustomer;
+            return next;
+        });
+        setShowTaskModal(true);
+    }, [currentUserId, users, filterCustomer]);
+
     const saveTaskDetails = useCallback(
         async (event) => {
             event.preventDefault();
@@ -446,6 +697,7 @@ export default function Tasks({ initial, filters, urls }) {
                         prioriteit: selectedTask.prioriteit ?? 'normaal',
                         task_project_id: selectedTask.task_project_id ?? null,
                         deadline: selectedTask.deadline ?? null,
+                        garage_company_id: selectedTask.customer?.id ?? null,
                         status: selectedTask.status ?? 'open',
                         assignees: (selectedTask.assignees ?? []).map((a) => a.id),
                     });
@@ -781,6 +1033,7 @@ export default function Tasks({ initial, filters, urls }) {
                     deadline: null,
                     labels: null,
                     assignees: view === 'team' ? (column.assigneeId ? [column.assigneeId] : []) : [],
+                    garage_company_id: filterCustomer?.id ?? null,
                 };
                 const response = await axios.post('/taken/tasks', payload);
                 const created = response.data.task;
@@ -792,7 +1045,7 @@ export default function Tasks({ initial, filters, urls }) {
                 setQuickAddSaving((prev) => ({ ...prev, [column.id]: false }));
             }
         },
-        [filterProject, group, quickAddSaving, view],
+        [filterCustomer, filterProject, group, quickAddSaving, view],
     );
 
     const createTask = useCallback(
@@ -809,6 +1062,7 @@ export default function Tasks({ initial, filters, urls }) {
                 form.append('prioriteit', taskForm.prioriteit);
                 if (taskForm.deadline) form.append('deadline', taskForm.deadline);
                 if (taskForm.labels) form.append('labels', taskForm.labels);
+                if (taskForm.customer?.id) form.append('garage_company_id', taskForm.customer.id);
                 taskForm.assignees.forEach((id) => form.append('assignees[]', id));
                 taskFiles.forEach((file) => form.append('attachments[]', file));
 
@@ -822,6 +1076,7 @@ export default function Tasks({ initial, filters, urls }) {
                     deadline: '',
                     labels: '',
                     assignees: [],
+                    customer: null,
                 });
                 setTaskFiles([]);
                 setShowTaskModal(false);
@@ -883,7 +1138,7 @@ export default function Tasks({ initial, filters, urls }) {
                                 Team
                             </button>
                         </div>
-                        <Button onClick={() => setShowTaskModal(true)}>Nieuwe taak</Button>
+                        <Button onClick={openNewTaskModal}>Nieuwe taak</Button>
                         <Button tone="secondary" onClick={() => setShowProjectModal(true)}>
                             Nieuw project
                         </Button>
@@ -953,7 +1208,11 @@ export default function Tasks({ initial, filters, urls }) {
                                 ))}
                             </select>
                         </div>
-                        <div className="md:col-span-2 lg:col-span-2">
+                        <div>
+                            <label htmlFor="tasks-filter-klant" className="block text-xs font-semibold text-zinc-500">Klant</label>
+                            <CustomerPicker id="tasks-filter-klant" value={filterCustomer} onChange={setFilterCustomer} placeholder="Alle klanten" clearLabel="Wissen" />
+                        </div>
+                        <div>
                             <label htmlFor="tasks-filter-toegewezen-aan" className="block text-xs font-semibold text-zinc-500">Toegewezen aan</label>
                             <select id="tasks-filter-toegewezen-aan" className="mt-1 w-full rounded-md border-zinc-300 text-sm" value={filterAssignee} onChange={(e) => setFilterAssignee(e.target.value)}>
                                 <option value="">Iedereen</option>
@@ -986,12 +1245,85 @@ export default function Tasks({ initial, filters, urls }) {
                         <div className="flex items-center gap-2">
                             {loading ? <span className="font-semibold text-zinc-700" role="status">Laden...</span> : null}
                             <span>{tasks.length === 1 ? '1 taak' : `${tasks.length} taken`}</span>
+                            <label className="ml-3 inline-flex items-center gap-2 text-sm font-semibold text-zinc-700">
+                                <input
+                                    type="checkbox"
+                                    className="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-600"
+                                    checked={showAppointments}
+                                    onChange={(e) => setShowAppointments(e.target.checked)}
+                                />
+                                Toon klantafspraken
+                            </label>
                         </div>
                         <Button tone="ghost" onClick={() => fetchTasks()} disabled={loading}>
                             Vernieuwen
                         </Button>
                     </div>
                 </div>
+
+                {showAppointments ? (
+                    <section className="mt-6 overflow-hidden rounded-2xl border border-zinc-200 bg-white" aria-labelledby="tasks-klantafspraken-title">
+                        <div className="flex items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3">
+                            <div>
+                                <h2 id="tasks-klantafspraken-title" className="text-sm font-semibold text-zinc-900">Klantafspraken</h2>
+                                <p className="mt-0.5 text-xs text-zinc-500">Open taken en afspraken vanaf de klantpagina's.</p>
+                            </div>
+                            <span className="rounded-full bg-zinc-200 px-2 py-0.5 text-xs font-semibold text-zinc-700">{appointments.length}</span>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-zinc-200 text-sm">
+                                <thead className="bg-zinc-50">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">Type</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">Titel</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">Klant</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">Datum</th>
+                                        <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500">Actie</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-zinc-200">
+                                    {appointments.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={5} className="px-4 py-6 text-center text-sm text-zinc-500">
+                                                {loading ? 'Laden...' : 'Geen open klantafspraken.'}
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        appointments.map((a) => (
+                                            <tr key={a.id} className="hover:bg-zinc-50">
+                                                <td className="px-4 py-3 text-zinc-600">{a.type === 'afspraak' ? 'Afspraak' : 'Taak'}</td>
+                                                <td className="px-4 py-3">
+                                                    <div className="font-semibold text-zinc-900">{a.titel}</div>
+                                                    {a.inhoud ? <div className="mt-0.5 line-clamp-2 text-xs text-zinc-500">{a.inhoud}</div> : null}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    {a.customer ? (
+                                                        <a href={`${a.customer.url}?tab=taken_afspraken`} className="font-semibold text-indigo-700 hover:underline">
+                                                            {a.customer.naam}
+                                                        </a>
+                                                    ) : (
+                                                        '-'
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <span className={a.overdue ? 'font-semibold text-rose-700' : 'text-zinc-600'}>{a.due_at ? formatDateTime(a.due_at) : '-'}</span>
+                                                        {a.overdue ? <OverdueBadge /> : null}
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    <Button tone="secondary" className="px-2 py-1 text-xs" disabled={Boolean(appointmentBusy[a.id])} onClick={() => completeAppointment(a)}>
+                                                        {appointmentBusy[a.id] ? 'Bezig...' : 'Afronden'}
+                                                    </Button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                ) : null}
 
                 {view === 'list' ? (
                     <div className="mt-6 overflow-hidden rounded-2xl border border-zinc-200 bg-white">
@@ -1000,6 +1332,7 @@ export default function Tasks({ initial, filters, urls }) {
                                 <thead className="bg-zinc-50">
                                     <tr>
                                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">Taak</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">Klant</th>
                                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">Project</th>
                                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">Status</th>
                                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">Prioriteit</th>
@@ -1011,7 +1344,7 @@ export default function Tasks({ initial, filters, urls }) {
                                 <tbody className="divide-y divide-zinc-200">
                                     {listRows.length === 0 ? (
                                         <tr>
-                                            <td colSpan={7} className="px-4 py-10 text-center text-sm text-zinc-500">
+                                            <td colSpan={8} className="px-4 py-10 text-center text-sm text-zinc-500">
                                                 {loading ? 'Laden...' : 'Geen taken gevonden.'}
                                             </td>
                                         </tr>
@@ -1023,6 +1356,15 @@ export default function Tasks({ initial, filters, urls }) {
                                                         {task.titel}
                                                     </button>
                                                 </td>
+                                                <td className="px-4 py-3">
+                                                    {task.customer ? (
+                                                        <a href={task.customer.url} className="font-semibold text-indigo-700 hover:underline">
+                                                            {task.customer.naam}
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-zinc-400">-</span>
+                                                    )}
+                                                </td>
                                                 <td className="px-4 py-3 text-zinc-600">{task.project?.naam ?? '-'}</td>
                                                 <td className="px-4 py-3 text-zinc-600">{statusLabel(task.status)}</td>
                                                 <td className="px-4 py-3">
@@ -1030,7 +1372,14 @@ export default function Tasks({ initial, filters, urls }) {
                                                         {priorityMeta(task.prioriteit).label}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-3 text-zinc-600">{task.deadline ? formatDateTime(task.deadline) : '-'}</td>
+                                                <td className="px-4 py-3">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <span className={isOverdue(task) ? 'font-semibold text-rose-700' : 'text-zinc-600'}>
+                                                            {task.deadline ? formatDateTime(task.deadline) : '-'}
+                                                        </span>
+                                                        {isOverdue(task) ? <OverdueBadge /> : null}
+                                                    </div>
+                                                </td>
                                                 <td className="px-4 py-3">
                                                     <div className="flex flex-wrap gap-2">
                                                         {task.assignees?.length ? task.assignees.map((a) => <Pill key={a.id}>{a.name}</Pill>) : <span className="text-zinc-400">-</span>}
@@ -1291,6 +1640,26 @@ export default function Tasks({ initial, filters, urls }) {
                                         value={taskForm.deadline}
                                         onChange={(e) => setTaskForm((t) => ({ ...t, deadline: e.target.value }))}
                                     />
+                                    <div className="mt-1 flex flex-wrap gap-1" role="group" aria-label="Snelle deadline">
+                                        {[
+                                            ['vandaag', 'Vandaag'],
+                                            ['morgen', 'Morgen'],
+                                            ['week', 'Volgende week'],
+                                        ].map(([kind, label]) => (
+                                            <button
+                                                key={kind}
+                                                type="button"
+                                                className="rounded-md bg-zinc-100 px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
+                                                onClick={() => setTaskForm((t) => ({ ...t, deadline: shortcutDate(kind) }))}
+                                            >
+                                                {label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label htmlFor="tasks-task-klant" className="block text-xs font-semibold text-zinc-500">Klant</label>
+                                    <CustomerPicker id="tasks-task-klant" value={taskForm.customer} onChange={(customer) => setTaskForm((t) => ({ ...t, customer }))} />
                                 </div>
                                 <div className="md:col-span-2">
                                     <label htmlFor="tasks-task-labels" className="block text-xs font-semibold text-zinc-500">Labels</label>
@@ -1360,12 +1729,24 @@ export default function Tasks({ initial, filters, urls }) {
                     >
                         <div className="flex items-start justify-between gap-4 border-b border-zinc-200 p-6">
                             <div>
-                                <div id="task-detail-title" className="text-lg font-bold text-zinc-900">Taak</div>
+                                <div className="flex items-center gap-2">
+                                    <div id="task-detail-title" className="text-lg font-bold text-zinc-900">Taak</div>
+                                    {isOverdue(selectedTask) ? <OverdueBadge /> : null}
+                                </div>
                                 <div className="mt-1 text-sm text-zinc-500">{selectedTask?.project?.naam ?? 'Geen project'}</div>
                             </div>
-                            <Button tone="ghost" onClick={closeTask}>
-                                Sluiten
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                {selectedTask && selectedTask.status !== 'afgerond' ? (
+                                    <Button onClick={completeSelectedTask} disabled={detailSaving}>
+                                        Afronden
+                                    </Button>
+                                ) : selectedTask ? (
+                                    <Pill className="bg-emerald-50 text-emerald-700">Afgerond</Pill>
+                                ) : null}
+                                <Button tone="ghost" onClick={closeTask}>
+                                    Sluiten
+                                </Button>
+                            </div>
                         </div>
                         {detailLoading ? (
                             <div className="p-6 text-sm text-zinc-600">Laden...</div>
@@ -1446,18 +1827,29 @@ export default function Tasks({ initial, filters, urls }) {
                                             </select>
                                         </div>
                                         <div>
-                                            <label htmlFor="tasks-detail-deadline" className="block text-xs font-semibold text-zinc-500">Deadline</label>
+                                            <label htmlFor="tasks-detail-deadline" className="flex items-center gap-2 text-xs font-semibold text-zinc-500">
+                                                Deadline {isOverdue(selectedTask) ? <OverdueBadge /> : null}
+                                            </label>
                                             <input
                                                 id="tasks-detail-deadline"
                                                 type="datetime-local"
                                                 className="mt-1 w-full rounded-md border-zinc-300 text-sm"
                                                 value={toLocalInputValue(selectedTask.deadline)}
+                                                aria-invalid={isOverdue(selectedTask) || undefined}
                                                 onChange={(e) =>
                                                     setSelectedTask((t) => ({
                                                         ...t,
                                                         deadline: e.target.value || null,
                                                     }))
                                                 }
+                                            />
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <label htmlFor="tasks-detail-klant" className="block text-xs font-semibold text-zinc-500">Klant</label>
+                                            <CustomerPicker
+                                                id="tasks-detail-klant"
+                                                value={selectedTask.customer ?? null}
+                                                onChange={(customer) => setSelectedTask((t) => ({ ...t, customer, garage_company_id: customer?.id ?? null }))}
                                             />
                                         </div>
                                         <div className="md:col-span-2">

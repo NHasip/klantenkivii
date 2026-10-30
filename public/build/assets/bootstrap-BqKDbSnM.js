@@ -1,1 +1,0 @@
-import{i as e}from"./axios-lzVaaQ-7.js";window.axios=e,window.axios.defaults.headers.common[`X-Requested-With`]=`XMLHttpRequest`;

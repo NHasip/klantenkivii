@@ -137,4 +137,97 @@ class RevenueCalculator
     {
         return self::totals(self::demoStatuses(), $companyQuery);
     }
+
+    /**
+     * MRR (excl. btw) per maand voor de laatste $months maanden, berekend uit de
+     * start- en einddatums van modulekoppelingen en de actief/opzeg/verloren-datums
+     * van klanten. Peildatum is het einde van elke maand (voor de huidige maand:
+     * vandaag). De laatste maand gebruikt exact mrr(), zodat het getal gelijk is
+     * aan het dashboard. Historie is een benadering: er is geen statuslog.
+     *
+     * @return list<array{month: string, label: string, excl: float}>
+     */
+    public static function mrrHistory(int $months = 12): array
+    {
+        $tz = 'Europe/Amsterdam';
+        $now = CarbonImmutable::now($tz);
+        $hasAantal = GarageCompanyModule::hasAantalColumn();
+
+        $select = [
+            'garage_company_modules.actief',
+            'garage_company_modules.prijs_maand_excl',
+            'garage_company_modules.startdatum',
+            'garage_company_modules.einddatum',
+            'garage_companies.status as company_status',
+            'garage_companies.actief_vanaf',
+            'garage_companies.created_at as company_created_at',
+            'garage_companies.opgezegd_op',
+            'garage_companies.verloren_op',
+        ];
+        if ($hasAantal) {
+            $select[] = 'garage_company_modules.aantal';
+        }
+
+        $rows = GarageCompanyModule::query()
+            ->join('garage_companies', 'garage_companies.id', '=', 'garage_company_modules.garage_company_id')
+            ->whereIn('garage_company_modules.garage_company_id', GarageCompany::query()->select('garage_companies.id'))
+            ->where(function ($q) {
+                // Huidig actieve modules, of beëindigde modules met een einddatum (historie).
+                $q->where('garage_company_modules.actief', true)
+                    ->orWhereNotNull('garage_company_modules.einddatum');
+            })
+            ->get($select)
+            ->map(function ($row) use ($tz, $hasAantal) {
+                $date = fn ($value) => $value ? CarbonImmutable::parse($value, $tz)->toDateString() : null;
+                $since = $date($row->actief_vanaf);
+                if ($since === null && (string) $row->company_status === GarageCompanyStatus::Actief->value) {
+                    $since = $date($row->company_created_at);
+                }
+
+                return [
+                    'amount' => (float) $row->prijs_maand_excl * ($hasAantal ? max(0, (int) ($row->aantal ?? 1)) : 1),
+                    'start' => $date($row->startdatum),
+                    'end' => $date($row->einddatum),
+                    'since' => $since,
+                    'opgezegd' => $date($row->opgezegd_op),
+                    'verloren' => $date($row->verloren_op),
+                ];
+            });
+
+        $result = [];
+        for ($i = $months - 1; $i >= 0; $i--) {
+            $month = $now->startOfMonth()->subMonthsNoOverflow($i);
+            $label = $month->locale('nl')->translatedFormat('M Y');
+
+            if ($i === 0) {
+                $result[] = ['month' => $month->format('Y-m'), 'label' => $label, 'excl' => self::mrr()['excl']];
+
+                continue;
+            }
+
+            $peil = $month->endOfMonth()->toDateString();
+            $sum = 0.0;
+            foreach ($rows as $row) {
+                if ($row['start'] !== null && $row['start'] > $peil) {
+                    continue;
+                }
+                if ($row['end'] !== null && $row['end'] < $peil) {
+                    continue;
+                }
+                if ($row['since'] === null || $row['since'] > $peil) {
+                    continue;
+                }
+                foreach (['opgezegd', 'verloren'] as $stop) {
+                    if ($row[$stop] !== null && $row[$stop] <= $peil && $row[$stop] >= $row['since']) {
+                        continue 2;
+                    }
+                }
+                $sum += $row['amount'];
+            }
+
+            $result[] = ['month' => $month->format('Y-m'), 'label' => $label, 'excl' => round($sum, 2)];
+        }
+
+        return $result;
+    }
 }

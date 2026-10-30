@@ -9,4 +9,5 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote')->hourly();
 
 Schedule::command('reminders:send-due')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('crm:daily-checks')->dailyAt('08:00')->timezone('Europe/Amsterdam')->withoutOverlapping();
 Schedule::command('leads:import-imap')->everyFiveMinutes()->withoutOverlapping();

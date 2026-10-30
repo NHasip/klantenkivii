@@ -6,10 +6,10 @@
     <button type="button" x-ref="bellButton" class="relative rounded-md p-2 hover:bg-zinc-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1"
             @click="open = !open; if (open) { $dispatch('kivii-menu-open', 'bell'); $wire.$refresh() }"
             :aria-expanded="open.toString()" aria-controls="reminders-panel"
-            aria-label="Herinneringen{{ $count > 0 ? ' ('.$count.' nieuw)' : '' }}">
+            aria-label="Meldingen{{ $count > 0 ? ' ('.$count.')' : '' }}">
         <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 2a6 6 0 00-6 6v2.586l-.707.707A1 1 0 004 13h12a1 1 0 00.707-1.707L16 10.586V8a6 6 0 00-6-6z"/><path d="M10 18a3 3 0 01-2.995-2.824L7 15h6a3 3 0 01-3 3z"/></svg>
         @if($count > 0)
-            <span aria-hidden="true" class="absolute -right-0.5 -top-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-indigo-600 px-1.5 text-xs font-semibold text-white">{{ $count }}</span>
+            <span aria-hidden="true" class="absolute -right-0.5 -top-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-indigo-600 px-1.5 text-xs font-semibold text-white">{{ $count > 99 ? '99+' : $count }}</span>
         @endif
     </button>
 
@@ -19,10 +19,41 @@
                 <button type="button" class="rounded text-sm text-zinc-600 hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600" @click="open = false; $refs.bellButton.focus()">Sluiten</button>
             </div>
 
+            <div class="max-h-[70vh] overflow-y-auto">
+            @foreach($signals as $signal)
+                <section class="border-b border-zinc-200 px-4 py-3" aria-label="{{ $signal['title'] }}">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="text-xs font-semibold uppercase tracking-wide text-zinc-500">{{ $signal['title'] }}</div>
+                        <span class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-zinc-100 px-1.5 text-xs font-semibold text-zinc-700">{{ $signal['count'] }}</span>
+                    </div>
+                    @if(! empty($signal['items']))
+                        <ul class="mt-2 space-y-1">
+                            @foreach($signal['items'] as $item)
+                                <li>
+                                    <a href="{{ $item['url'] }}" class="block rounded px-1 py-1 text-sm hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
+                                        <span class="block truncate font-medium text-zinc-900">{{ $item['label'] }}</span>
+                                        @if($item['meta'])
+                                            <span class="block text-xs {{ $item['overdue'] ? 'font-semibold text-rose-700' : 'text-zinc-500' }}">{{ $item['overdue'] ? 'Te laat · ' : '' }}{{ $item['meta'] }}</span>
+                                        @endif
+                                    </a>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                    @if($signal['link'])
+                        <a href="{{ $signal['link'] }}" class="mt-2 inline-block rounded text-xs font-semibold text-indigo-700 hover:text-indigo-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
+                            {{ $signal['linkLabel'] }} &rarr;
+                        </a>
+                    @endif
+                </section>
+            @endforeach
+
             @if($reminders->isEmpty())
-                <div class="px-4 py-6 text-sm text-zinc-600">Geen openstaande herinneringen.</div>
+                @if(empty($signals))
+                    <div class="px-4 py-6 text-sm text-zinc-600">Geen openstaande herinneringen.</div>
+                @endif
             @else
-                <ul class="max-h-[70vh] divide-y divide-zinc-100 overflow-y-auto">
+                <ul class="divide-y divide-zinc-100">
                     @foreach($reminders as $reminder)
                         <li class="px-4 py-3">
                             <div class="flex items-start justify-between gap-3">
@@ -48,5 +79,6 @@
                     @endforeach
                 </ul>
             @endif
+            </div>
     </div>
 </div>

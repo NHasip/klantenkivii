@@ -3,6 +3,7 @@
 use App\Http\Controllers\Crm\DashboardController;
 use App\Http\Controllers\Crm\EmailTemplatesController;
 use App\Http\Controllers\Crm\GarageCompaniesController;
+use App\Http\Controllers\Crm\SearchController;
 use App\Http\Controllers\Crm\TasksController;
 use App\Http\Controllers\Crm\UsersController;
 use App\Http\Controllers\Auth\PasskeyLoginController;
@@ -29,6 +30,9 @@ Route::middleware(['auth', 'active', 'admin.2fa'])->group(function () {
     Route::get('/garagebedrijven', [GarageCompaniesController::class, 'index'])->name('crm.garage_companies.index');
     Route::get('/garagebedrijven/nieuw', [GarageCompaniesController::class, 'create'])->name('crm.garage_companies.create');
     Route::post('/garagebedrijven', [GarageCompaniesController::class, 'store'])->name('crm.garage_companies.store');
+    Route::get('/garagebedrijven/export/csv', [GarageCompaniesController::class, 'exportCsv'])->name('crm.garage_companies.export_csv');
+    Route::post('/garagebedrijven/bulk/tag', [GarageCompaniesController::class, 'bulkTag'])->name('crm.garage_companies.bulk_tag');
+    Route::get('/garagebedrijven/duplicaten', [GarageCompaniesController::class, 'duplicateCheck'])->name('crm.garage_companies.duplicates');
     Route::get('/garagebedrijven/{garageCompany}', [GarageCompaniesController::class, 'show'])->name('crm.garage_companies.show');
     Route::delete('/garagebedrijven/{garageCompany}', [GarageCompaniesController::class, 'destroy'])->name('crm.garage_companies.destroy');
     Route::post('/garagebedrijven/{garageCompany}/restore', [GarageCompaniesController::class, 'restore'])->name('crm.garage_companies.restore');
@@ -58,9 +62,11 @@ Route::middleware(['auth', 'active', 'admin.2fa'])->group(function () {
 
 
     Route::get('/rapportages', \App\Livewire\Crm\Reports\Index::class)->name('crm.reports.index');
+    Route::get('/zoeken', SearchController::class)->middleware('throttle:60,1')->name('crm.search');
 
     Route::get('/taken', [TasksController::class, 'index'])->name('crm.tasks.index');
     Route::get('/taken/data', [TasksController::class, 'data'])->name('crm.tasks.data');
+    Route::get('/taken/klanten', [TasksController::class, 'customers'])->name('crm.tasks.customers');
     Route::post('/taken/projects', [TasksController::class, 'storeProject'])->name('crm.tasks.projects.store');
     Route::post('/taken/tasks', [TasksController::class, 'storeTask'])->name('crm.tasks.tasks.store');
     Route::patch('/taken/tasks/reorder', [TasksController::class, 'reorder'])->name('crm.tasks.tasks.reorder');
@@ -88,6 +94,9 @@ Route::middleware(['auth', 'active', 'admin.2fa'])->group(function () {
     Route::post('/email-templates', [EmailTemplatesController::class, 'store'])
         ->middleware('admin')
         ->name('crm.email_templates.store');
+    Route::post('/email-templates/voorbeeld', [EmailTemplatesController::class, 'preview'])
+        ->middleware(['admin', 'throttle:60,1'])
+        ->name('crm.email_templates.preview');
     Route::patch('/email-templates/{emailTemplate}', [EmailTemplatesController::class, 'update'])
         ->middleware('admin')
         ->name('crm.email_templates.update');
