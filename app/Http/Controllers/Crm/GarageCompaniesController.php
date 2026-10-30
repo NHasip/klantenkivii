@@ -46,7 +46,7 @@ class GarageCompaniesController
 {
     private static ?array $incassoColumns = null;
 
-    private const DEFAULT_DEMO_DAYS = 14;
+    private const DEFAULT_DEMO_DAYS = GarageCompany::DEFAULT_DEMO_DAYS;
 
     private const LIST_STATUS_TABS = ['alle', 'demo_aangevraagd', 'proefperiode', 'actief', 'opgezegd', 'verloren'];
 
@@ -169,7 +169,8 @@ class GarageCompaniesController
                 $query->orderBy('omzet_excl', $dir);
                 break;
             case 'demo_eind':
-                $query->orderByRaw('garage_companies.demo_eind_op IS NULL')->orderBy('demo_eind_op', $dir);
+                [$expr, $bindings] = $this->effectiveDemoEndSortExpression($baseQuery);
+                $query->orderByRaw("({$expr}) IS NULL", $bindings)->orderByRaw("({$expr}) {$dir}", $bindings);
                 break;
             case 'actief_vanaf':
                 $query->orderBy('actief_vanaf', $dir);
@@ -196,6 +197,9 @@ class GarageCompaniesController
             'omzet_demo_excl' => RevenueCalculator::demoPipeline($baseQuery)['excl'],
         ];
 
+        $demoVariants = $this->statusVariants(GarageCompanyStatus::Proefperiode->value);
+        $isDemo = fn (GarageCompany $company) => in_array($company->status?->value, $demoVariants, true);
+
         $companies->through(fn (GarageCompany $company) => [
             'id' => $company->id,
             'bedrijfsnaam' => $company->bedrijfsnaam,
@@ -203,7 +207,8 @@ class GarageCompaniesController
             'hoofd_email' => $company->hoofd_email,
             'hoofd_telefoon' => $company->hoofd_telefoon,
             'plaats' => $company->plaats,
-            'demo_eind_op' => $company->demo_eind_op?->toDateString(),
+            'demo_eind_op' => $isDemo($company) ? $company->effectiveDemoEnd()?->toDateString() : $company->demo_eind_op?->toDateString(),
+            'demo_eind_berekend' => $isDemo($company) && $company->demoEndIsComputed(),
             'volgende_actie' => $nextActions[$company->id] ?? null,
             'updated_at' => $company->updated_at?->toIso8601String(),
             'deleted_at' => $company->deleted_at?->toIso8601String(),
@@ -532,7 +537,7 @@ class GarageCompaniesController
             ->whereIn('id', $ids)
             ->withSum(['modules as omzet_excl' => fn ($q) => RevenueCalculator::constrainActiveModules($q)], RevenueCalculator::exclExpression())
             ->orderBy('bedrijfsnaam')
-            ->get(['id', 'bedrijfsnaam', 'status', 'plaats', 'hoofd_email', 'hoofd_telefoon', 'demo_eind_op']);
+            ->get(['id', 'bedrijfsnaam', 'status', 'plaats', 'hoofd_email', 'hoofd_telefoon', 'demo_eind_op', 'demo_duur_dagen', 'proefperiode_start', 'demo_aangevraagd_op']);
 
         $labels = GarageCompanyStatus::labelMap();
         $safe = function ($value): string {
@@ -560,7 +565,9 @@ class GarageCompaniesController
                     $safe($company->hoofd_email),
                     $safe($company->hoofd_telefoon),
                     number_format((float) ($company->omzet_excl ?? 0), 2, ',', ''),
-                    $company->demo_eind_op?->format('d-m-Y') ?? '',
+                    in_array($company->status?->value, $this->statusVariants(GarageCompanyStatus::Proefperiode->value), true)
+                        ? ($company->effectiveDemoEnd()?->format('d-m-Y').($company->demoEndIsComputed() ? ' (berekend)' : ''))
+                        : ($company->demo_eind_op?->format('d-m-Y') ?? ''),
                 ], ';');
             }
             fclose($out);
@@ -700,6 +707,43 @@ class GarageCompaniesController
      *
      * @return list<string>
      */
+    /**
+     * Sorteerexpressie voor de effectieve demo-einddatum, werkt op MySQL en SQLite.
+     * Opgeslagen demo_eind_op gaat voor; voor demo-klanten zonder einddatum wordt de
+     * in PHP berekende datum per id als binding meegegeven (demo-klanten zijn er weinig).
+     *
+     * @return array{0: string, 1: list<string|int>}
+     */
+    private function effectiveDemoEndSortExpression($baseQuery): array
+    {
+        $computed = (clone $baseQuery)
+            ->whereIn('status', $this->statusVariants(GarageCompanyStatus::Proefperiode->value))
+            ->whereNull('demo_eind_op')
+            ->where(fn ($q) => $q->whereNotNull('proefperiode_start')->orWhereNotNull('demo_aangevraagd_op'))
+            ->get(['garage_companies.id', 'demo_eind_op', 'demo_duur_dagen', 'proefperiode_start', 'demo_aangevraagd_op']);
+
+        $cases = [];
+        $bindings = [];
+        foreach ($computed as $company) {
+            $end = $company->effectiveDemoEnd();
+            if ($end === null) {
+                continue;
+            }
+            $cases[] = 'WHEN ? THEN ?';
+            $bindings[] = (int) $company->id;
+            $bindings[] = $end->format('Y-m-d H:i:s');
+        }
+
+        if ($cases === []) {
+            return ['garage_companies.demo_eind_op', []];
+        }
+
+        return [
+            'CASE WHEN garage_companies.demo_eind_op IS NOT NULL THEN garage_companies.demo_eind_op ELSE CASE garage_companies.id '.implode(' ', $cases).' ELSE NULL END END',
+            $bindings,
+        ];
+    }
+
     private function statusVariants(string $status): array
     {
         return match ($status) {
@@ -1008,6 +1052,8 @@ class GarageCompaniesController
                 'demo_gepland_op' => $this->formatDateTime($garageCompany->demo_gepland_op),
                 'demo_duur_dagen' => $garageCompany->demo_duur_dagen,
                 'demo_eind_op' => $this->formatDateTime($garageCompany->demo_eind_op),
+                'demo_eind_effectief' => $this->formatDateTime($garageCompany->effectiveDemoEnd()),
+                'demo_eind_berekend' => $garageCompany->demoEndIsComputed(),
                 'proefperiode_start' => $this->formatDateTime($garageCompany->proefperiode_start),
                 'actief_vanaf' => $this->formatDateTime($garageCompany->actief_vanaf),
                 'opgezegd_op' => $this->formatDateTime($garageCompany->opgezegd_op),

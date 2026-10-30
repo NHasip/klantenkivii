@@ -365,7 +365,7 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                                     >
                                         <div className="min-w-0 flex-1">
                                             <div className="truncate text-sm font-semibold text-zinc-950">{item.bedrijfsnaam}</div>
-                                            <div className="mt-1 text-xs text-zinc-600">Einddatum {formatDate(item.demo_eind_op)}</div>
+                                            <div className="mt-1 text-xs text-zinc-600">Einddatum {formatDate(item.demo_eind_op)}{item.demo_eind_berekend && <span className="text-zinc-400"> (berekend)</span>}</div>
                                         </div>
                                         <Badge tone={item.days_left < 0 ? 'danger' : item.days_left <= 2 ? 'info' : 'neutral'}>
                                             {daysLeftLabel(item.days_left)}

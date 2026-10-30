@@ -41,11 +41,14 @@
                 </div>
                 <div>
                     <label for="user_role" class="block text-xs font-medium text-zinc-600">Rol</label>
-                    <select id="user_role" class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model="role">
+                    <select id="user_role" class="mt-1 w-full rounded-md border-zinc-300 text-sm disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:opacity-60" wire:model="role" @disabled($userId !== null && $userId === $currentUserId)>
                         @foreach($roles as $r)
                             <option value="{{ $r->value }}">{{ ucfirst($r->value) }}</option>
                         @endforeach
                     </select>
+                    @if($userId !== null && $userId === $currentUserId)
+                        <div class="mt-1 text-xs text-zinc-500">Je kunt je eigen rol niet wijzigen.</div>
+                    @endif
                     @error('role') <div class="mt-1 text-xs text-rose-600">{{ $message }}</div> @enderror
                 </div>
 

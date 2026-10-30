@@ -419,7 +419,7 @@ class TasksController
             'project' => $request->query('project'),
             'assignee' => $request->query('assignee'),
             'status' => $request->query('status'),
-            'priority' => $request->query('priority'),
+            'prioriteit' => $this->priorityFilter($request),
             'search' => $request->query('search', ''),
             'sort' => $request->query('sort', 'deadline'),
             'klant' => $request->query('klant'),
@@ -512,6 +512,16 @@ class TasksController
     /**
      * @return Collection<int, Task>
      */
+    /**
+     * Prioriteitsfilter uit de URL: "prioriteit", met "priority" als fallback voor oude links.
+     */
+    private function priorityFilter(Request $request): ?string
+    {
+        $value = $request->query('prioriteit') ?? $request->query('priority');
+
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
     private function filteredTasks(Request $request): Collection
     {
         $sort = (string) $request->query('sort', 'deadline');
@@ -523,7 +533,7 @@ class TasksController
             ->when($request->query('project'), fn ($q, $project) => $q->where('task_project_id', $project))
             ->when($request->query('assignee'), fn ($q, $assignee) => $q->whereHas('assignees', fn ($sub) => $sub->where('users.id', $assignee)))
             ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
-            ->when($request->query('priority'), fn ($q, $priority) => $q->where('prioriteit', $priority))
+            ->when($this->priorityFilter($request), fn ($q, $priority) => $q->where('prioriteit', $priority))
             ->when($request->filled('search'), function ($q) use ($request) {
                 $term = '%'.trim((string) $request->query('search')).'%';
                 $q->where(function ($inner) use ($term) {

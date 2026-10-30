@@ -16,6 +16,9 @@ use Illuminate\Support\Facades\Schema;
 
 class GarageCompany extends Model
 {
+    /** Standaard demoduur in dagen als demo_duur_dagen ontbreekt. */
+    public const DEFAULT_DEMO_DAYS = 14;
+
     protected static ?bool $hasDeletedAtColumn = null;
 
     protected $fillable = [
@@ -245,6 +248,62 @@ class GarageCompany extends Model
     public function activeSeatsCount(): Attribute
     {
         return Attribute::get(fn () => (int) $this->seats()->where('actief', true)->count());
+    }
+
+    /**
+     * Effectieve demo-einddatum zonder iets op te slaan: demo_eind_op als die gezet is,
+     * anders startdatum (proefperiode_start, anders demo_aangevraagd_op) plus
+     * demo_duur_dagen (of de standaardduur). Null als er geen startdatum is.
+     */
+    public function effectiveDemoEnd(): ?Carbon
+    {
+        if ($this->demo_eind_op instanceof Carbon) {
+            return $this->demo_eind_op->copy();
+        }
+
+        $start = $this->proefperiode_start ?? $this->demo_aangevraagd_op;
+        if (! $start instanceof Carbon) {
+            return null;
+        }
+
+        $dagen = (int) ($this->demo_duur_dagen ?: self::DEFAULT_DEMO_DAYS);
+
+        return $start->copy()->startOfDay()->addDays($dagen);
+    }
+
+    /**
+     * True als de demo-einddatum berekend is (niet opgeslagen in demo_eind_op).
+     */
+    public function demoEndIsComputed(): bool
+    {
+        return ! $this->demo_eind_op instanceof Carbon && $this->effectiveDemoEnd() !== null;
+    }
+
+    /**
+     * Klanten met een van de opgegeven statussen waarvan de effectieve demo-einddatum
+     * op of voor $until valt (en optioneel op of na $from), gesorteerd op einddatum.
+     * Demo-klanten zijn er weinig, dus filteren gebeurt in PHP (DB-onafhankelijk).
+     *
+     * @param  list<string>  $statuses
+     * @return \Illuminate\Support\Collection<int, self>
+     */
+    public static function withEffectiveDemoEndBetween(array $statuses, ?\DateTimeInterface $from, \DateTimeInterface $until): \Illuminate\Support\Collection
+    {
+        return static::query()
+            ->whereIn('status', $statuses)
+            ->where(function (Builder $q) {
+                $q->whereNotNull('demo_eind_op')
+                    ->orWhereNotNull('proefperiode_start')
+                    ->orWhereNotNull('demo_aangevraagd_op');
+            })
+            ->get(['id', 'bedrijfsnaam', 'status', 'demo_eind_op', 'demo_duur_dagen', 'proefperiode_start', 'demo_aangevraagd_op'])
+            ->filter(function (self $company) use ($from, $until) {
+                $end = $company->effectiveDemoEnd();
+
+                return $end !== null && $end->lte($until) && ($from === null || $end->gte($from));
+            })
+            ->sortBy(fn (self $company) => [$company->effectiveDemoEnd()->getTimestamp(), $company->id])
+            ->values();
     }
 
     public function demoAangevraagdOuderDanDagen(int $dagen): bool

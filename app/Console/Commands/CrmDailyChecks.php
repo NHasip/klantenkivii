@@ -68,16 +68,14 @@ class CrmDailyChecks extends Command
 
     private function demoEndsOn(CarbonInterface $day, string $marker, string $title, string $body): void
     {
-        GarageCompany::query()
-            ->whereIn('status', self::DEMO_STATUSES)
-            ->whereBetween('demo_eind_op', [$day->copy()->startOfDay(), $day->copy()->endOfDay()])
-            ->orderBy('id')
-            ->get(['id', 'bedrijfsnaam', 'demo_eind_op'])
+        // Effectieve einddatum: opgeslagen demo_eind_op, anders berekend uit start + duur.
+        GarageCompany::withEffectiveDemoEndBetween(self::DEMO_STATUSES, $day->copy()->startOfDay(), $day->copy()->endOfDay())
+            ->sortBy('id')
             ->each(fn (GarageCompany $company) => $this->createOnce(
                 $company,
                 $marker.':'.$day->toDateString(),
                 $title.': '.$company->bedrijfsnaam,
-                $body.' Einddatum: '.$company->demo_eind_op?->format('d-m-Y').'.',
+                $body.' Einddatum: '.$company->effectiveDemoEnd()?->format('d-m-Y').($company->demoEndIsComputed() ? ' (berekend)' : '').'.',
                 TaskPriority::Hoog,
             ));
     }

@@ -139,10 +139,20 @@ function readUrlState() {
     };
 }
 
+// Snelkeuze-datum. "Vandaag": standaardtijd als die nog moet komen, anders het
+// volgende hele uur; valt dat na middernacht, dan morgen 09:00.
 function shortcutDate(kind) {
     const date = new Date();
     if (kind === 'vandaag') {
+        const now = new Date();
         date.setHours(17, 0, 0, 0);
+        if (date <= now) {
+            date.setTime(now.getTime());
+            date.setHours(now.getHours() + 1, 0, 0, 0);
+            if (date.getDate() !== now.getDate()) {
+                date.setHours(9, 0, 0, 0);
+            }
+        }
     } else if (kind === 'morgen') {
         date.setDate(date.getDate() + 1);
         date.setHours(9, 0, 0, 0);
@@ -473,7 +483,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
     const [filterProject, setFilterProject] = useState(filters?.project ?? '');
     const [filterAssignee, setFilterAssignee] = useState(filters?.assignee ?? '');
     const [filterStatus, setFilterStatus] = useState(filters?.status ?? '');
-    const [filterPriority, setFilterPriority] = useState(filters?.priority ?? '');
+    const [filterPriority, setFilterPriority] = useState(filters?.prioriteit ?? filters?.priority ?? '');
     const [search, setSearch] = useState(filters?.search ?? '');
     const [loading, setLoading] = useState(false);
     const [notice, setNotice] = useState(null);
@@ -525,7 +535,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                     project: filterProject || undefined,
                     assignee: filterAssignee || undefined,
                     status: filterStatus || undefined,
-                    priority: filterPriority || undefined,
+                    prioriteit: filterPriority || undefined,
                     search: search || undefined,
                     sort: sortMode || undefined,
                     klant: filterCustomer?.id || undefined,
@@ -615,7 +625,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
         if (filterProject) params.set('project', filterProject);
         if (filterAssignee) params.set('assignee', filterAssignee);
         if (filterStatus) params.set('status', filterStatus);
-        if (filterPriority) params.set('priority', filterPriority);
+        if (filterPriority) params.set('prioriteit', filterPriority);
         if (search) params.set('search', search);
         if (sortMode && sortMode !== 'deadline') params.set('sort', sortMode);
         if (filterCustomer?.id) params.set('klant', String(filterCustomer.id));

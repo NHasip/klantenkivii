@@ -132,15 +132,12 @@ class Bell extends Component
         }
 
         // 3. Demo's die binnen 3 dagen eindigen of al verlopen zijn.
-        $demoQuery = GarageCompany::query()
-            ->whereIn('status', [
-                GarageCompanyStatus::DemoAangevraagd->value,
-                GarageCompanyStatus::DemoGepland->value,
-                GarageCompanyStatus::Proefperiode->value,
-            ])
-            ->whereNotNull('demo_eind_op')
-            ->where('demo_eind_op', '<=', $now->copy()->addDays(3)->endOfDay());
-        $demoCount = (clone $demoQuery)->count();
+        $demos = GarageCompany::withEffectiveDemoEndBetween([
+            GarageCompanyStatus::DemoAangevraagd->value,
+            GarageCompanyStatus::DemoGepland->value,
+            GarageCompanyStatus::Proefperiode->value,
+        ], null, $now->copy()->addDays(3)->endOfDay());
+        $demoCount = $demos->count();
         if ($demoCount > 0) {
             $signals[] = [
                 'key' => 'demos',
@@ -148,13 +145,17 @@ class Bell extends Component
                 'count' => $demoCount,
                 'link' => null,
                 'linkLabel' => null,
-                'items' => $demoQuery->orderBy('demo_eind_op')->limit(5)->get(['id', 'bedrijfsnaam', 'demo_eind_op'])
-                    ->map(fn (GarageCompany $company) => [
-                        'label' => $company->bedrijfsnaam,
-                        'meta' => ($company->demo_eind_op->lt($now) ? 'Verlopen op ' : 'Eindigt op ').$company->demo_eind_op->format('d-m-Y'),
-                        'url' => route('crm.garage_companies.show', ['garageCompany' => $company->id, 'tab' => 'demo_status']),
-                        'overdue' => $company->demo_eind_op->lt($now),
-                    ])->all(),
+                'items' => $demos->take(5)
+                    ->map(function (GarageCompany $company) use ($now) {
+                        $end = $company->effectiveDemoEnd();
+
+                        return [
+                            'label' => $company->bedrijfsnaam,
+                            'meta' => ($end->lt($now) ? 'Verlopen op ' : 'Eindigt op ').$end->format('d-m-Y').($company->demoEndIsComputed() ? ' (berekend)' : ''),
+                            'url' => route('crm.garage_companies.show', ['garageCompany' => $company->id, 'tab' => 'demo_status']),
+                            'overdue' => $end->lt($now),
+                        ];
+                    })->values()->all(),
             ];
         }
 

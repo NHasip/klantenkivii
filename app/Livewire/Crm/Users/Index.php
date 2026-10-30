@@ -82,6 +82,11 @@ class Index extends Component
 
                     return;
                 }
+                if ($data['role'] !== $existing->role->value) {
+                    $this->addError('role', 'Je kunt je eigen rol niet wijzigen.');
+
+                    return;
+                }
             }
 
             if (self::isLastActiveAdmin($existing) && (! $willBeAdmin || ! $willBeActive)) {

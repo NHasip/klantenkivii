@@ -118,9 +118,12 @@ function MailIcon() {
     );
 }
 
-function DemoEnd({ value, status }) {
+function DemoEnd({ value, status, computed = false }) {
     const date = parseDateOnly(value);
     if (!date) return <span className="text-zinc-400">-</span>;
+    const computedNote = computed ? (
+        <span className="text-xs font-normal text-zinc-400" title="Niet opgeslagen: berekend uit startdatum en demoduur">(berekend)</span>
+    ) : null;
     const days = daysFromToday(date);
     const relevant = status === 'proefperiode';
     if (relevant && days < 0) {
@@ -128,6 +131,7 @@ function DemoEnd({ value, status }) {
             <span className="inline-flex flex-col">
                 <span className="font-semibold text-rose-700">{formatDate(date)}</span>
                 <span className="text-xs text-rose-700">Verlopen</span>
+                {computedNote}
             </span>
         );
     }
@@ -136,6 +140,15 @@ function DemoEnd({ value, status }) {
             <span className="inline-flex flex-col">
                 <span className="font-semibold text-amber-800">{formatDate(date)}</span>
                 <span className="text-xs text-amber-800">{days === 0 ? 'Vandaag' : `Over ${days} ${days === 1 ? 'dag' : 'dagen'}`}</span>
+                {computedNote}
+            </span>
+        );
+    }
+    if (computedNote) {
+        return (
+            <span className="inline-flex flex-col">
+                <span className="text-zinc-700">{formatDate(date)}</span>
+                {computedNote}
             </span>
         );
     }
@@ -902,7 +915,7 @@ export default function Index({ companies, totals, statusCounts, trashCount, fil
                                     <div className="text-zinc-500">Volgende actie</div>
                                     <div className="text-right"><NextAction action={company.volgende_actie} /></div>
                                     <div className="text-zinc-500">Demo eindigt</div>
-                                    <div className="text-right"><DemoEnd value={company.demo_eind_op} status={company.status} /></div>
+                                    <div className="text-right"><DemoEnd value={company.demo_eind_op} status={company.status} computed={company.demo_eind_berekend} /></div>
                                 </>
                             )}
                             <div className="text-zinc-500">Gebruikers</div>
@@ -1051,7 +1064,7 @@ export default function Index({ companies, totals, statusCounts, trashCount, fil
                                     </div>
                                 </td>
                                 <td className="px-4 py-3 text-sm"><NextAction action={company.volgende_actie} /></td>
-                                <td className="px-4 py-3 text-sm"><DemoEnd value={company.demo_eind_op} status={company.status} /></td>
+                                <td className="px-4 py-3 text-sm"><DemoEnd value={company.demo_eind_op} status={company.status} computed={company.demo_eind_berekend} /></td>
                                 <td className="px-4 py-3 text-sm">{formatEuro(company.omzet_excl)}</td>
                                 <td className="px-4 py-3 text-sm text-zinc-600">
                                     {isTrashView ? formatDateTime(company.deleted_at) : formatDateTime(company.updated_at)}

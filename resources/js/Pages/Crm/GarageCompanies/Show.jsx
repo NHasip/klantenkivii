@@ -251,9 +251,15 @@ function dateShortcut(kind) {
     if (kind === 'volgende_week') date.setDate(date.getDate() + 7);
     date.setHours(9, 0, 0, 0);
     if (kind === 'vandaag') {
+        // 09:00 als dat nog moet komen, anders het volgende hele uur;
+        // valt dat na middernacht, dan morgen 09:00.
         const now = new Date();
-        if (now.getHours() >= 9) {
+        if (date <= now) {
+            date.setTime(now.getTime());
             date.setHours(now.getHours() + 1, 0, 0, 0);
+            if (date.getDate() !== now.getDate()) {
+                date.setHours(9, 0, 0, 0);
+            }
         }
     }
     return toLocalDateTimeInput(date);
@@ -1120,13 +1126,16 @@ export default function Show({
     const contactEmail = garageCompany.hoofd_email || garageCompany.primary_person?.email || '';
 
     const demoInfo = (() => {
-        if (!isDemoStatus || !garageCompany.demo_eind_op) return null;
-        const end = new Date(garageCompany.demo_eind_op);
+        // Effectieve einddatum: opgeslagen of berekend uit start + duur (niet opgeslagen).
+        const endValue = garageCompany.demo_eind_effectief || garageCompany.demo_eind_op;
+        if (!isDemoStatus || !endValue) return null;
+        const end = new Date(endValue);
         if (Number.isNaN(end.getTime())) return null;
+        const suffix = garageCompany.demo_eind_berekend ? ' (berekend)' : '';
         const days = Math.round((startOfDay(end) - startOfDay(new Date())) / 86400000);
-        if (days < 0) return { text: `Demo verlopen op ${formatDate(garageCompany.demo_eind_op)}`, expired: true };
-        if (days === 0) return { text: 'Demo eindigt vandaag', soon: true };
-        return { text: `Demo eindigt over ${days} ${days === 1 ? 'dag' : 'dagen'}`, soon: days <= 3 };
+        if (days < 0) return { text: `Demo verlopen op ${formatDate(endValue)}${suffix}`, expired: true };
+        if (days === 0) return { text: `Demo eindigt vandaag${suffix}`, soon: true };
+        return { text: `Demo eindigt over ${days} ${days === 1 ? 'dag' : 'dagen'}${suffix}`, soon: days <= 3 };
     })();
 
     const openItems = useMemo(() => {

@@ -113,20 +113,16 @@ class DashboardController
             ])
             ->values();
 
-        $demoEnding = GarageCompany::query()
-            ->whereIn('status', RevenueCalculator::demoStatuses())
-            ->whereNotNull('demo_eind_op')
-            ->where('demo_eind_op', '<=', $now->addDays(7)->endOfDay())
-            ->orderBy('demo_eind_op')
-            ->limit(20)
-            ->get(['id', 'bedrijfsnaam', 'demo_eind_op'])
+        $demoEnding = GarageCompany::withEffectiveDemoEndBetween(RevenueCalculator::demoStatuses(), null, $now->addDays(7)->endOfDay())
+            ->take(20)
             ->map(function (GarageCompany $company) use ($now) {
-                $end = CarbonImmutable::parse($company->demo_eind_op)->setTimezone('Europe/Amsterdam')->startOfDay();
+                $end = CarbonImmutable::parse($company->effectiveDemoEnd())->setTimezone('Europe/Amsterdam')->startOfDay();
 
                 return [
                     'id' => $company->id,
                     'bedrijfsnaam' => $company->bedrijfsnaam,
                     'demo_eind_op' => $end->toDateString(),
+                    'demo_eind_berekend' => $company->demoEndIsComputed(),
                     'days_left' => (int) $now->startOfDay()->diffInDays($end, false),
                     'url' => route('crm.garage_companies.show', ['garageCompany' => $company->id, 'tab' => 'demo_status']),
                 ];
