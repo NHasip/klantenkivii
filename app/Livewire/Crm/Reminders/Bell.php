@@ -81,7 +81,12 @@ class Bell extends Component
             ->where('status', '!=', TaskStatus::Afgerond->value)
             ->whereNotNull('deadline')
             ->where('deadline', '<', $now)
-            ->whereHas('assignees', fn ($q) => $q->where('users.id', $userId));
+            ->where(function ($q) use ($userId) {
+                $q->whereHas('assignees', fn ($a) => $a->where('users.id', $userId))
+                    ->orWhere(function ($own) use ($userId) {
+                        $own->whereDoesntHave('assignees')->where('created_by', $userId);
+                    });
+            });
         $taskCount = (clone $taskQuery)->count();
         if ($taskCount > 0) {
             $signals[] = [
@@ -154,14 +159,12 @@ class Bell extends Component
         }
 
         // 4. Actieve klanten zonder actief SEPA-mandaat (alleen aantal).
-        $mandateCount = GarageCompany::query()
-            ->where('status', GarageCompanyStatus::Actief->value)
-            ->whereDoesntHave('mandates', fn ($q) => $q->where('status', SepaMandateStatus::Actief->value))
-            ->count();
+        // Zelfde definitie als dashboard en rapportages.
+        $mandateCount = \App\Services\Crm\SepaChecklist::activeCompaniesWithIssues()->count();
         if ($mandateCount > 0) {
             $signals[] = [
                 'key' => 'mandaten',
-                'title' => 'Actieve klanten zonder actief mandaat',
+                'title' => 'Actieve klanten met incomplete SEPA',
                 'count' => $mandateCount,
                 'link' => route('crm.garage_companies.index', ['status' => GarageCompanyStatus::Actief->value]),
                 'linkLabel' => 'Naar klantenlijst',

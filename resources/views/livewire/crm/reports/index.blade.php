@@ -205,7 +205,7 @@
             </div>
             <svg viewBox="0 0 {{ $chartW }} {{ $chartH }}" class="mt-3 h-auto w-full" role="img" aria-label="Lijngrafiek MRR per maand, laatste 12 maanden">
                 @foreach ([0, 0.25, 0.5, 0.75, 1] as $f)
-                    @php($gy = round($padT + $plotH - $plotH * $f, 1))
+                    @php $gy = round($padT + $plotH - $plotH * $f, 1); @endphp
                     <line x1="{{ $padL }}" x2="{{ $chartW - $padR }}" y1="{{ $gy }}" y2="{{ $gy }}" stroke="#e4e4e7" stroke-width="1" />
                     <text x="{{ $padL - 8 }}" y="{{ $gy + 4 }}" text-anchor="end" font-size="11" fill="#71717a">{{ $euro($mrrTop * $f) }}</text>
                 @endforeach
@@ -239,7 +239,7 @@
             </div>
             <svg viewBox="0 0 {{ $chartW }} {{ $chartH }}" class="mt-2 h-auto w-full" role="img" aria-label="Staafgrafiek instroom en uitstroom per maand, laatste 12 maanden">
                 @foreach ([0, 0.25, 0.5, 0.75, 1] as $f)
-                    @php($gy = round($padT + $plotH - $plotH * $f, 1))
+                    @php $gy = round($padT + $plotH - $plotH * $f, 1); @endphp
                     <line x1="{{ $padL }}" x2="{{ $chartW - $padR }}" y1="{{ $gy }}" y2="{{ $gy }}" stroke="#e4e4e7" stroke-width="1" />
                     <text x="{{ $padL - 8 }}" y="{{ $gy + 4 }}" text-anchor="end" font-size="11" fill="#71717a">{{ (int) round($flowTop * $f) }}</text>
                 @endforeach

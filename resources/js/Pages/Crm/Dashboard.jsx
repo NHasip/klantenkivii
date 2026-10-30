@@ -315,7 +315,7 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                                 value={formatInt(kpis.tasks_open)}
                                 sub={`Te laat: ${formatInt(kpis.tasks_overdue)} | Binnen 7 dagen: ${formatInt(kpis.tasks_due_7)}`}
                                 tone={tasksTone}
-                                href={urls.tasks}
+                                href={`${urls.tasks}?weergave=lijst`}
                             />
                             <MetricCard
                                 label="MRR excl. btw"
