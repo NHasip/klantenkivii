@@ -61,8 +61,14 @@
                 },
                 show() {
                     this.open = true;
+                    // Direct tonen en focussen (niet wachten op Alpine/x-trap), zodat toetsen
+                    // die meteen na Ctrl+K getypt worden in het zoekveld terechtkomen.
+                    if (this.$refs.searchOverlay) this.$refs.searchOverlay.style.removeProperty('display');
+                    if (this.$refs.searchInput) this.$refs.searchInput.focus();
                     this.$dispatch('kivii-menu-open', 'search');
-                    this.$nextTick(() => this.$refs.searchInput && this.$refs.searchInput.focus());
+                    this.$nextTick(() => {
+                        if (this.$refs.searchInput && document.activeElement !== this.$refs.searchInput) this.$refs.searchInput.focus();
+                    });
                 },
                 close() {
                     this.open = false;
@@ -183,9 +189,9 @@
                     </button>
 
                     <template x-teleport="body">
-                        <div x-cloak x-show="open" class="fixed inset-0 z-50 flex items-start justify-center bg-zinc-900/40 px-4 pt-[10vh]"
+                        <div x-cloak x-show="open" x-ref="searchOverlay" class="fixed inset-0 z-50 flex items-start justify-center bg-zinc-900/40 px-4 pt-[10vh]"
                              @click.self="close()" @keydown.escape.prevent.stop="close()">
-                            <div class="w-full max-w-xl overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xl" role="dialog" aria-modal="true" aria-label="Zoeken in Kivii CRM" x-trap.noscroll="open">
+                            <div class="w-full max-w-xl overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xl" role="dialog" aria-modal="true" aria-label="Zoeken in Kivii CRM" x-trap.noscroll.noautofocus="open">
                                 <div class="flex items-center gap-2 border-b border-zinc-200 px-4">
                                     <svg class="h-5 w-5 shrink-0 text-zinc-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.45 4.39l3.08 3.08a.75.75 0 11-1.06 1.06l-3.08-3.08A7 7 0 012 9z" clip-rule="evenodd" /></svg>
                                     <input x-ref="searchInput" type="search" x-model="q" @input="queue()"

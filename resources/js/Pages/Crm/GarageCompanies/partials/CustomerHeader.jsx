@@ -119,7 +119,7 @@ export default function CustomerHeader({
                             className={inputClasses}
                             value={noteForm.data.titel}
                             onChange={(e) => noteForm.setData('titel', e.target.value)}
-                            placeholder="Titel"
+                            placeholder="Titel (standaard Notitie)"
                             aria-invalid={noteForm.errors.titel ? true : undefined}
                         />
                         {noteForm.errors.titel && <p className="mt-1 text-xs font-medium text-rose-700" role="alert">{noteForm.errors.titel}</p>}
@@ -197,8 +197,8 @@ export default function CustomerHeader({
                 </form>
             )}
 
-            <nav aria-label="Klantdossier" className="-mx-1 mt-3 overflow-x-auto">
-                <div className="flex min-w-max gap-1 px-1">
+            <nav aria-label="Klantdossier" className="scrollbar-none scroll-fade-r -mx-1 mt-3 overflow-x-auto">
+                <div className="flex min-w-max gap-1 pl-1 pr-6">
                     {tabs.map((item) => {
                         const active = activeTab === item.key;
                         return (

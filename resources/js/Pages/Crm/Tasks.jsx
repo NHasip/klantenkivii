@@ -7,7 +7,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useDialog } from '../../components/useDialog';
 import { MultiSelectChips } from '../../components/MultiSelectChips';
 import { useConfirm } from '../../components/ConfirmProvider';
-import { Badge, Button, EmptyState, PageHeader, Spinner, cx, inputClasses, tableClasses } from '../../components/ui';
+import { Badge, Button, EmptyState, FilePicker, PageHeader, Spinner, cx, inputClasses, tableClasses } from '../../components/ui';
 
 function dedupeById(list) {
     const seen = new Set();
@@ -159,6 +159,8 @@ function detailSnapshot(task) {
 }
 
 const FILTER_LABEL = 'block text-xs font-medium text-zinc-600';
+// Statische klassen zodat Tailwind ze meeneemt.
+const BOARD_GRID_COLS = { 1: 'xl:grid-cols-1', 2: 'xl:grid-cols-2', 3: 'xl:grid-cols-3', 4: 'xl:grid-cols-4' };
 
 const VIEW_TO_URL = { list: 'lijst', board: 'bord', team: 'team' };
 const URL_TO_VIEW = { lijst: 'list', bord: 'board', team: 'team' };
@@ -410,9 +412,9 @@ function DroppableBody({ id, children }) {
     );
 }
 
-function Column({ title, subtitle, count, children, footer, droppableId = null }) {
+function Column({ title, subtitle, count, children, footer, droppableId = null, fit = false }) {
     return (
-        <div className="flex w-[min(320px,85vw)] flex-col rounded-xl border border-zinc-200 bg-zinc-50">
+        <div className={cx('flex h-full w-[min(300px,85vw)] flex-col rounded-xl border border-zinc-200 bg-zinc-50', fit && 'xl:w-auto')}>
             <div className="flex items-start justify-between gap-3 border-b border-zinc-200 px-3 py-3">
                 <div className="min-w-0">
                     <h2 className="truncate text-sm font-semibold text-zinc-900" title={title}>{title}</h2>
@@ -554,6 +556,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
     const [priorityOptions, setPriorityOptions] = useState(initial?.priorityOptions ?? []);
 
     const [view, setView] = useState(urlInit.view ?? 'board'); // board | list | team
+    const [filtersOpen, setFiltersOpen] = useState(false);
     const [groupBoardBy, setGroupBoardBy] = useState(urlInit.group ?? 'status'); // project | status
     const [filterCustomer, setFilterCustomer] = useState(customerFilter ?? null);
     const [showAppointments, setShowAppointments] = useState(Boolean(urlInit.appointments));
@@ -654,6 +657,23 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
     useEffect(() => {
         setItemsByColumn(buildItemsByColumn(tasks, columns, group, assigneeAlias));
     }, [tasks, columns, group, assigneeAlias]);
+
+    // Bord: tot 4 kolommen passen vanaf xl in een grid; anders horizontaal scrollen met een vervaagde rand als hint.
+    const boardFits = columns.length > 0 && columns.length <= 4;
+    const boardScrollRef = useRef(null);
+    const [boardScroll, setBoardScroll] = useState({ start: true, end: true });
+    const updateBoardScroll = useCallback(() => {
+        const el = boardScrollRef.current;
+        if (!el) return;
+        const start = el.scrollLeft <= 2;
+        const end = el.scrollLeft + el.clientWidth >= el.scrollWidth - 2;
+        setBoardScroll((prev) => (prev.start === start && prev.end === end ? prev : { start, end }));
+    }, []);
+    useEffect(() => {
+        updateBoardScroll();
+        window.addEventListener('resize', updateBoardScroll);
+        return () => window.removeEventListener('resize', updateBoardScroll);
+    }, [updateBoardScroll, columns.length, view]);
 
     const activeDragTask = useMemo(() => {
         const tid = parseId(activeDragId);
@@ -1230,6 +1250,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
     const listRows = tasks;
 
     const hasActiveFilters = Boolean(filterProject || filterAssignee || filterStatus || filterPriority || search.trim() || filterCustomer);
+    const activeFilterCount = [filterProject, filterAssignee, filterStatus, filterPriority, search.trim(), filterCustomer].filter(Boolean).length;
     const resetFilters = useCallback(() => {
         setFilterProject('');
         setFilterAssignee('');
@@ -1325,7 +1346,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
                         {view === 'board' ? (
-                            <label htmlFor="tasks-filter-groepeer" className="inline-flex items-center gap-2 text-sm text-zinc-600">
+                            <label htmlFor="tasks-filter-groepeer" className="inline-flex items-center gap-2 whitespace-nowrap text-sm text-zinc-600">
                                 Groepeer op
                                 <select
                                     id="tasks-filter-groepeer"
@@ -1339,7 +1360,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                             </label>
                         ) : null}
                         {view === 'list' ? (
-                            <label htmlFor="tasks-filter-sorteren" className="inline-flex items-center gap-2 text-sm text-zinc-600">
+                            <label htmlFor="tasks-filter-sorteren" className="inline-flex items-center gap-2 whitespace-nowrap text-sm text-zinc-600">
                                 Sorteren op
                                 <select
                                     id="tasks-filter-sorteren"
@@ -1356,7 +1377,28 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                     </div>
                 </div>
 
-                <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+                <div className="md:hidden">
+                    <Button
+                        variant="secondary"
+                        className="w-full justify-between"
+                        onClick={() => setFiltersOpen((open) => !open)}
+                        aria-expanded={filtersOpen}
+                        aria-controls="tasks-filters"
+                    >
+                        <span className="inline-flex items-center gap-2">
+                            Zoeken en filters
+                            {activeFilterCount > 0 && (
+                                <span className="rounded-full bg-indigo-600 px-2 text-xs text-white">
+                                    {activeFilterCount}
+                                    <span className="sr-only"> actief</span>
+                                </span>
+                            )}
+                        </span>
+                        <span aria-hidden="true" className="text-xs">{filtersOpen ? '▲' : '▼'}</span>
+                    </Button>
+                </div>
+
+                <div id="tasks-filters" role="search" className={cx('rounded-xl border border-zinc-200 bg-white p-4 shadow-sm md:block', filtersOpen ? 'block' : 'hidden')}>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
                         <div className="sm:col-span-2">
                             <label htmlFor="tasks-filter-zoeken" className={FILTER_LABEL}>Zoeken</label>
@@ -1600,9 +1642,21 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                         {tasks.length === 0 && hasActiveFilters && !loading ? <div className="mb-4">{emptyTasksState}</div> : null}
                         <p className="mb-2 text-xs text-zinc-500">
                             Sleep kaarten om de volgorde of {view === 'team' ? 'de toegewezen persoon' : group === 'project' ? 'het project' : 'de status'} te wijzigen. Open een kaart om dit met het toetsenbord te doen.
+                            {!boardScroll.end || !boardScroll.start ? ' Scroll horizontaal voor meer kolommen.' : ''}
                         </p>
                         <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
-                            <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain px-4 pb-4 sm:mx-0 sm:snap-none sm:px-0" role="list" aria-label="Kolommen">
+                            <div className="relative">
+                            <div
+                                ref={boardScrollRef}
+                                onScroll={updateBoardScroll}
+                                className={cx(
+                                    '-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain px-4 pb-4 sm:mx-0 sm:snap-none sm:px-0',
+                                    boardFits && 'xl:grid xl:overflow-x-visible',
+                                    boardFits && BOARD_GRID_COLS[columns.length],
+                                )}
+                                role="list"
+                                aria-label="Kolommen"
+                            >
                                 {columns.map((col) => {
                                     const taskIds = itemsByColumn[col.id] ?? [];
                                     const quickValue = quickAdd[col.id] ?? '';
@@ -1610,6 +1664,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                     return (
                                         <div key={col.id} className="shrink-0 snap-start" role="listitem">
                                             <Column
+                                                fit={boardFits}
                                                 droppableId={col.id}
                                                 title={col.title}
                                                 subtitle={col.subtitle}
@@ -1659,6 +1714,13 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                         </div>
                                     );
                                 })}
+                            </div>
+                            {!boardScroll.start ? (
+                                <div aria-hidden="true" className={cx('pointer-events-none absolute inset-y-0 left-0 bottom-4 w-8 bg-gradient-to-r from-white to-transparent', boardFits && 'xl:hidden')} />
+                            ) : null}
+                            {!boardScroll.end ? (
+                                <div aria-hidden="true" className={cx('pointer-events-none absolute inset-y-0 right-0 bottom-4 w-10 bg-gradient-to-l from-white to-transparent', boardFits && 'xl:hidden')} />
+                            ) : null}
                             </div>
                             <DragOverlay>{activeDragTask ? <TaskOverlay task={activeDragTask} /> : null}</DragOverlay>
                         </DndContext>
@@ -1898,10 +1960,10 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                 </div>
                                 <div className="md:col-span-2">
                                     <label htmlFor="tasks-task-bijlagen" className="block text-sm font-medium text-zinc-800">Bijlagen</label>
-                                    <input
+                                    <FilePicker
                                         id="tasks-task-bijlagen"
-                                        type="file"
-                                        className="mt-1 block w-full text-sm text-zinc-700 file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-zinc-800 hover:file:bg-zinc-200"
+                                        className="mt-1"
+                                        files={taskFiles}
                                         multiple
                                         accept={ATTACHMENT_ACCEPT}
                                         onChange={(e) => {

@@ -15,6 +15,29 @@
     html {
         scroll-padding-top: 5rem;
     }
+
+    /* Ruimte voor de scrollbalk altijd reserveren: geen horizontale verspringing tussen pagina's. */
+    html {
+        scrollbar-gutter: stable;
+    }
+}
+
+@layer utilities {
+    /* Scrollbalk visueel verbergen, element blijft scrollbaar (touch, trackpad, toetsenbord). */
+    .scrollbar-none {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .scrollbar-none::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* Vervaagde rechterrand als hint dat er meer te scrollen is. */
+    .scroll-fade-r {
+        -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
+        mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
+    }
 }
 
 [x-cloak] {

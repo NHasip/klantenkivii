@@ -1,5 +1,5 @@
 import React from 'react';
-import { Badge, Button, Card, CardHeader, EmptyState, Field, Stat, cx, inputClasses } from '../../../../components/ui';
+import { Badge, Button, Card, CardHeader, EmptyState, Field, FilePicker, Stat, cx, inputClasses } from '../../../../components/ui';
 import CopyButton, { formatIban } from './CopyButton';
 import {
     CheckboxField,
@@ -233,11 +233,10 @@ function MandateForm({ form, editing, incasso, onSubmit, onCancel }) {
                                     {incasso.formulier_uploaded_at ? ` (${formatDate(incasso.formulier_uploaded_at)})` : ''}
                                 </p>
                             )}
-                            <input
+                            <FilePicker
                                 id="mandate-incasso-formulier"
-                                type="file"
                                 accept=".pdf,.jpg,.jpeg,.png"
-                                className="block w-full text-sm text-zinc-700 file:mr-3 file:h-9 file:rounded-lg file:border-0 file:bg-zinc-100 file:px-3 file:text-sm file:font-semibold file:text-zinc-800 hover:file:bg-zinc-200"
+                                files={form.data.incasso_formulier}
                                 onChange={(e) => form.setData('incasso_formulier', e.target.files?.[0] || null)}
                             />
                         </Field>

@@ -138,7 +138,7 @@ export default function Dashboard({ kpis = {}, urls = {}, meta = {}, lists = {} 
                 />
 
                 {/* Kerncijfers */}
-                <section aria-label="Kerncijfers" className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <section aria-label="Kerncijfers" className="grid min-w-0 grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
                     <Stat
                         label="Open taken"
                         value={formatInt(kpis.tasks_open)}

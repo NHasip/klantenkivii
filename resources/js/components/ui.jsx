@@ -154,14 +154,56 @@ export function Stat({ label, value, sub, href, tone = 'neutral' }) {
         <>
             <span className={cx('absolute inset-y-3 left-0 w-1 rounded-r', toneBar)} aria-hidden="true" />
             <div className="text-xs font-medium uppercase tracking-wide text-zinc-500">{label}</div>
-            <div className="mt-1 text-2xl font-semibold tabular-nums text-zinc-900">{value}</div>
+            <div className="mt-1 break-words text-xl font-semibold tabular-nums text-zinc-900 sm:text-2xl">{value}</div>
             {sub ? <div className="mt-1 text-xs text-zinc-500">{sub}</div> : null}
         </>
     );
-    const base = 'relative block min-w-0 rounded-xl border border-zinc-200 bg-white p-4 pl-5 shadow-sm';
+    const base = 'relative block min-w-0 rounded-xl border border-zinc-200 bg-white p-3 pl-4 shadow-sm sm:p-4 sm:pl-5';
     return href ? (
         <a href={href} className={cx(base, 'transition hover:border-zinc-300 hover:shadow', FOCUS)}>{content}</a>
     ) : (
         <div className={base}>{content}</div>
+    );
+}
+
+/*
+ * Bestandskiezer met Nederlandse knop en statustekst in plaats van de native
+ * "Choose Files / No file chosen". Het echte input blijft focusbaar (sr-only),
+ * dus Tab + Enter/Spatie werkt; de focusring staat op de knop via focus-within.
+ */
+export function FilePicker({ id, multiple = false, accept, disabled = false, onChange, files = [], buttonLabel, className = '', describedBy }) {
+    const list = Array.isArray(files) ? files.filter(Boolean) : files ? [files] : [];
+    const statusId = id ? `${id}-status` : undefined;
+    const status =
+        list.length === 0
+            ? 'Geen bestand gekozen'
+            : list.length === 1
+              ? list[0]?.name || '1 bestand gekozen'
+              : `${list.length} bestanden gekozen`;
+    return (
+        <div className={cx('flex min-w-0 flex-wrap items-center gap-3', className)}>
+            <label
+                className={cx(
+                    buttonClasses({ variant: 'secondary', size: 'md' }),
+                    'focus-within:ring-2 focus-within:ring-indigo-600 focus-within:ring-offset-2',
+                    disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
+                )}
+            >
+                <input
+                    id={id}
+                    type="file"
+                    className="sr-only"
+                    multiple={multiple}
+                    accept={accept}
+                    disabled={disabled}
+                    aria-describedby={cx(statusId, describedBy) || undefined}
+                    onChange={onChange}
+                />
+                {buttonLabel ?? (multiple ? 'Bestanden kiezen' : 'Bestand kiezen')}
+            </label>
+            <span id={statusId} className="min-w-0 truncate text-sm text-zinc-600" aria-live="polite">
+                {status}
+            </span>
+        </div>
     );
 }

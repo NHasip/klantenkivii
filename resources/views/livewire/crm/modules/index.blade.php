@@ -4,6 +4,7 @@
     $error = 'mt-1 text-xs font-medium text-rose-700';
     $btnPrimary = 'inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-indigo-600 px-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
     $btnSecondary = 'inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-white px-3.5 text-sm font-semibold text-zinc-800 shadow-sm ring-1 ring-inset ring-zinc-300 transition-colors hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:opacity-50';
+    $actionSlot = 'w-[6.5rem] shrink-0 justify-center';
     $btnSmall = 'inline-flex h-8 items-center rounded-lg px-2.5 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:opacity-50';
     $th = 'px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500';
     $activeCount = $supportsArchive ? $modules->whereNull('archived_at')->count() : $modules->count();
@@ -178,19 +179,24 @@
                             <td class="whitespace-nowrap px-4 py-3 text-right align-middle tabular-nums text-zinc-700">{{ number_format($inUse, 0, ',', '.') }}</td>
                             <td class="hidden px-4 py-3 align-middle text-zinc-700 md:table-cell">{{ $m->default_visible ? 'Ja' : 'Nee' }}</td>
                             <td class="whitespace-nowrap px-4 py-3 text-right align-middle">
-                                <div class="inline-flex items-center gap-1">
-                                    <button type="button" class="{{ $btnSmall }} text-zinc-700 hover:bg-zinc-100" wire:click="startEdit({{ $m->id }})" aria-label="{{ $m->naam }} bewerken">Bewerken</button>
+                                {{-- Vaste, rechts uitgelijnde groep met drie slots, zodat knoppen per rij onder elkaar staan. --}}
+                                <div class="flex items-center justify-end gap-1">
+                                    <button type="button" class="{{ $btnSmall }} {{ $actionSlot }} text-zinc-700 hover:bg-zinc-100" wire:click="startEdit({{ $m->id }})" aria-label="{{ $m->naam }} bewerken">Bewerken</button>
                                     @if($archived)
-                                        <button type="button" class="{{ $btnSmall }} text-zinc-700 hover:bg-zinc-100" wire:click="restoreModule({{ $m->id }})" wire:loading.attr="disabled" wire:target="restoreModule({{ $m->id }})" aria-label="{{ $m->naam }} herstellen">Herstellen</button>
+                                        <button type="button" class="{{ $btnSmall }} {{ $actionSlot }} text-zinc-700 hover:bg-zinc-100" wire:click="restoreModule({{ $m->id }})" wire:loading.attr="disabled" wire:target="restoreModule({{ $m->id }})" aria-label="{{ $m->naam }} herstellen">Herstellen</button>
                                     @elseif($supportsArchive)
-                                        <button type="button" class="{{ $btnSmall }} text-amber-800 hover:bg-amber-50" aria-label="{{ $m->naam }} archiveren"
+                                        <button type="button" class="{{ $btnSmall }} {{ $actionSlot }} text-amber-800 hover:bg-amber-50" aria-label="{{ $m->naam }} archiveren"
                                                 @click="ask('archiveModule', {{ $m->id }}, 'Module archiveren?', 'Bestaande klanten houden de module, maar je kunt hem niet meer kiezen bij nieuwe koppelingen.', 'Archiveren')">Archiveren</button>
                                     @elseif($inUse > 0)
-                                        <span class="px-2.5 text-xs text-zinc-400" title="Draai de nieuwste migraties om archiveren mogelijk te maken.">In gebruik</span>
+                                        <span class="{{ $actionSlot }} inline-flex items-center text-xs text-zinc-400" title="Draai de nieuwste migraties om archiveren mogelijk te maken.">In gebruik</span>
+                                    @else
+                                        <span class="{{ $actionSlot }}" aria-hidden="true"></span>
                                     @endif
                                     @if(! $archived && $inUse === 0)
-                                        <button type="button" class="{{ $btnSmall }} text-rose-700 hover:bg-rose-50 focus-visible:ring-rose-600" aria-label="{{ $m->naam }} verwijderen"
+                                        <button type="button" class="{{ $btnSmall }} {{ $actionSlot }} text-rose-700 hover:bg-rose-50 focus-visible:ring-rose-600" aria-label="{{ $m->naam }} verwijderen"
                                                 @click="ask('deleteModule', {{ $m->id }}, 'Module verwijderen?', 'Weet je zeker dat je deze module wilt verwijderen? Dit kan niet ongedaan worden gemaakt.', 'Verwijderen', true)">Verwijderen</button>
+                                    @else
+                                        <span class="{{ $actionSlot }}" aria-hidden="true"></span>
                                     @endif
                                 </div>
                             </td>

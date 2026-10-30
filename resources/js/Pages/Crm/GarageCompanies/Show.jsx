@@ -677,15 +677,17 @@ export default function Show({
     // ---- Activiteit ----
     const [timelineFilter, setTimelineFilter] = useState('alles');
 
-    const noteForm = useForm({ titel: 'Notitie', inhoud: '' });
+    // Titel start leeg (placeholder "Notitie"); leeg laten wordt bij versturen "Notitie".
+    const noteForm = useForm({ titel: '', inhoud: '' });
 
     const submitNote = (event) => {
         event.preventDefault();
         if (noteForm.processing) return;
+        noteForm.transform((data) => ({ ...data, titel: String(data.titel ?? '').trim() || 'Notitie' }));
         noteForm.post(urls.add_note, {
             preserveScroll: true,
             onSuccess: () => {
-                noteForm.reset('inhoud');
+                noteForm.reset();
                 setHeaderPanel(null);
             },
         });

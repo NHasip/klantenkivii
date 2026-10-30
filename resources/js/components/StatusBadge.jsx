@@ -41,6 +41,16 @@ export function translateStatusText(text, labels = {}) {
         .replace(/\s->\s/g, ' naar ');
 }
 
+// Oude statusregels als "Status gewijzigd: Demo naar Demo" (zelfde van/naar na labelvertaling)
+// zijn geen echte wijziging; die verbergen we alleen bij het tonen, de data blijft staan.
+export function isNoopStatusChange(activity, labels = {}) {
+    if (!activity || activity.type !== 'status_wijziging' || !activity.titel) return false;
+    const text = translateStatusText(activity.titel, labels).replace(/^[^:]*:\s*/, '');
+    const match = text.match(/^(.+?)\s+naar\s+(.+)$/i);
+    if (!match) return false;
+    return match[1].trim().toLowerCase() === match[2].trim().toLowerCase();
+}
+
 // Visible keyboard focus for links, buttons and summaries inside a page wrapper.
 export const FOCUS_SCOPE = [
     '[&_a:focus-visible]:outline [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-offset-2 [&_a:focus-visible]:outline-indigo-600',

@@ -2,7 +2,7 @@
     @php
         $card = 'min-w-0 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5';
         $focus = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2';
-        $csvBtn = 'inline-flex h-7 items-center rounded-lg bg-white px-2.5 text-xs font-semibold text-zinc-700 shadow-sm ring-1 ring-inset ring-zinc-300 transition-colors hover:bg-zinc-50 disabled:opacity-50 '.$focus;
+        $csvBtn = 'inline-flex h-7 shrink-0 items-center rounded-lg bg-white px-2.5 text-xs font-semibold text-zinc-700 shadow-sm ring-1 ring-inset ring-zinc-300 transition-colors hover:bg-zinc-50 disabled:opacity-50 '.$focus;
         $input = 'mt-1 block w-full rounded-lg border-zinc-300 text-sm text-zinc-900 shadow-sm focus:border-indigo-600 focus:ring-indigo-600';
         $th = 'px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-zinc-500';
         $tile = 'block h-full min-w-0 rounded-xl border border-zinc-200 bg-white px-4 py-3 shadow-sm';
@@ -169,7 +169,7 @@
         $chartW = 640;
         $chartH = 220;
         $padL = 64;
-        $padR = 16;
+        $padR = 24;
         $padT = 16;
         $padB = 32;
         $plotW = $chartW - $padL - $padR;
@@ -193,15 +193,22 @@
 
         $flowMax = max(1, ...array_map(fn ($row) => max((int) $row['in'], (int) $row['opgezegd'] + (int) $row['verloren']), $flowByMonth));
         $flowTop = (int) max(4, ceil($flowMax / 4) * 4);
-        $flowSlot = $plotW / max(1, count($flowByMonth));
-        $barW = max(4, min(18, ($flowSlot - 8) / 2));
+        // Eigen afmetingen voor de smallere kaart (lg:col-span-5), zodat staven en labels niet verkleinen.
+        $flowW = 420;
+        $flowH = 260;
+        $flowPadL = 36;
+        $flowPadR = 12;
+        $flowPlotW = $flowW - $flowPadL - $flowPadR;
+        $flowPlotH = $flowH - $padT - $padB;
+        $flowSlot = $flowPlotW / max(1, count($flowByMonth));
+        $barW = max(4, min(14, ($flowSlot - 6) / 2));
         $euro = fn ($v) => '€ '.number_format((float) $v, 0, ',', '.');
     @endphp
 
     <div class="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-12">
         <div class="min-w-0 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5 lg:col-span-7">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-                <div>
+            <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
                     <h2 class="text-base font-semibold text-zinc-900">MRR per maand</h2>
                     <div class="text-xs text-zinc-500">Laatste 12 maanden, excl. btw. Berekend uit start- en einddatums van modules (benadering, huidige maand is exact).</div>
                 </div>
@@ -225,15 +232,15 @@
                         <title>{{ $p['row']['label'] }}: {{ '€ '.number_format((float) $p['row']['excl'], 2, ',', '.') }}</title>
                     </circle>
                     @if ($i % 2 === (count($mrrPoints) - 1) % 2)
-                        <text x="{{ $p['x'] }}" y="{{ $chartH - 10 }}" text-anchor="middle" font-size="11" fill="#71717a">{{ $p['row']['label'] }}</text>
+                        <text x="{{ $p['x'] }}" y="{{ $chartH - 10 }}" text-anchor="{{ $i === count($mrrPoints) - 1 ? 'end' : 'middle' }}" font-size="11" fill="#71717a">{{ $p['row']['label'] }}</text>
                     @endif
                 @endforeach
             </svg>
         </div>
 
         <div class="min-w-0 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5 lg:col-span-5">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-                <div>
+            <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
                     <h2 class="text-base font-semibold text-zinc-900">Instroom en uitstroom per maand</h2>
                     <div class="text-xs text-zinc-500">Nieuw actief (actief vanaf) tegenover opgezegd en verloren (op datum).</div>
                 </div>
@@ -244,29 +251,29 @@
                 <span class="inline-flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm bg-rose-500"></span>Opgezegd</span>
                 <span class="inline-flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm bg-rose-300"></span>Verloren</span>
             </div>
-            <svg viewBox="0 0 {{ $chartW }} {{ $chartH }}" class="mt-2 h-auto w-full" role="img" aria-label="Staafgrafiek instroom en uitstroom per maand, laatste 12 maanden">
+            <svg viewBox="0 0 {{ $flowW }} {{ $flowH }}" class="mt-2 h-auto w-full" role="img" aria-label="Staafgrafiek instroom en uitstroom per maand, laatste 12 maanden">
                 @foreach ([0, 0.25, 0.5, 0.75, 1] as $f)
-                    @php $gy = round($padT + $plotH - $plotH * $f, 1); @endphp
-                    <line x1="{{ $padL }}" x2="{{ $chartW - $padR }}" y1="{{ $gy }}" y2="{{ $gy }}" stroke="#e4e4e7" stroke-width="1" />
-                    <text x="{{ $padL - 8 }}" y="{{ $gy + 4 }}" text-anchor="end" font-size="11" fill="#71717a">{{ (int) round($flowTop * $f) }}</text>
+                    @php $gy = round($padT + $flowPlotH - $flowPlotH * $f, 1); @endphp
+                    <line x1="{{ $flowPadL }}" x2="{{ $flowW - $flowPadR }}" y1="{{ $gy }}" y2="{{ $gy }}" stroke="#e4e4e7" stroke-width="1" />
+                    <text x="{{ $flowPadL - 8 }}" y="{{ $gy + 4 }}" text-anchor="end" font-size="11" fill="#71717a">{{ (int) round($flowTop * $f) }}</text>
                 @endforeach
                 @foreach ($flowByMonth as $i => $row)
                     @php
-                        $cx = $padL + $flowSlot * $i + $flowSlot / 2;
-                        $hIn = $plotH * ((int) $row['in'] / $flowTop);
-                        $hOp = $plotH * ((int) $row['opgezegd'] / $flowTop);
-                        $hVe = $plotH * ((int) $row['verloren'] / $flowTop);
-                        $base = $padT + $plotH;
+                        $cx = $flowPadL + $flowSlot * $i + $flowSlot / 2;
+                        $hIn = $flowPlotH * ((int) $row['in'] / $flowTop);
+                        $hOp = $flowPlotH * ((int) $row['opgezegd'] / $flowTop);
+                        $hVe = $flowPlotH * ((int) $row['verloren'] / $flowTop);
+                        $base = $padT + $flowPlotH;
                     @endphp
                     <g>
                         <title>{{ $row['label'] }}: {{ $row['in'] }} nieuw actief, {{ $row['opgezegd'] }} opgezegd, {{ $row['verloren'] }} verloren</title>
                         <rect x="{{ round($cx - $barW - 1, 1) }}" y="{{ round($base - $hIn, 1) }}" width="{{ round($barW, 1) }}" height="{{ round($hIn, 1) }}" rx="2" fill="#10b981" />
                         <rect x="{{ round($cx + 1, 1) }}" y="{{ round($base - $hOp, 1) }}" width="{{ round($barW, 1) }}" height="{{ round($hOp, 1) }}" rx="2" fill="#f43f5e" />
                         <rect x="{{ round($cx + 1, 1) }}" y="{{ round($base - $hOp - $hVe, 1) }}" width="{{ round($barW, 1) }}" height="{{ round($hVe, 1) }}" rx="2" fill="#fda4af" />
-                        <rect x="{{ round($cx - $flowSlot / 2, 1) }}" y="{{ $padT }}" width="{{ round($flowSlot, 1) }}" height="{{ $plotH }}" fill="transparent" />
+                        <rect x="{{ round($cx - $flowSlot / 2, 1) }}" y="{{ $padT }}" width="{{ round($flowSlot, 1) }}" height="{{ $flowPlotH }}" fill="transparent" />
                     </g>
                     @if ($i % 2 === (count($flowByMonth) - 1) % 2)
-                        <text x="{{ round($cx, 1) }}" y="{{ $chartH - 10 }}" text-anchor="middle" font-size="11" fill="#71717a">{{ $row['label'] }}</text>
+                        <text x="{{ round($cx, 1) }}" y="{{ $flowH - 10 }}" text-anchor="middle" font-size="11" fill="#71717a">{{ $row['label'] }}</text>
                     @endif
                 @endforeach
             </svg>
@@ -299,12 +306,15 @@
         </div>
 
         <div class="flex h-full min-w-0 flex-col rounded-xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5 lg:col-span-8">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
-                    <div class="flex items-center gap-2"><h2 class="text-base font-semibold text-zinc-900">Modules prestaties</h2><button type="button" class="{{ $csvBtn }}" wire:click="export('modules')" wire:loading.attr="disabled" wire:target="export" aria-label="Modules prestaties exporteren als CSV">CSV</button></div>
-                    <div class="mt-1 text-xs text-zinc-500">Alleen klanten met status Actief. Demo-klanten tellen niet mee.</div>
+                    <h2 class="text-base font-semibold text-zinc-900">Modules prestaties</h2>
+                    <div class="text-xs text-zinc-500">Alleen klanten met status Actief. Demo-klanten tellen niet mee.</div>
                 </div>
-                <div class="grid grid-cols-1 gap-2 sm:w-72">
+                <button type="button" class="{{ $csvBtn }}" wire:click="export('modules')" wire:loading.attr="disabled" wire:target="export" aria-label="Modules prestaties exporteren als CSV">CSV</button>
+            </div>
+            <div class="mt-3">
+                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
                     @forelse($topModules as $module)
                         <div class="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs">
                             <div class="flex items-center justify-between gap-2">

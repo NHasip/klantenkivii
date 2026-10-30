@@ -169,11 +169,16 @@ function NextAction({ action }) {
     );
 }
 
+// Compactere cellen dan de standaard tabel zodat alle kolommen op 1920px passen; horizontaal scrollen blijft de fallback.
+const TABLE_TH = tableClasses.th.replace('px-4', 'px-3');
+const TABLE_TD = tableClasses.td.replace('px-4', 'px-3');
+const NEXT_ACTION_CELL = 'hidden xl:table-cell';
+
 function SortHeader({ field, label, sort, dir, onSort, className }) {
     const active = sort === field;
     const ariaSort = active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none';
     return (
-        <th scope="col" aria-sort={ariaSort} className={cx(tableClasses.th, 'whitespace-nowrap', className)}>
+        <th scope="col" aria-sort={ariaSort} className={cx(TABLE_TH, 'whitespace-nowrap', className)}>
             <button
                 type="button"
                 onClick={() => onSort(field)}
@@ -504,7 +509,9 @@ export default function Index({ companies, totals, statusCounts, trashCount, fil
     };
 
     // Bulkselectie kolom alleen in de actieve lijst, actiekolom alleen in de prullenbak.
-    const columnCount = 8 + (bulkEnabled ? 1 : 0) + (isTrashView ? 1 : 0);
+    // "Volgende actie" alleen tonen als minstens een rij een waarde heeft (en pas vanaf xl).
+    const showNextAction = (Array.isArray(rows) ? rows : []).some((c) => c?.volgende_actie);
+    const columnCount = 7 + (showNextAction ? 1 : 0) + (bulkEnabled ? 1 : 0) + (isTrashView ? 1 : 0);
     const totalCount = Number(safeCompanies.total || 0);
     const telHref = (phone) => `tel:${String(phone).replace(/[^\d+]/g, '')}`;
     const filterSummary = [
@@ -935,7 +942,7 @@ export default function Index({ companies, totals, statusCounts, trashCount, fil
                     <caption className="sr-only">
                         {isTrashView ? 'Verwijderde klanten' : 'Klanten'}, sorteerbaar via de kolomkoppen
                     </caption>
-                    <thead className={tableClasses.thead}>
+                    <thead className={TABLE_THead}>
                         <tr>
                             {bulkEnabled && (
                                 <th scope="col" className="w-10 px-4 py-2.5">
@@ -953,17 +960,17 @@ export default function Index({ companies, totals, statusCounts, trashCount, fil
                             <SortHeader field="naam" label="Bedrijf" sort={activeSort} dir={activeDir} onSort={onSort} />
                             <SortHeader field="status" label="Status" sort={activeSort} dir={activeDir} onSort={onSort} />
                             <SortHeader field="plaats" label="Plaats" sort={activeSort} dir={activeDir} onSort={onSort} />
-                            <th scope="col" className={tableClasses.th}>Contact</th>
-                            <SortHeader field="volgende_actie" label="Volgende actie" sort={activeSort} dir={activeDir} onSort={onSort} />
+                            <th scope="col" className={TABLE_TH}>Contact</th>
+                            {showNextAction && <SortHeader field="volgende_actie" label="Volgende actie" sort={activeSort} dir={activeDir} onSort={onSort} className={NEXT_ACTION_CELL} />}
                             <SortHeader field="demo_eind" label="Demo eindigt" sort={activeSort} dir={activeDir} onSort={onSort} />
                             <SortHeader field="omzet" label="Omzet excl." sort={activeSort} dir={activeDir} onSort={onSort} className="text-right" />
                             {isTrashView ? (
-                                <th scope="col" className={tableClasses.th}>Verwijderd op</th>
+                                <th scope="col" className={TABLE_TH}>Verwijderd op</th>
                             ) : (
                                 <SortHeader field="bijgewerkt" label="Bijgewerkt" sort={activeSort} dir={activeDir} onSort={onSort} />
                             )}
                             {isTrashView && (
-                                <th scope="col" className={tableClasses.th}>
+                                <th scope="col" className={TABLE_TH}>
                                     <span className="sr-only">Acties</span>
                                 </th>
                             )}
@@ -996,7 +1003,7 @@ export default function Index({ companies, totals, statusCounts, trashCount, fil
                                             />
                                         </td>
                                     )}
-                                    <td className={cx(tableClasses.td, 'font-semibold text-zinc-900')}>
+                                    <td className={cx(TABLE_TD, 'min-w-[10rem] max-w-[18rem] break-words font-semibold text-zinc-900')}>
                                         {company.show_url ? (
                                             <Link href={company.show_url} className="hover:text-indigo-700 hover:underline">
                                                 {company.bedrijfsnaam}
@@ -1005,11 +1012,11 @@ export default function Index({ companies, totals, statusCounts, trashCount, fil
                                             company.bedrijfsnaam
                                         )}
                                     </td>
-                                    <td className={tableClasses.td}>
+                                    <td className={TABLE_TD}>
                                         <StatusBadge status={company.status} labels={safeStatusLabels} />
                                     </td>
-                                    <td className={tableClasses.td}>{company.plaats || <span className="text-zinc-400">-</span>}</td>
-                                    <td className={cx(tableClasses.td, 'max-w-[16rem]')}>
+                                    <td className={TABLE_TD}>{company.plaats || <span className="text-zinc-400">-</span>}</td>
+                                    <td className={cx(TABLE_TD, 'max-w-[14rem]')}>
                                         {company.hoofd_email ? (
                                             <a href={`mailto:${company.hoofd_email}`} className="block truncate text-zinc-800 hover:text-indigo-700 hover:underline" title={company.hoofd_email}>
                                                 {company.hoofd_email}
@@ -1023,14 +1030,14 @@ export default function Index({ companies, totals, statusCounts, trashCount, fil
                                             </a>
                                         ) : null}
                                     </td>
-                                    <td className={tableClasses.td}><NextAction action={company.volgende_actie} /></td>
-                                    <td className={cx(tableClasses.td, 'whitespace-nowrap')}><DemoEnd value={company.demo_eind_op} status={company.status} computed={company.demo_eind_berekend} /></td>
-                                    <td className={cx(tableClasses.td, 'whitespace-nowrap text-right tabular-nums')}>{formatEuro(company.omzet_excl)}</td>
-                                    <td className={cx(tableClasses.td, 'whitespace-nowrap text-zinc-500')}>
+                                    {showNextAction && <td className={cx(TABLE_TD, NEXT_ACTION_CELL)}><NextAction action={company.volgende_actie} /></td>}
+                                    <td className={cx(TABLE_TD, 'whitespace-nowrap')}><DemoEnd value={company.demo_eind_op} status={company.status} computed={company.demo_eind_berekend} /></td>
+                                    <td className={cx(TABLE_TD, 'whitespace-nowrap text-right tabular-nums')}>{formatEuro(company.omzet_excl)}</td>
+                                    <td className={cx(TABLE_TD, 'whitespace-nowrap text-zinc-500')}>
                                         {formatDateTime(isTrashView ? company.deleted_at : company.updated_at)}
                                     </td>
                                     {isTrashView && (
-                                        <td className={cx(tableClasses.td, 'text-right')}>
+                                        <td className={cx(TABLE_TD, 'text-right')}>
                                             <div className="flex items-center justify-end gap-2">
                                                 {company.restore_url && (
                                                     <Button variant="secondary" size="sm" onClick={() => restoreCompany(company)}>

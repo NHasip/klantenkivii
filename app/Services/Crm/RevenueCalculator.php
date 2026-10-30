@@ -179,8 +179,9 @@ class RevenueCalculator
             ->get($select)
             ->map(function ($row) use ($tz, $hasAantal) {
                 $date = fn ($value) => $value ? CarbonImmutable::parse($value, $tz)->toDateString() : null;
+                $status = (string) $row->company_status;
                 $since = $date($row->actief_vanaf);
-                if ($since === null && (string) $row->company_status === GarageCompanyStatus::Actief->value) {
+                if ($since === null && $status === GarageCompanyStatus::Actief->value) {
                     $since = $date($row->company_created_at);
                 }
 
@@ -191,6 +192,7 @@ class RevenueCalculator
                     'since' => $since,
                     'opgezegd' => $date($row->opgezegd_op),
                     'verloren' => $date($row->verloren_op),
+                    'status' => $status,
                 ];
             });
 
@@ -205,9 +207,24 @@ class RevenueCalculator
                 continue;
             }
 
+            // Benadering: we hebben geen statushistorie, dus een klant telt in een maand mee als
+            // hij op het peilmoment (einde maand) volgens de datums Actief was:
+            // - huidige status Actief: vanaf actief_vanaf (fallback created_at);
+            // - huidige status Opgezegd/Verloren: vanaf actief_vanaf tot opgezegd_op/verloren_op;
+            //   zonder bekende einddatum weten we niet wanneer hij stopte en tellen we hem niet mee;
+            // - elke andere status (lead, demo, proefperiode) telt nooit mee, ook niet met een
+            //   (oude of vooraf ingevulde) actief_vanaf.
             $peil = $month->endOfMonth()->toDateString();
             $sum = 0.0;
             foreach ($rows as $row) {
+                $isActief = $row['status'] === GarageCompanyStatus::Actief->value;
+                $isGestopt = in_array($row['status'], [GarageCompanyStatus::Opgezegd->value, GarageCompanyStatus::Verloren->value], true);
+                if (! $isActief && ! $isGestopt) {
+                    continue;
+                }
+                if ($isGestopt && $row['opgezegd'] === null && $row['verloren'] === null) {
+                    continue;
+                }
                 if ($row['start'] !== null && $row['start'] > $peil) {
                     continue;
                 }

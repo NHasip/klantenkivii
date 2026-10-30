@@ -1,6 +1,6 @@
 import React from 'react';
 import { Badge, Button, Card, CardHeader, EmptyState, cx } from '../../../../components/ui';
-import { translateStatusText } from '../../../../components/StatusBadge';
+import { isNoopStatusChange, translateStatusText } from '../../../../components/StatusBadge';
 import {
     ACTIVITY_TYPE_LABELS,
     CHANNEL_LABELS,
@@ -130,7 +130,7 @@ function NoteForm({ form, onSubmit }) {
         <Card as="form" onSubmit={onSubmit} noValidate aria-labelledby="note-form-title">
             <h2 id="note-form-title" className="mb-4 text-base font-semibold text-zinc-900">Nieuwe notitie</h2>
             <div className="space-y-4">
-                <FormField form={form} name="titel" id="noteForm-titel" label="Titel" required />
+                <FormField form={form} name="titel" id="noteForm-titel" label="Titel" placeholder="Notitie" hint="Leeg laten wordt Notitie." />
                 <FormField form={form} name="inhoud" id="noteForm-inhoud" label="Notitie" as="textarea" rows={4} required />
                 <FormActions form={form}>
                     <Button type="submit" loading={form.processing}>
@@ -143,7 +143,7 @@ function NoteForm({ form, onSubmit }) {
 }
 
 function Timeline({ activities, filter, setFilter, statusLabels }) {
-    const all = activities?.data || [];
+    const all = (activities?.data || []).filter((activity) => !isNoopStatusChange(activity, statusLabels));
     const filtered = all.filter((activity) => matchesTimelineFilter(activity, filter));
 
     return (

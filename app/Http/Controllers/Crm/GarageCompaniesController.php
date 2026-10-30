@@ -2102,6 +2102,11 @@ class GarageCompaniesController
 
     public function addTimelineNote(Request $request, GarageCompany $garageCompany): RedirectResponse
     {
+        // Lege titel wordt standaard "Notitie" (het formulier start leeg met placeholder).
+        if (trim((string) $request->input('titel', '')) === '') {
+            $request->merge(['titel' => 'Notitie']);
+        }
+
         $data = $request->validate([
             'titel' => ['required', 'string', 'max:255'],
             'inhoud' => ['required', 'string', 'min:2'],
