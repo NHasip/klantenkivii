@@ -710,6 +710,23 @@ export default function Index({ companies, totals, statusCounts, trashCount, fil
     };
 
     const [exportOpen, setExportOpen] = useState(false);
+    const [incassoPreview, setIncassoPreview] = useState({ loading: false, data: null, error: null });
+    const [showExcluded, setShowExcluded] = useState(false);
+    useEffect(() => {
+        if (!exportOpen || isTrashView || !safeUrls.preview_incasso_batch) return undefined;
+        const controller = new AbortController();
+        setIncassoPreview((prev) => ({ ...prev, loading: true, error: null }));
+        const query = new URLSearchParams({ maand: exportForm.data.maand, jaar: exportForm.data.jaar });
+        fetch(`${safeUrls.preview_incasso_batch}?${query.toString()}`, { headers: { Accept: 'application/json' }, signal: controller.signal })
+            .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
+            .then((json) => setIncassoPreview({ loading: false, data: json, error: null }))
+            .catch((err) => {
+                if (err?.name === 'AbortError') return;
+                setIncassoPreview({ loading: false, data: null, error: 'Overzicht kon niet worden geladen.' });
+            });
+        return () => controller.abort();
+    }, [exportOpen, isTrashView, exportForm.data.maand, exportForm.data.jaar, safeUrls.preview_incasso_batch]);
+
     const exportIncasso = () => {
         if (!safeUrls.export_incasso_batch || !exportForm.data.uitvoerdatum) return;
         const query = new URLSearchParams({ maand: exportForm.data.maand, jaar: exportForm.data.jaar, uitvoerdatum: exportForm.data.uitvoerdatum });
@@ -825,6 +842,40 @@ export default function Index({ companies, totals, statusCounts, trashCount, fil
                         <Button icon="download" onClick={exportIncasso} disabled={!exportForm.data.uitvoerdatum || !safeUrls.export_incasso_batch}>
                             Exporteren
                         </Button>
+                    </div>
+                    <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50/60 p-3 text-sm" aria-live="polite">
+                        {incassoPreview.loading && !incassoPreview.data ? (
+                            <p className="text-zinc-500">Overzicht laden...</p>
+                        ) : incassoPreview.error ? (
+                            <p className="text-rose-700">{incassoPreview.error}</p>
+                        ) : incassoPreview.data ? (
+                            <>
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                                    <span className="font-medium text-zinc-900">
+                                        {incassoPreview.data.included.length} {incassoPreview.data.included.length === 1 ? 'klant' : 'klanten'} in de batch
+                                    </span>
+                                    <span className="text-zinc-600">Totaal {formatEuro(incassoPreview.data.total)} incl. btw</span>
+                                    {incassoPreview.data.excluded.length > 0 ? (
+                                        <button type="button" className="focus-ring rounded font-medium text-amber-800 underline-offset-2 hover:underline" aria-expanded={showExcluded} onClick={() => setShowExcluded((v) => !v)}>
+                                            {incassoPreview.data.excluded.length} niet meegenomen, bekijk waarom
+                                        </button>
+                                    ) : null}
+                                </div>
+                                {showExcluded && incassoPreview.data.excluded.length > 0 ? (
+                                    <ul className="mt-3 divide-y divide-zinc-200 rounded-lg border border-zinc-200 bg-white">
+                                        {incassoPreview.data.excluded.map((row) => (
+                                            <li key={row.company_id} className="flex flex-wrap items-start justify-between gap-2 px-3 py-2">
+                                                <div className="min-w-0">
+                                                    <div className="font-medium text-zinc-900">{row.company_name}</div>
+                                                    <div className="text-xs text-zinc-600">{(row.reasons || []).join(' · ')}</div>
+                                                </div>
+                                                {row.url ? <Link href={row.url} className="btn btn-secondary btn-xs shrink-0">Aanvullen</Link> : null}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : null}
+                            </>
+                        ) : null}
                     </div>
                 </Card>
             ) : null}

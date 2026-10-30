@@ -53,6 +53,7 @@ Route::middleware(['auth', 'active', 'admin.2fa'])->group(function () {
     Route::post('/garagebedrijven/{garageCompany}/incasso-instellingen', [GarageCompaniesController::class, 'updateIncassoSettings'])->name('crm.garage_companies.incasso.settings');
     Route::patch('/garagebedrijven/{garageCompany}/incasso/{mandate}', [GarageCompaniesController::class, 'setMandateStatus'])->name('crm.garage_companies.mandates.status');
     Route::get('/incasso/export', [GarageCompaniesController::class, 'exportIncassoBatch'])->name('crm.incasso.export');
+    Route::get('/incasso/voorbeeld', [GarageCompaniesController::class, 'previewIncassoBatch'])->name('crm.incasso.preview');
     Route::post('/garagebedrijven/{garageCompany}/timeline', [GarageCompaniesController::class, 'addTimelineNote'])->name('crm.garage_companies.timeline.add');
     Route::post('/garagebedrijven/{garageCompany}/taken', [GarageCompaniesController::class, 'addTaskAppointment'])->name('crm.garage_companies.tasks.add');
     Route::patch('/garagebedrijven/{garageCompany}/taken/{activity}', [GarageCompaniesController::class, 'markTaskDone'])->name('crm.garage_companies.tasks.done');

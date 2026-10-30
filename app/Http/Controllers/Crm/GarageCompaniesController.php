@@ -252,6 +252,7 @@ class GarageCompaniesController
                 'create' => route('crm.garage_companies.create'),
                 'purge_trash' => route('crm.garage_companies.purge_trash'),
                 'export_incasso_batch' => route('crm.incasso.export'),
+                'preview_incasso_batch' => route('crm.incasso.preview'),
                 'export_csv' => route('crm.garage_companies.export_csv'),
                 'bulk_tag' => route('crm.garage_companies.bulk_tag'),
             ],
@@ -1228,6 +1229,7 @@ class GarageCompaniesController
                 'save_mandate' => route('crm.garage_companies.mandates.save', ['garageCompany' => $garageCompany->id]),
                 'save_incasso_settings' => route('crm.garage_companies.incasso.settings', ['garageCompany' => $garageCompany->id]),
                 'export_incasso_batch' => route('crm.incasso.export'),
+                'preview_incasso_batch' => route('crm.incasso.preview'),
                 'set_mandate_status' => route('crm.garage_companies.mandates.status', ['garageCompany' => $garageCompany->id, 'mandate' => '__MANDATE__']),
                 'add_note' => route('crm.garage_companies.timeline.add', ['garageCompany' => $garageCompany->id]),
                 'add_task' => route('crm.garage_companies.tasks.add', ['garageCompany' => $garageCompany->id]),
@@ -2004,6 +2006,38 @@ class GarageCompaniesController
         ]);
 
         return back()->with('status', 'Incasso-instellingen opgeslagen.');
+    }
+
+    /**
+     * Overzicht vooraf: welke klanten komen in de ING-batch en welke niet (met reden).
+     * Bevat geen IBAN's of andere bankgegevens.
+     */
+    public function previewIncassoBatch(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'maand' => ['nullable', 'integer', 'min:1', 'max:12'],
+            'jaar' => ['nullable', 'integer', 'min:2020', 'max:2100'],
+        ]);
+
+        $month = (int) ($data['maand'] ?? now()->month);
+        $year = (int) ($data['jaar'] ?? now()->year);
+        $overview = $this->incassoExportOverview($month, $year);
+
+        return response()->json([
+            'included' => collect($overview['eligible'])->map(fn (array $row) => [
+                'company_id' => $row['company_id'],
+                'company_name' => $row['company_name'],
+                'bedrag' => round((float) $row['bedrag'], 2),
+                'url' => route('crm.garage_companies.show', ['garageCompany' => $row['company_id']]),
+            ])->values(),
+            'excluded' => collect($overview['missing'])->map(fn (array $row) => [
+                'company_id' => $row['company_id'],
+                'company_name' => $row['company_name'],
+                'reasons' => array_values(array_unique($row['missing_fields'] ?? [])),
+                'url' => $row['url'] ?? null,
+            ])->values(),
+            'total' => round(collect($overview['eligible'])->sum(fn (array $row) => (float) $row['bedrag']), 2),
+        ]);
     }
 
     public function exportIncassoBatch(Request $request): BinaryFileResponse|RedirectResponse
