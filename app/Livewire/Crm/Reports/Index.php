@@ -31,17 +31,35 @@ class Index extends Component
         $this->applyFilters();
     }
 
+    /**
+     * Een vaste periode direct toepassen; bij "Aangepast" wacht de gebruiker op Toepassen.
+     */
+    public function updatedPreset(): void
+    {
+        if ($this->preset !== 'custom') {
+            $this->applyFilters();
+        }
+    }
+
     public function applyFilters(): void
     {
+        $this->resetErrorBag();
+        $isCustom = $this->preset === 'custom';
+
+        // Datums alleen valideren bij "Aangepast": oude waarden mogen een vaste periode niet blokkeren.
         $validated = $this->validate([
             'preset' => ['required', 'string', Rule::in(array_keys($this->presetOptions()))],
-            'from' => ['nullable', 'date'],
-            'to' => ['nullable', 'date', 'after_or_equal:from'],
+            'from' => $isCustom ? ['nullable', 'date'] : ['nullable'],
+            'to' => $isCustom ? ['nullable', 'date', Rule::when(filled($this->from), 'after_or_equal:from')] : ['nullable'],
+        ], [
+            'to.after_or_equal' => 'De einddatum moet op of na de begindatum liggen.',
+            'from.date' => 'Vul een geldige begindatum in.',
+            'to.date' => 'Vul een geldige einddatum in.',
         ]);
 
         $this->appliedPreset = $validated['preset'];
-        $this->appliedFrom = $validated['from'] ?? null;
-        $this->appliedTo = $validated['to'] ?? null;
+        $this->appliedFrom = $isCustom ? ($validated['from'] ?? null) : null;
+        $this->appliedTo = $isCustom ? ($validated['to'] ?? null) : null;
     }
 
     /**
@@ -59,6 +77,15 @@ class Index extends Component
             $end = $this->appliedTo
                 ? CarbonImmutable::parse($this->appliedTo, 'Europe/Amsterdam')->endOfDay()
                 : $today->endOfDay();
+
+            // Alleen een begin- of einddatum ingevuld: houd de periode geldig (begin voor eind).
+            if ($start->gt($end)) {
+                if ($this->appliedFrom) {
+                    $end = $start->endOfDay();
+                } else {
+                    $start = $end->subDays(29)->startOfDay();
+                }
+            }
 
             return [$start, $end];
         }

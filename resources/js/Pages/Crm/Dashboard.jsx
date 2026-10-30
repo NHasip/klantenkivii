@@ -1,357 +1,288 @@
 import React from 'react';
 import { Head } from '@inertiajs/react';
+import { Badge, Card, CardHeader, EmptyState, PageHeader, Stat, buttonClasses, cx } from '../../components/ui';
 
-function formatEuro(value) {
-    try {
-        return new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(value ?? 0);
-    } catch {
-        return `EUR ${Number(value ?? 0).toFixed(2)}`.replace('.', ',');
-    }
+const nlNumber = new Intl.NumberFormat('nl-NL');
+const nlEuro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' });
+const nlDate = new Intl.DateTimeFormat('nl-NL', { year: 'numeric', month: '2-digit', day: '2-digit' });
+const nlDateTime = new Intl.DateTimeFormat('nl-NL', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+const formatEuro = (value) => nlEuro.format(Number(value) || 0);
+const formatInt = (value) => nlNumber.format(Number(value) || 0);
+
+function safeFormat(formatter, value) {
+    if (!value) return '-';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? String(value) : formatter.format(date);
 }
 
-function formatInt(value) {
-    try {
-        return new Intl.NumberFormat('nl-NL').format(value ?? 0);
-    } catch {
-        return String(value ?? 0);
-    }
+const formatDate = (value) => safeFormat(nlDate, value);
+const formatDateTime = (value) => safeFormat(nlDateTime, value);
+
+const plural = (n, one, many) => `${formatInt(n)} ${Number(n) === 1 ? one : many}`;
+
+function daysLeftLabel(days) {
+    if (days < 0) return `${plural(Math.abs(days), 'dag', 'dagen')} verlopen`;
+    if (days === 0) return 'Verloopt vandaag';
+    return `Nog ${plural(days, 'dag', 'dagen')}`;
 }
 
-function formatDate(dateString) {
-    if (!dateString) return '-';
-
-    try {
-        return new Intl.DateTimeFormat('nl-NL', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-        }).format(new Date(dateString));
-    } catch {
-        return String(dateString);
-    }
+const PRIORITY_TONES = { kritiek: 'danger', hoog: 'warning', normaal: 'neutral', laag: 'neutral' };
+/* Alleen hoge prioriteit tonen; normaal en laag zijn ruis in een overzicht. */
+function PriorityBadge({ value }) {
+    const tone = PRIORITY_TONES[value];
+    if (!value || !tone || tone === 'neutral') return null;
+    return <Badge tone={tone}>{capitalize(value)}</Badge>;
 }
 
-function formatDateTime(isoString) {
-    if (!isoString) return '-';
+const capitalize = (text) => (text ? text.charAt(0).toUpperCase() + text.slice(1).replace(/_/g, ' ') : '');
 
-    try {
-        return new Intl.DateTimeFormat('nl-NL', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-        }).format(new Date(isoString));
-    } catch {
-        return String(isoString);
-    }
+const ROW_LINK = 'flex min-w-0 items-start justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600';
+
+/* Lijst met rijen gescheiden door een subtiele lijn: rustiger dan losse kaartjes. */
+function RowList({ children, className = '' }) {
+    return <ul className={cx('-mx-3 divide-y divide-zinc-100', className)}>{children}</ul>;
 }
 
-function cx(...parts) {
-    return parts.filter(Boolean).join(' ');
-}
-
-function Badge({ children, tone = 'neutral' }) {
-    const toneClasses = {
-        neutral: 'bg-zinc-100 text-zinc-700 ring-zinc-200',
-        info: 'bg-sky-100 text-sky-800 ring-sky-200',
-        danger: 'bg-rose-100 text-rose-700 ring-rose-200',
-    };
-
-    return (
-        <span
-            className={cx(
-                'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1',
-                toneClasses[tone] || toneClasses.neutral
-            )}
-        >
-            {children}
-        </span>
-    );
-}
-
-const primaryButtonClass =
-    'inline-flex items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700';
-
-function ButtonLink({ href, children }) {
-    return (
-        <a href={href} className={primaryButtonClass}>
-            {children}
-        </a>
-    );
-}
-
-function Panel({ title, subtitle, action, children }) {
-    return (
-        <section className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5">
-            {(title || subtitle || action) && (
-                <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1 basis-48">
-                        {title ? <h2 className="text-base font-semibold text-zinc-950">{title}</h2> : null}
-                        {subtitle ? <p className="mt-1 text-sm text-zinc-600">{subtitle}</p> : null}
-                    </div>
-                    {action}
-                </div>
-            )}
-            {children}
-        </section>
-    );
-}
-
-function MetricCard({ label, value, sub, tone = 'default', href }) {
-    const toneClasses = {
-        default: 'border-zinc-200 bg-white',
-        info: 'border-sky-200 bg-sky-50',
-        danger: 'border-rose-200 bg-rose-50',
-    };
-    const className = cx(
-        'block min-w-0 rounded-xl border p-4',
-        toneClasses[tone] || toneClasses.default,
-        href && 'transition hover:border-indigo-300 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1'
-    );
-    const content = (
+function LinkRow({ href, title, meta, aside, overdue = false }) {
+    const body = (
         <>
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">{label}</div>
-            <div className="mt-2 break-words text-2xl font-semibold tracking-tight text-zinc-950">{value}</div>
-            {sub ? <div className="mt-1 text-sm text-zinc-600">{sub}</div> : null}
+            <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium text-zinc-900" title={typeof title === 'string' ? title : undefined}>{title}</div>
+                {meta ? <div className="mt-0.5 text-xs text-zinc-500">{meta}</div> : null}
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+                {aside}
+                {overdue ? <Badge tone="danger">Te laat</Badge> : null}
+            </div>
         </>
     );
 
-    return href ? (
-        <a href={href} className={className}>
-            {content}
-        </a>
-    ) : (
-        <div className={className}>{content}</div>
-    );
-}
-
-function daysLeftLabel(days) {
-    if (days < 0) return `${Math.abs(days)} ${Math.abs(days) === 1 ? 'dag' : 'dagen'} verlopen`;
-    if (days === 0) return 'Verloopt vandaag';
-    return `Nog ${days} ${days === 1 ? 'dag' : 'dagen'}`;
-}
-
-function TodayRow({ href, title, meta, overdue, badge }) {
     return (
         <li>
-            <a
-                href={href}
-                className={cx(
-                    'flex min-w-0 items-start justify-between gap-3 rounded-xl border bg-white p-3 transition hover:border-zinc-300',
-                    overdue ? 'border-rose-300' : 'border-zinc-200'
-                )}
-            >
-                <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-semibold text-zinc-950" title={title}>{title}</div>
-                    <div className="mt-1 text-xs text-zinc-600">{meta}</div>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                    {badge ? <Badge>{badge}</Badge> : null}
-                    {overdue ? <Badge tone="danger">Te laat</Badge> : null}
-                </div>
-            </a>
+            {href ? (
+                <a href={href} className={ROW_LINK}>{body}</a>
+            ) : (
+                <div className="flex min-w-0 items-start justify-between gap-3 px-3 py-2.5">{body}</div>
+            )}
         </li>
     );
 }
 
-function EmptyState({ text }) {
+function SubHeading({ children, action }) {
     return (
-        <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 px-4 py-8 text-sm text-zinc-500">
-            {text}
+        <div className="mb-2 flex items-center justify-between gap-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{children}</h3>
+            {action}
         </div>
     );
 }
 
-function TaskRow({ task }) {
-    const overdue = task.deadline ? new Date(task.deadline) < new Date() : false;
-    const hasDeadline = Boolean(task.deadline);
-
+function TextLink({ href, children }) {
     return (
-        <li className={cx('min-w-0 rounded-xl border bg-white p-4', overdue ? 'border-rose-300' : 'border-zinc-200')}>
-            <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <div className="min-w-0 max-w-full truncate text-sm font-semibold text-zinc-950" title={task.titel}>{task.titel}</div>
-                        {overdue ? <Badge tone="danger">Te laat</Badge> : null}
-                    </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-600">
-                        {task.project?.naam ? <span>Project: {task.project.naam}</span> : null}
-                        <span>{hasDeadline ? `Deadline: ${formatDateTime(task.deadline)}` : 'Geen deadline'}</span>
-                        {task.prioriteit ? <span>Prioriteit: {task.prioriteit.charAt(0).toUpperCase() + task.prioriteit.slice(1)}</span> : null}
-                    </div>
-                </div>
-                <div className="shrink-0 text-xs font-semibold text-zinc-400">#{task.id}</div>
-            </div>
-        </li>
-    );
-}
-
-function AppointmentRow({ item }) {
-    const overdue = item.due_at ? new Date(item.due_at) < new Date() : false;
-    return (
-        <li className="min-w-0 rounded-xl border border-zinc-200 bg-white p-4">
-            <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <div className="min-w-0 break-words text-sm font-semibold text-zinc-950">{item.titel}</div>
-                        {overdue ? <Badge tone="danger">Verlopen</Badge> : null}
-                    </div>
-                    <div className="mt-2 text-xs leading-5 text-zinc-600">
-                        {formatDateTime(item.due_at)}
-                        {item.garage_company?.bedrijfsnaam ? (
-                            <>
-                                {' | '}
-                                <a href={item.garage_company.url} className="font-semibold text-zinc-900 hover:underline">
-                                    {item.garage_company.bedrijfsnaam}
-                                </a>
-                            </>
-                        ) : null}
-                    </div>
-                </div>
-                <div className="shrink-0 text-xs font-semibold text-zinc-400">#{item.id}</div>
-            </div>
-        </li>
-    );
-}
-
-function DurationRow({ item, typeLabel }) {
-    return (
-        <a
-            href={item.url}
-            className="flex min-w-0 items-start justify-between gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition hover:border-zinc-300"
-        >
-            <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-zinc-950">{item.bedrijfsnaam}</div>
-                <div className="mt-1 text-xs text-zinc-600">
-                    Sinds {formatDate(item.since_at)} | {typeLabel}
-                </div>
-            </div>
-            <div className="shrink-0 whitespace-nowrap text-sm font-semibold text-zinc-700">{formatInt(item.days)} dagen</div>
+        <a href={href} className="rounded text-sm font-medium text-indigo-700 hover:text-indigo-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
+            {children}
         </a>
     );
 }
 
-export default function Dashboard({ kpis, urls, meta, lists }) {
+function DurationList({ items, typeLabel, emptyTitle }) {
+    if (items.length === 0) return <EmptyState title={emptyTitle} />;
+
+    return (
+        <RowList>
+            {items.slice(0, 8).map((item) => (
+                <LinkRow
+                    key={item.id}
+                    href={item.url}
+                    title={item.bedrijfsnaam}
+                    meta={`${typeLabel} sinds ${formatDate(item.since_at)}`}
+                    aside={<span className="whitespace-nowrap text-sm font-semibold tabular-nums text-zinc-700">{plural(item.days, 'dag', 'dagen')}</span>}
+                />
+            ))}
+        </RowList>
+    );
+}
+
+export default function Dashboard({ kpis = {}, urls = {}, meta = {}, lists = {} }) {
     const todayTasks = lists?.today?.tasks ?? [];
     const todayCustomer = lists?.today?.customer ?? [];
     const demoEnding = lists?.demo_ending ?? [];
-    const customersUrl = (status) => `${urls.customers}?status=${encodeURIComponent(status)}`;
     const taskItems = lists?.tasks ?? [];
     const appointmentItems = lists?.appointments?.items ?? [];
+    const appointmentsOverdue = lists?.appointments?.overdue_count ?? 0;
     const appointmentsByCompany = lists?.appointments?.by_company ?? [];
     const demoDurationItems = lists?.status_duration?.demo ?? [];
     const activeDurationItems = lists?.status_duration?.active ?? [];
     const activeMissingSepaItems = lists?.active_missing_sepa ?? [];
 
-    const tasksTone = kpis?.tasks_overdue > 0 ? 'danger' : kpis.tasks_open > 0 ? 'info' : 'default';
-    const cancelledTone = kpis.cancelled_last_30 > 0 ? 'danger' : 'default';
+    const customersUrl = (status) => `${urls.customers}?status=${encodeURIComponent(status)}`;
+    const tasksOverdue = Number(kpis.tasks_overdue) || 0;
+    const missingSepa = Number(kpis.active_missing_sepa) || 0;
+    const todayCount = todayTasks.length + todayCustomer.length;
 
     return (
         <>
             <Head title="Dashboard" />
 
-            <div className="min-w-0 space-y-6 overflow-x-hidden">
-                <section className="min-w-0 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-                    <div className="h-1.5 w-full bg-sky-400" />
-                    <div className="grid gap-6 p-4 sm:p-6 xl:grid-cols-[1.3fr_0.7fr]">
-                        <div className="min-w-0">
-                            <div className="text-xs font-medium text-zinc-500">Bijgewerkt om {meta.generated_at}</div>
-                            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">Dashboard</h1>
-                            <p className="mt-2 max-w-2xl text-sm leading-7 text-zinc-600 sm:text-base">
-                                Helder overzicht van taken, afspraken, omzet en statusduur van je klanten.
-                            </p>
+            <div className="min-w-0 space-y-6">
+                <PageHeader
+                    title="Dashboard"
+                    description={`Taken, afspraken, omzet en klantstatus in een oogopslag. Bijgewerkt om ${meta.generated_at ?? '-'}.`}
+                    actions={
+                        <>
+                            <a href={urls.reports} className={buttonClasses({ variant: 'secondary' })}>Rapportages</a>
+                            <a href={urls.tasks} className={buttonClasses({ variant: 'primary' })}>Naar taken</a>
+                        </>
+                    }
+                />
 
-                            <div className="mt-6">
-                                <h2 className="text-base font-semibold text-zinc-950">Vandaag</h2>
-                                <div className="mt-3 grid min-w-0 gap-4 lg:grid-cols-2">
-                                    <div className="min-w-0">
-                                        <div className="mb-2 flex items-center justify-between gap-2">
-                                            <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Mijn taken</div>
-                                            <a href={urls.tasks} className="text-xs font-semibold text-indigo-700 hover:underline">Alle taken</a>
-                                        </div>
-                                        {todayTasks.length === 0 ? (
-                                            <EmptyState text="Geen taken voor vandaag of te laat." />
-                                        ) : (
-                                            <ul className="space-y-2">
-                                                {todayTasks.map((task) => (
-                                                    <TodayRow
-                                                        key={`t-${task.id}`}
-                                                        href={task.url}
-                                                        title={task.titel}
-                                                        meta={`Deadline: ${formatDateTime(task.deadline)}`}
-                                                        overdue={task.overdue}
-                                                    />
-                                                ))}
-                                            </ul>
-                                        )}
-                                    </div>
-                                    <div className="min-w-0">
-                                        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Klantafspraken en klanttaken</div>
-                                        {todayCustomer.length === 0 ? (
-                                            <EmptyState text="Geen klantafspraken voor vandaag of te laat." />
-                                        ) : (
-                                            <ul className="space-y-2">
-                                                {todayCustomer.map((item) => (
-                                                    <TodayRow
-                                                        key={`a-${item.id}`}
-                                                        href={item.garage_company.url}
-                                                        title={item.titel}
-                                                        meta={`${item.garage_company.bedrijfsnaam} | ${formatDateTime(item.due_at)}`}
-                                                        overdue={item.overdue}
-                                                        badge={item.type === 'afspraak' ? 'Afspraak' : 'Taak'}
-                                                    />
-                                                ))}
-                                            </ul>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                            <MetricCard
-                                label="Open taken"
-                                value={formatInt(kpis.tasks_open)}
-                                sub={`Te laat: ${formatInt(kpis.tasks_overdue)} | Binnen 7 dagen: ${formatInt(kpis.tasks_due_7)}`}
-                                tone={tasksTone}
-                                href={`${urls.tasks}?weergave=lijst`}
-                            />
-                            <MetricCard
-                                label="MRR excl. btw"
-                                value={formatEuro(kpis.mrr_excl)}
-                                sub={`Alleen status Actief | Incl. btw ${formatEuro(kpis.mrr_incl)}`}
-                                tone="info"
-                            />
-                            <MetricCard
-                                label="Pijplijn (demo)"
-                                value={formatEuro(kpis.demo_pipeline_excl)}
-                                sub="Modules van demo-klanten, excl. btw. Telt niet mee in MRR."
-                            />
-                        </div>
-                    </div>
-                </section>
-
-                <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <MetricCard label="Klanten totaal" value={formatInt(kpis.companies_total)} sub={`Actief: ${formatInt(kpis.companies_active)}`} href={urls.customers} />
-                    <MetricCard label="Demo klanten" value={formatInt(kpis.demo_customers)} sub={`Gem. ${formatInt(kpis.demo_avg_days)} dagen`} tone="info" href={customersUrl('proefperiode')} />
-                    <MetricCard label="Actieve klanten" value={formatInt(kpis.companies_active)} sub={`Gem. ${formatInt(kpis.active_avg_days)} dagen actief`} tone="info" href={customersUrl('actief')} />
-                    <MetricCard
+                {/* Kerncijfers */}
+                <section aria-label="Kerncijfers" className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <Stat
+                        label="Open taken"
+                        value={formatInt(kpis.tasks_open)}
+                        sub={`${formatInt(tasksOverdue)} te laat, ${formatInt(kpis.tasks_due_7)} binnen 7 dagen`}
+                        tone={tasksOverdue > 0 ? 'danger' : 'brand'}
+                        href={`${urls.tasks}?weergave=lijst`}
+                    />
+                    <Stat
+                        label="MRR excl. btw"
+                        value={formatEuro(kpis.mrr_excl)}
+                        sub={`Incl. btw ${formatEuro(kpis.mrr_incl)}, alleen status Actief`}
+                        tone="success"
+                        href={urls.reports}
+                    />
+                    <Stat
+                        label="Pijplijn (demo)"
+                        value={formatEuro(kpis.demo_pipeline_excl)}
+                        sub="Modules van demo-klanten, telt niet mee in MRR"
+                        href={customersUrl('proefperiode')}
+                    />
+                    <Stat
+                        label="Klanten totaal"
+                        value={formatInt(kpis.companies_total)}
+                        sub={`${formatInt(kpis.leads_last_30)} nieuw toegevoegd (30d)`}
+                        href={urls.customers}
+                    />
+                    <Stat
+                        label="Actieve klanten"
+                        value={formatInt(kpis.companies_active)}
+                        sub={`Gem. ${plural(kpis.active_avg_days, 'dag', 'dagen')} actief, ${formatInt(kpis.active_new_last_30)} nieuw (30d)`}
+                        tone="success"
+                        href={customersUrl('actief')}
+                    />
+                    <Stat
+                        label="Demo klanten"
+                        value={formatInt(kpis.demo_customers)}
+                        sub={`Gem. ${plural(kpis.demo_avg_days, 'dag', 'dagen')} in demo`}
+                        tone="brand"
+                        href={customersUrl('proefperiode')}
+                    />
+                    <Stat
+                        label="Demo aangevraagd"
+                        value={formatInt(kpis.companies_demo_requested)}
+                        sub={`${formatInt(kpis.demo_requested_last_30)} aangevraagd in 30d`}
+                        href={customersUrl('demo_aangevraagd')}
+                    />
+                    <Stat
                         label="Opzeggingen (30d)"
                         value={formatInt(kpis.cancelled_last_30)}
-                        sub={`Nieuw actief: ${formatInt(kpis.active_new_last_30)} | Demo aangevraagd: ${formatInt(kpis.demo_requested_last_30)}`}
-                        tone={cancelledTone}
+                        sub={missingSepa > 0 ? `${formatInt(missingSepa)} actief zonder complete SEPA` : 'SEPA van actieve klanten compleet'}
+                        tone={Number(kpis.cancelled_last_30) > 0 ? 'danger' : missingSepa > 0 ? 'warning' : 'neutral'}
                         href={customersUrl('opgezegd')}
                     />
-                </div>
+                </section>
 
-                <Panel
-                    title="Demo's die aflopen"
-                    subtitle="Demo's die binnen 7 dagen eindigen of al verlopen zijn."
-                    action={<ButtonLink href={customersUrl('proefperiode')}>Alle demo klanten</ButtonLink>}
-                >
+                {/* Vandaag */}
+                <Card>
+                    <CardHeader
+                        title="Vandaag"
+                        description={todayCount > 0 ? `${plural(todayCount, 'item', 'items')} voor vandaag of te laat.` : 'Alles voor vandaag is afgehandeld.'}
+                    />
+                    <div className="grid min-w-0 gap-6 lg:grid-cols-2">
+                        <div className="min-w-0">
+                            <SubHeading action={<TextLink href={urls.tasks}>Alle taken</TextLink>}>Mijn taken</SubHeading>
+                            {todayTasks.length === 0 ? (
+                                <EmptyState title="Geen taken voor vandaag" description="Er staan geen taken met een deadline vandaag of eerder op jouw naam." />
+                            ) : (
+                                <RowList>
+                                    {todayTasks.map((task) => (
+                                        <LinkRow
+                                            key={`t-${task.id}`}
+                                            href={task.url}
+                                            title={task.titel}
+                                            meta={`Deadline ${formatDateTime(task.deadline)}`}
+                                            overdue={task.overdue}
+                                            aside={<PriorityBadge value={task.prioriteit} />}
+                                        />
+                                    ))}
+                                </RowList>
+                            )}
+                        </div>
+                        <div className="min-w-0">
+                            <SubHeading>Klantafspraken en klanttaken</SubHeading>
+                            {todayCustomer.length === 0 ? (
+                                <EmptyState title="Geen klantafspraken voor vandaag" description="Open klanttaken en afspraken met een datum vandaag of eerder verschijnen hier." />
+                            ) : (
+                                <RowList>
+                                    {todayCustomer.map((item) => (
+                                        <LinkRow
+                                            key={`a-${item.id}`}
+                                            href={item.garage_company?.url}
+                                            title={item.titel || 'Zonder titel'}
+                                            meta={`${item.garage_company?.bedrijfsnaam ?? 'Onbekende klant'}, ${formatDateTime(item.due_at)}`}
+                                            overdue={item.overdue}
+                                            aside={<Badge tone={item.type === 'afspraak' ? 'info' : 'neutral'}>{item.type === 'afspraak' ? 'Afspraak' : 'Taak'}</Badge>}
+                                        />
+                                    ))}
+                                </RowList>
+                            )}
+                        </div>
+                    </div>
+                </Card>
+
+                {/* SEPA-signalering */}
+                {missingSepa > 0 ? (
+                    <details id="sepa" className="group min-w-0 rounded-xl border border-amber-200 bg-amber-50/40 p-4 shadow-sm sm:p-5">
+                        <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 [&::-webkit-details-marker]:hidden">
+                            <div className="min-w-0">
+                                <h2 className="flex flex-wrap items-center gap-2 text-base font-semibold text-zinc-900">
+                                    Actieve klanten zonder complete SEPA
+                                    <Badge tone="warning">{formatInt(missingSepa)}</Badge>
+                                </h2>
+                                <p className="mt-0.5 text-sm text-zinc-600">Vul de ontbrekende gegevens aan bij Abonnement, onderdeel Incasso, van de klant.</p>
+                            </div>
+                            <span className={buttonClasses({ variant: 'secondary', size: 'sm' })} aria-hidden="true">
+                                <span className="group-open:hidden">Tonen</span>
+                                <span className="hidden group-open:inline">Verbergen</span>
+                            </span>
+                        </summary>
+                        <RowList className="mt-4 rounded-lg bg-white">
+                            {activeMissingSepaItems.map((item) => (
+                                <LinkRow
+                                    key={item.id}
+                                    href={item.url}
+                                    title={item.bedrijfsnaam}
+                                    meta={<span className="text-amber-800">{(item.missing ?? []).join(', ')}</span>}
+                                />
+                            ))}
+                        </RowList>
+                        {missingSepa > activeMissingSepaItems.length ? (
+                            <p className="mt-3 text-xs text-zinc-500">En nog {plural(missingSepa - activeMissingSepaItems.length, 'andere klant', 'andere klanten')}.</p>
+                        ) : null}
+                    </details>
+                ) : null}
+
+                {/* Demo's die aflopen */}
+                <Card>
+                    <CardHeader
+                        title="Demo's die aflopen"
+                        description="Demo's die binnen 7 dagen eindigen of al verlopen zijn."
+                        actions={<TextLink href={customersUrl('proefperiode')}>Alle demo klanten</TextLink>}
+                    />
                     {demoEnding.length === 0 ? (
-                        <EmptyState text="Geen demo's die binnenkort aflopen." />
+                        <EmptyState title="Geen demo's die binnenkort aflopen" description="Demo's met een einddatum binnen 7 dagen verschijnen hier." />
                     ) : (
                         <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                             {demoEnding.map((item) => (
@@ -359,15 +290,18 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                                     <a
                                         href={item.url}
                                         className={cx(
-                                            'flex min-w-0 items-start justify-between gap-3 rounded-xl border bg-white p-4 transition hover:border-zinc-300',
-                                            item.days_left < 0 ? 'border-rose-300' : 'border-zinc-200'
+                                            'flex h-full min-w-0 items-start justify-between gap-3 rounded-lg border bg-white p-3 transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600',
+                                            item.days_left < 0 ? 'border-rose-200' : 'border-zinc-200'
                                         )}
                                     >
                                         <div className="min-w-0 flex-1">
-                                            <div className="truncate text-sm font-semibold text-zinc-950">{item.bedrijfsnaam}</div>
-                                            <div className="mt-1 text-xs text-zinc-600">Einddatum {formatDate(item.demo_eind_op)}{item.demo_eind_berekend && <span className="text-zinc-400"> (berekend)</span>}</div>
+                                            <div className="truncate text-sm font-medium text-zinc-900" title={item.bedrijfsnaam}>{item.bedrijfsnaam}</div>
+                                            <div className="mt-0.5 text-xs text-zinc-500">
+                                                Einddatum {formatDate(item.demo_eind_op)}
+                                                {item.demo_eind_berekend ? <span className="text-zinc-400"> (berekend)</span> : null}
+                                            </div>
                                         </div>
-                                        <Badge tone={item.days_left < 0 ? 'danger' : item.days_left <= 2 ? 'info' : 'neutral'}>
+                                        <Badge tone={item.days_left < 0 ? 'danger' : item.days_left <= 2 ? 'warning' : 'neutral'}>
                                             {daysLeftLabel(item.days_left)}
                                         </Badge>
                                     </a>
@@ -375,141 +309,100 @@ export default function Dashboard({ kpis, urls, meta, lists }) {
                             ))}
                         </ul>
                     )}
-                </Panel>
+                </Card>
 
-                {kpis.active_missing_sepa > 0 && (
-                    <details className="group min-w-0 rounded-2xl border border-amber-200 bg-white p-4 shadow-sm sm:p-5">
-                        <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
-                            <div className="min-w-0">
-                                <h2 className="text-base font-semibold text-zinc-950">
-                                    Actieve klanten zonder complete SEPA{' '}
-                                    <span className="ml-1 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900">
-                                        {formatInt(kpis.active_missing_sepa)}
-                                    </span>
-                                </h2>
-                                <p className="mt-1 text-sm text-zinc-600">Klik om de lijst te tonen. Vul de gegevens aan in de Incasso-tab per klant.</p>
-                            </div>
-                            <span className="text-sm font-semibold text-indigo-700">
-                                <span className="group-open:hidden">Tonen</span>
-                                <span className="hidden group-open:inline">Verbergen</span>
-                            </span>
-                        </summary>
-                        <div className="mt-4 space-y-3">
-                            {activeMissingSepaItems.map((item) => (
-                                <a
-                                    key={item.id}
-                                    href={item.url}
-                                    className="block rounded-xl border border-amber-200 bg-amber-50 p-4 transition hover:border-amber-300"
-                                >
-                                    <div className="text-sm font-semibold text-zinc-900">{item.bedrijfsnaam}</div>
-                                    <div className="mt-1 text-xs text-amber-900">{item.missing.join(', ')}</div>
-                                </a>
-                            ))}
-                            {kpis.active_missing_sepa > activeMissingSepaItems.length ? (
-                                <div className="text-xs text-zinc-500">
-                                    En nog {formatInt(kpis.active_missing_sepa - activeMissingSepaItems.length)} andere klanten.
-                                </div>
-                            ) : null}
-                        </div>
-                    </details>
-                )}
-
-                <div className="grid min-w-0 gap-6 xl:grid-cols-2">
-                    <Panel
-                        title="Demo statusduur"
-                        subtitle="Aantal dagen dat klanten in demo-status staan."
-                        action={
-                            <ButtonLink href={`${urls.customers}?status=proefperiode`}>Bekijk demo klanten</ButtonLink>
-                        }
-                    >
-                        {demoDurationItems.length === 0 ? (
-                            <EmptyState text="Geen klanten met status Demo." />
-                        ) : (
-                            <div className="space-y-3">
-                                {demoDurationItems.slice(0, 8).map((item) => (
-                                    <DurationRow key={item.id} item={item} typeLabel="Demo" />
-                                ))}
-                            </div>
-                        )}
-                    </Panel>
-
-                    <Panel
-                        title="Actief statusduur"
-                        subtitle="Aantal dagen dat klanten actief zijn."
-                        action={
-                            <ButtonLink href={`${urls.customers}?status=actief`}>Bekijk actieve klanten</ButtonLink>
-                        }
-                    >
-                        {activeDurationItems.length === 0 ? (
-                            <EmptyState text="Geen actieve klanten gevonden." />
-                        ) : (
-                            <div className="space-y-3">
-                                {activeDurationItems.slice(0, 8).map((item) => (
-                                    <DurationRow key={item.id} item={item} typeLabel="Actief" />
-                                ))}
-                            </div>
-                        )}
-                    </Panel>
-                </div>
-
-                <div className="grid min-w-0 gap-6 xl:grid-cols-[1.3fr_0.7fr]">
-                    <Panel
-                        title="Urgente taken"
-                        subtitle="Open taken uit de takenlijst, gesorteerd op deadline. Klantafspraken staan bij Vandaag."
-                        action={
-                            <ButtonLink href={urls.tasks}>Naar taken</ButtonLink>
-                        }
-                    >
+                {/* Taken en afspraken */}
+                <div className="grid min-w-0 gap-6 xl:grid-cols-[1.4fr_1fr]">
+                    <Card>
+                        <CardHeader
+                            title="Urgente taken"
+                            description="Open taken uit de takenlijst, eerst op deadline. Klantafspraken staan bij Vandaag."
+                            actions={<TextLink href={`${urls.tasks}?weergave=lijst`}>Takenlijst</TextLink>}
+                        />
                         {taskItems.length === 0 ? (
-                            <EmptyState text="Geen open taken gevonden." />
+                            <EmptyState title="Geen open taken" description="Alle taken in de takenlijst zijn afgerond." />
                         ) : (
-                            <ul className="grid gap-3 lg:grid-cols-2">
+                            <RowList>
                                 {taskItems.map((task) => (
-                                    <TaskRow key={task.id} task={task} />
+                                    <LinkRow
+                                        key={task.id}
+                                        href={task.url}
+                                        title={task.titel}
+                                        overdue={task.overdue}
+                                        meta={[
+                                            task.deadline ? `Deadline ${formatDateTime(task.deadline)}` : 'Geen deadline',
+                                            task.project?.naam ? `Project ${task.project.naam}` : null,
+                                        ].filter(Boolean).join(', ')}
+                                        aside={<PriorityBadge value={task.prioriteit} />}
+                                    />
                                 ))}
-                            </ul>
+                            </RowList>
                         )}
-                    </Panel>
+                    </Card>
 
                     <div className="min-w-0 space-y-6">
-                        <Panel title="Komende afspraken" subtitle="Eerstvolgende afspraken uit de planning.">
+                        <Card>
+                            <CardHeader
+                                title="Komende afspraken"
+                                description={appointmentsOverdue > 0
+                                    ? `Vanaf vandaag. ${plural(appointmentsOverdue, 'verlopen afspraak staat', 'verlopen afspraken staan')} nog open.`
+                                    : 'Eerstvolgende afspraken vanaf vandaag.'}
+                            />
                             {appointmentItems.length === 0 ? (
-                                <EmptyState text="Geen komende afspraken." />
+                                <EmptyState title="Geen komende afspraken" description="Plan een afspraak vanuit de klantkaart, tab Activiteit." />
                             ) : (
-                                <ul className="space-y-3">
+                                <RowList>
                                     {appointmentItems.slice(0, 6).map((item) => (
-                                        <AppointmentRow key={item.id} item={item} />
+                                        <LinkRow
+                                            key={item.id}
+                                            href={item.garage_company?.url}
+                                            title={item.titel || 'Afspraak'}
+                                            meta={[formatDateTime(item.due_at), item.garage_company?.bedrijfsnaam].filter(Boolean).join(', ')}
+                                        />
                                     ))}
-                                </ul>
+                                </RowList>
                             )}
-                        </Panel>
+                        </Card>
 
-                        <Panel title="Afspraken per klant" subtitle="Klanten met de meeste geplande contactmomenten.">
+                        <Card>
+                            <CardHeader title="Afspraken per klant" description="Klanten met de meeste open afspraken." />
                             {appointmentsByCompany.length === 0 ? (
-                                <EmptyState text="Geen afspraken per klant gevonden." />
+                                <EmptyState title="Geen open afspraken" />
                             ) : (
-                                <div className="space-y-3">
+                                <RowList>
                                     {appointmentsByCompany.slice(0, 6).map((row) => (
-                                        <a
+                                        <LinkRow
                                             key={row.garage_company.id}
                                             href={row.garage_company.url}
-                                            className="flex min-w-0 items-start justify-between gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition hover:border-zinc-300"
-                                        >
-                                            <div className="min-w-0 flex-1">
-                                                <div className="truncate text-sm font-semibold text-zinc-950">{row.garage_company.bedrijfsnaam}</div>
-                                                <div className="mt-1 text-xs leading-5 text-zinc-600">
-                                                    Volgende afspraak: {row.eerstvolgende.titel}
-                                                    <br />
-                                                    {formatDateTime(row.eerstvolgende.due_at)}
-                                                </div>
-                                            </div>
-                                            <div className="shrink-0 whitespace-nowrap text-sm font-semibold text-zinc-700">{row.aantal} afspraken</div>
-                                        </a>
+                                            title={row.garage_company.bedrijfsnaam}
+                                            meta={`Volgende: ${row.eerstvolgende?.titel || 'Afspraak'}, ${formatDateTime(row.eerstvolgende?.due_at)}`}
+                                            aside={<span className="whitespace-nowrap text-sm font-semibold tabular-nums text-zinc-700">{plural(row.aantal, 'afspraak', 'afspraken')}</span>}
+                                        />
                                     ))}
-                                </div>
+                                </RowList>
                             )}
-                        </Panel>
+                        </Card>
                     </div>
+                </div>
+
+                {/* Statusduur */}
+                <div className="grid min-w-0 gap-6 xl:grid-cols-2">
+                    <Card>
+                        <CardHeader
+                            title="Langst in demo"
+                            description="Aantal dagen dat klanten in demo-status staan."
+                            actions={<TextLink href={customersUrl('proefperiode')}>Bekijk demo klanten</TextLink>}
+                        />
+                        <DurationList items={demoDurationItems} typeLabel="Demo" emptyTitle="Geen klanten met status Demo" />
+                    </Card>
+                    <Card>
+                        <CardHeader
+                            title="Langst actief"
+                            description="Aantal dagen dat klanten actief zijn."
+                            actions={<TextLink href={customersUrl('actief')}>Bekijk actieve klanten</TextLink>}
+                        />
+                        <DurationList items={activeDurationItems} typeLabel="Actief" emptyTitle="Geen actieve klanten" />
+                    </Card>
                 </div>
             </div>
         </>

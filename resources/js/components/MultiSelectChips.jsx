@@ -59,11 +59,17 @@ export function MultiSelectChips({ id, options = [], value = [], onChange, place
             else setActive((i) => Math.min(filtered.length - 1, i + 1));
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
-            setActive((i) => Math.max(0, i - 1));
+            if (!open) setOpen(true);
+            else setActive((i) => Math.max(0, i - 1));
         } else if (e.key === 'Enter') {
             if (open && filtered[active]) {
                 e.preventDefault();
                 toggle(filtered[active].id);
+                // Zoekterm wissen na kiezen, zodat je direct de volgende kunt zoeken.
+                if (query) {
+                    setQuery('');
+                    setActive(0);
+                }
             }
         } else if (e.key === 'Escape') {
             if (open) {
@@ -79,17 +85,24 @@ export function MultiSelectChips({ id, options = [], value = [], onChange, place
     const activeOptionId = open && filtered[active] ? `${listId}-${filtered[active].id}` : undefined;
 
     return (
-        <div ref={wrapperRef} className="relative mt-1">
+        <div
+            ref={wrapperRef}
+            className="relative mt-1"
+            onBlur={(e) => {
+                // Lijst sluiten als de focus het component verlaat (bijv. met Tab).
+                if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false);
+            }}
+        >
             <div
-                className="flex min-h-[38px] w-full flex-wrap items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 focus-within:border-indigo-600 focus-within:ring-1 focus-within:ring-indigo-600"
+                className="flex min-h-[36px] w-full cursor-text flex-wrap items-center gap-1 rounded-lg border border-zinc-300 bg-white px-2 py-1 shadow-sm focus-within:border-indigo-600 focus-within:ring-1 focus-within:ring-indigo-600"
                 onClick={() => inputRef.current?.focus()}
             >
                 {selected.map((o) => (
-                    <span key={o.id} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 py-0.5 pl-2 pr-1 text-xs font-semibold text-indigo-800">
+                    <span key={o.id} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 py-0.5 pl-2 pr-1 text-xs font-medium text-indigo-800 ring-1 ring-inset ring-indigo-200">
                         {o.name}
                         <button
                             type="button"
-                            className="rounded-full px-1 leading-none text-indigo-800 hover:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
+                            className="inline-flex h-4 w-4 items-center justify-center rounded-full leading-none text-indigo-800 hover:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
                             aria-label={`Verwijder ${o.name}`}
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -110,7 +123,7 @@ export function MultiSelectChips({ id, options = [], value = [], onChange, place
                     aria-expanded={open}
                     aria-controls={listId}
                     aria-activedescendant={activeOptionId}
-                    className="min-w-[8rem] flex-1 border-0 p-1 text-sm focus:outline-none focus:ring-0"
+                    className="min-w-[8rem] flex-1 border-0 bg-transparent p-1 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-0"
                     placeholder={selected.length ? '' : placeholder}
                     value={query}
                     onChange={(e) => {
@@ -127,10 +140,10 @@ export function MultiSelectChips({ id, options = [], value = [], onChange, place
                     id={listId}
                     role="listbox"
                     aria-multiselectable="true"
-                    className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-zinc-200 bg-white py-1 text-sm shadow-lg"
+                    className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-zinc-200 bg-white p-1 text-sm shadow-lg"
                 >
                     {filtered.length === 0 ? (
-                        <li className="px-3 py-2 text-zinc-500">{emptyText}</li>
+                        <li className="px-3 py-2 text-zinc-500" role="presentation">{emptyText}</li>
                     ) : (
                         filtered.map((o, i) => {
                             const isSelected = selectedIds.includes(Number(o.id));
@@ -140,7 +153,7 @@ export function MultiSelectChips({ id, options = [], value = [], onChange, place
                                     id={`${listId}-${o.id}`}
                                     role="option"
                                     aria-selected={isSelected}
-                                    className={`flex cursor-pointer items-center justify-between px-3 py-2 ${i === active ? 'bg-zinc-100' : ''}`}
+                                    className={`flex cursor-pointer items-center justify-between gap-2 rounded-md px-3 py-2 ${i === active ? 'bg-zinc-100' : ''} ${isSelected ? 'font-medium text-zinc-900' : 'text-zinc-700'}`}
                                     onMouseDown={(e) => e.preventDefault()}
                                     onMouseEnter={() => setActive(i)}
                                     onClick={() => toggle(o.id)}

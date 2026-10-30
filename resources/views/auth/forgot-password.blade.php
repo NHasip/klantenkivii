@@ -1,34 +1,30 @@
 <x-guest-layout>
-    <x-authentication-card>
-        <x-slot name="logo">
-            <x-authentication-card-logo />
-        </x-slot>
+    <x-slot name="title">Wachtwoord vergeten</x-slot>
 
-        <div class="mb-4 text-sm text-gray-600">
-            {{ __('Forgot your password? No problem. Just let us know your email address and we will email you a password reset link that will allow you to choose a new one.') }}
-        </div>
-
+    <x-authentication-card title="Wachtwoord vergeten" description="Vul je e-mailadres in. Je ontvangt een link om een nieuw wachtwoord in te stellen.">
         @session('status')
-            <div class="mb-4 font-medium text-sm text-green-600">
+            <div class="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900" role="status">
                 {{ $value }}
             </div>
         @endsession
 
-        <x-validation-errors class="mb-4" />
+        <x-validation-errors class="mb-5" />
 
-        <form method="POST" action="{{ route('password.email') }}">
+        <form method="POST" action="{{ route('password.email') }}" class="space-y-4">
             @csrf
 
-            <div class="block">
-                <x-label for="email" value="{{ __('Email') }}" />
-                <x-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required autofocus autocomplete="username" />
+            <div>
+                <x-label for="email" value="E-mailadres" />
+                <x-input id="email" class="mt-1 block w-full" type="email" name="email" :value="old('email')" required autofocus autocomplete="username" inputmode="email" />
             </div>
 
-            <div class="flex items-center justify-end mt-4">
-                <x-button>
-                    {{ __('Email Password Reset Link') }}
-                </x-button>
-            </div>
+            <x-button class="h-10 w-full">
+                Herstellink versturen
+            </x-button>
         </form>
+
+        <p class="mt-6 text-center text-sm text-zinc-600">
+            <a href="{{ route('login') }}" class="rounded font-medium text-indigo-700 hover:text-indigo-900 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">&larr; Terug naar inloggen</a>
+        </p>
     </x-authentication-card>
 </x-guest-layout>

@@ -86,7 +86,8 @@ class DashboardController
                 'id' => $task->id,
                 'titel' => $task->titel,
                 'deadline' => $task->deadline?->toIso8601String(),
-                'overdue' => $task->deadline !== null && $task->deadline->lt($now->startOfDay()),
+                // Zelfde definitie als de KPI 'Te laat': deadline ligt voor nu.
+                'overdue' => $task->deadline !== null && $task->deadline->lt($now),
                 'prioriteit' => $task->prioriteit?->value,
                 'url' => route('crm.tasks.show', ['task' => $task->id]),
             ])
@@ -104,7 +105,7 @@ class DashboardController
                 'type' => $activity->type?->value,
                 'titel' => $activity->titel,
                 'due_at' => $activity->due_at?->toIso8601String(),
-                'overdue' => $activity->due_at !== null && $activity->due_at->lt($now->startOfDay()),
+                'overdue' => $activity->due_at !== null && $activity->due_at->lt($now),
                 'garage_company' => [
                     'id' => $activity->garageCompany->id,
                     'bedrijfsnaam' => $activity->garageCompany->bedrijfsnaam,
@@ -141,6 +142,8 @@ class DashboardController
                 'status' => $task->status?->value,
                 'prioriteit' => $task->prioriteit?->value,
                 'deadline' => $task->deadline?->toIso8601String(),
+                'overdue' => $task->deadline !== null && $task->deadline->lt($now),
+                'url' => route('crm.tasks.show', ['task' => $task->id]),
                 'project' => $task->project ? [
                     'id' => $task->project->id,
                     'naam' => $task->project->naam,
@@ -155,7 +158,7 @@ class DashboardController
             ->whereNotNull('due_at')
             ->whereHas('garageCompany')
             ->orderBy('due_at')
-            ->limit(50)
+            // Geen limiet: anders klopt het aantal per klant niet (lijst wordt hieronder ingekort).
             ->get(['id', 'garage_company_id', 'titel', 'due_at'])
             ->map(fn (Activity $activity) => [
                 'id' => $activity->id,
@@ -169,12 +172,15 @@ class DashboardController
             ])
             ->values();
 
+        $nowTs = $now->getTimestamp();
+        $ts = fn (?string $iso) => $iso ? strtotime($iso) : PHP_INT_MAX;
         $appointmentsByCompany = $appointments
             ->filter(fn (array $row) => is_array($row['garage_company'] ?? null))
             ->groupBy(fn (array $row) => (string) $row['garage_company']['id'])
-            ->map(function ($items) {
+            ->map(function ($items) use ($nowTs, $ts) {
                 /** @var \Illuminate\Support\Collection<int, array{id:int,titel:string,due_at:?string,garage_company:array{id:int,bedrijfsnaam:string,url:string}}> $items */
-                $first = $items->first();
+                // Eerstvolgende = eerste afspraak vanaf nu; anders de oudste verlopen afspraak.
+                $first = $items->first(fn (array $row) => $ts($row['due_at']) >= $nowTs && $row['due_at'] !== null) ?? $items->first();
 
                 return [
                     'garage_company' => $first['garage_company'],
@@ -185,7 +191,7 @@ class DashboardController
                     ],
                 ];
             })
-            ->sortByDesc(fn (array $row) => $row['aantal'])
+            ->sort(fn (array $a, array $b) => [$b['aantal'], $ts($a['eerstvolgende']['due_at'])] <=> [$a['aantal'], $ts($b['eerstvolgende']['due_at'])])
             ->take(12)
             ->values();
 
@@ -258,7 +264,14 @@ class DashboardController
             'lists' => [
                 'tasks' => $taskItems,
                 'appointments' => [
-                    'items' => $appointments->take(12)->values(),
+                    // Komend = vanaf vandaag; verlopen afspraken staan al bij Vandaag.
+                    'items' => $appointments
+                        ->filter(fn (array $row) => $row['due_at'] !== null && strtotime($row['due_at']) >= $todayStart->getTimestamp())
+                        ->take(12)
+                        ->values(),
+                    'overdue_count' => $appointments
+                        ->filter(fn (array $row) => $row['due_at'] !== null && strtotime($row['due_at']) < $todayStart->getTimestamp())
+                        ->count(),
                     'by_company' => $appointmentsByCompany,
                 ],
                 'status_duration' => [

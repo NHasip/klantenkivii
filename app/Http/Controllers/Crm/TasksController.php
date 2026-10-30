@@ -128,27 +128,46 @@ class TasksController
             status: $data['status'],
         );
 
-        $task = Task::create([
-            'task_project_id' => $data['task_project_id'] ?? null,
-            ...(Task::supportsCustomer() ? ['garage_company_id' => $data['garage_company_id'] ?? null] : []),
-            'titel' => $data['titel'],
-            'omschrijving' => $data['omschrijving'] ?? null,
-            'status' => TaskStatus::from($data['status']),
-            'prioriteit' => TaskPriority::from($data['prioriteit']),
-            'deadline' => $data['deadline'] ?? null,
-            'labels' => $data['labels'] ?? null,
-            'created_by' => $request->user()->id,
-            'sort_order' => $sortOrder,
-        ]);
+        // Taak en bijlagen in een transactie: wordt een bijlage geweigerd (bijv. door de
+        // virusscan), dan blijft er geen half aangemaakte taak achter en ontstaat er bij
+        // opnieuw proberen geen dubbele taak.
+        $userId = (int) $request->user()->id;
+        $storedPaths = [];
+        try {
+            $task = DB::transaction(function () use ($data, $request, $sortOrder, $userId, &$storedPaths) {
+                $task = Task::create([
+                    'task_project_id' => $data['task_project_id'] ?? null,
+                    ...(Task::supportsCustomer() ? ['garage_company_id' => $data['garage_company_id'] ?? null] : []),
+                    'titel' => $data['titel'],
+                    'omschrijving' => $data['omschrijving'] ?? null,
+                    'status' => TaskStatus::from($data['status']),
+                    'prioriteit' => TaskPriority::from($data['prioriteit']),
+                    'deadline' => $data['deadline'] ?? null,
+                    'labels' => $data['labels'] ?? null,
+                    'created_by' => $userId,
+                    'sort_order' => $sortOrder,
+                ]);
 
-        if (! empty($data['assignees'])) {
-            $task->assignees()->sync($data['assignees']);
-            $assignees = User::query()->whereIn('id', $data['assignees'])->get();
-            Notification::send($assignees, new TaskAssigned($task));
+                if (! empty($data['assignees'])) {
+                    $task->assignees()->sync($data['assignees']);
+                }
+
+                foreach ($request->file('attachments', []) as $file) {
+                    $storedPaths[] = $this->storeTaskAttachment($task, $file, $userId)->path;
+                }
+
+                return $task;
+            });
+        } catch (Throwable $e) {
+            foreach ($storedPaths as $path) {
+                Storage::disk('local')->delete($path);
+            }
+            throw $e;
         }
 
-        foreach ($request->file('attachments', []) as $file) {
-            $this->storeTaskAttachment($task, $file, (int) $request->user()->id);
+        if (! empty($data['assignees'])) {
+            $assignees = User::query()->whereIn('id', $data['assignees'])->get();
+            Notification::send($assignees, new TaskAssigned($task));
         }
 
         $task->load(['project:id,naam,kleur', 'assignees:id,name', ...$this->customerRelation()]);
@@ -262,7 +281,11 @@ class TasksController
                     continue;
                 }
 
-                $task->task_project_id = $row['task_project_id'] ?? null;
+                // Alleen overschrijven als het project echt is meegestuurd, anders zou een
+                // herordening zonder projectveld de taak uit haar project halen.
+                if (array_key_exists('task_project_id', $row)) {
+                    $task->task_project_id = $row['task_project_id'] ?: null;
+                }
                 if (! empty($row['status'])) {
                     $this->applyStatus($task, TaskStatus::from($row['status']));
                 }
@@ -510,9 +533,6 @@ class TasksController
     }
 
     /**
-     * @return Collection<int, Task>
-     */
-    /**
      * Prioriteitsfilter uit de URL: "prioriteit", met "priority" als fallback voor oude links.
      */
     private function priorityFilter(Request $request): ?string
@@ -522,6 +542,9 @@ class TasksController
         return is_string($value) && $value !== '' ? $value : null;
     }
 
+    /**
+     * @return Collection<int, Task>
+     */
     private function filteredTasks(Request $request): Collection
     {
         $sort = (string) $request->query('sort', 'deadline');

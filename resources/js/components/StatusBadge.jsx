@@ -53,7 +53,7 @@ export default function StatusBadge({ status, labels, className = '' }) {
     const tone = STATUS_CLASSES[normalized] || 'bg-zinc-100 text-zinc-700 ring-zinc-300';
     return (
         <span
-            className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${tone} ${className}`.trim()}
+            className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${tone} ${className}`.trim()}
         >
             {customerStatusLabel(status, labels)}
         </span>

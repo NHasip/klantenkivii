@@ -1,59 +1,63 @@
-<div class="min-w-0 space-y-5">
-    <div class="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5">
-        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div>
-                <h1 class="text-2xl font-semibold tracking-tight">Rapportages</h1>
-                <div class="mt-2 inline-flex items-center rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-medium text-zinc-700">
-                    Periode: {{ $range['start']->format('d-m-Y') }} t/m {{ $range['end']->format('d-m-Y') }}
-                </div>
-            </div>
+<div class="min-w-0 space-y-6">
+    @php
+        $card = 'min-w-0 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5';
+        $focus = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2';
+        $csvBtn = 'inline-flex h-7 items-center rounded-lg bg-white px-2.5 text-xs font-semibold text-zinc-700 shadow-sm ring-1 ring-inset ring-zinc-300 transition-colors hover:bg-zinc-50 disabled:opacity-50 '.$focus;
+        $input = 'mt-1 block w-full rounded-lg border-zinc-300 text-sm text-zinc-900 shadow-sm focus:border-indigo-600 focus:ring-indigo-600';
+        $th = 'px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-zinc-500';
+        $tile = 'block h-full min-w-0 rounded-xl border border-zinc-200 bg-white px-4 py-3 shadow-sm';
+        $tileLink = $tile.' transition hover:border-zinc-300 hover:shadow '.$focus;
+    @endphp
 
-            <div class="w-full xl:max-w-3xl">
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-6 sm:items-end">
-                    <div class="sm:col-span-2">
-                        <label for="report_preset" class="block text-xs font-medium text-zinc-600">Periode</label>
-                        <select id="report_preset" class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model.live="preset">
-                            @foreach($this->presetOptions() as $key => $label)
-                                <option value="{{ $key }}">{{ $label }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    @if($preset === 'custom')
-                        <div class="sm:col-span-2">
-                            <label for="report_from" class="block text-xs font-medium text-zinc-600">Van</label>
-                            <input id="report_from" type="date" class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model="from" />
-                        </div>
-                        <div class="sm:col-span-2">
-                            <label for="report_to" class="block text-xs font-medium text-zinc-600">Tot</label>
-                            <input id="report_to" type="date" class="mt-1 w-full rounded-md border-zinc-300 text-sm" wire:model="to" />
-                        </div>
-                    @else
-                        <div class="sm:col-span-4 hidden sm:block">
-                            <div class="rounded-md border border-dashed border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
-                                <button type="button" class="font-semibold text-zinc-700 underline decoration-zinc-400 underline-offset-2 hover:text-zinc-900" wire:click="$set('preset', 'custom')">
-                                    Kies "Aangepast"
-                                </button>
-                                voor vrije datumselectie.
-                            </div>
-                        </div>
-                    @endif
-
-                    <div class="sm:col-span-6 flex flex-wrap items-center justify-between gap-3">
-                        <div class="text-xs text-rose-600" role="alert">
-                            @error('from') {{ $message }} @enderror
-                            @error('to') {{ $message }} @enderror
-                            @error('preset') {{ $message }} @enderror
-                        </div>
-                        <button type="button" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60" wire:click="applyFilters" wire:loading.attr="disabled" wire:target="applyFilters">
-                            <span wire:loading.remove wire:target="applyFilters">Toepassen</span>
-                            <span wire:loading wire:target="applyFilters">Laden...</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
+    <div class="flex flex-wrap items-end justify-between gap-4">
+        <div class="min-w-0">
+            <h1 class="text-2xl font-semibold tracking-tight text-zinc-900">Rapportages</h1>
+            <p class="mt-1 text-sm text-zinc-500">Omzet, instroom en modules. Omzetcijfers zijn altijd de stand van vandaag; de periode geldt voor instroom en uitstroom.</p>
         </div>
+        <span class="inline-flex items-center gap-2 rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700 ring-1 ring-inset ring-zinc-200">
+            Periode: {{ $range['start']->format('d-m-Y') }} t/m {{ $range['end']->format('d-m-Y') }}
+            <svg wire:loading wire:target="preset,applyFilters" class="h-3.5 w-3.5 animate-spin text-zinc-500" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
+        </span>
     </div>
+
+    <form wire:submit="applyFilters" class="{{ $card }}" aria-label="Periode kiezen">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-12 sm:items-end">
+            <div class="sm:col-span-4">
+                <label for="report_preset" class="block text-sm font-medium text-zinc-800">Periode</label>
+                <select id="report_preset" class="{{ $input }}" wire:model.live="preset">
+                    @foreach($this->presetOptions() as $key => $label)
+                        <option value="{{ $key }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+                @error('preset') <p class="mt-1 text-xs font-medium text-rose-700" role="alert">{{ $message }}</p> @enderror
+            </div>
+
+            @if($preset === 'custom')
+                <div class="sm:col-span-3">
+                    <label for="report_from" class="block text-sm font-medium text-zinc-800">Van</label>
+                    <input id="report_from" type="date" class="{{ $input }}" wire:model="from" @error('from') aria-invalid="true" aria-describedby="report_from_error" @enderror />
+                    @error('from') <p id="report_from_error" class="mt-1 text-xs font-medium text-rose-700" role="alert">{{ $message }}</p> @enderror
+                </div>
+                <div class="sm:col-span-3">
+                    <label for="report_to" class="block text-sm font-medium text-zinc-800">Tot en met</label>
+                    <input id="report_to" type="date" class="{{ $input }}" wire:model="to" @error('to') aria-invalid="true" aria-describedby="report_to_error" @enderror />
+                    @error('to') <p id="report_to_error" class="mt-1 text-xs font-medium text-rose-700" role="alert">{{ $message }}</p> @enderror
+                </div>
+                <div class="sm:col-span-2 sm:flex sm:justify-end">
+                    <button type="submit" class="inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto {{ $focus }}" wire:loading.attr="disabled" wire:target="applyFilters">
+                        <span wire:loading.remove wire:target="applyFilters">Toepassen</span>
+                        <span wire:loading wire:target="applyFilters">Laden...</span>
+                    </button>
+                </div>
+            @else
+                <p class="text-sm text-zinc-500 sm:col-span-8">
+                    De periode wordt direct toegepast. Kies
+                    <button type="button" class="rounded font-medium text-indigo-700 underline underline-offset-2 hover:text-indigo-800 {{ $focus }}" wire:click="$set('preset', 'custom')">Aangepast</button>
+                    voor eigen datums.
+                </p>
+            @endif
+        </div>
+    </form>
 
     @php
         $activeRatio = $kpis['companies_total'] > 0
@@ -70,15 +74,15 @@
         $topModules = $modulesOverview->sortByDesc(fn ($row) => (float) $row->mrr_excl)->take(3);
     @endphp
 
-    <div class="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-12">
-        <div class="flex h-full min-w-0 flex-col rounded-2xl border border-zinc-200 bg-white p-4 xl:col-span-6">
+    <div class="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 xl:grid-cols-12">
+        <div class="flex h-full min-w-0 flex-col rounded-xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5 md:col-span-2 xl:col-span-6">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="min-w-0">
-                    <div class="text-xs font-medium uppercase tracking-wide text-zinc-500">Omzet per maand</div>
+                    <h2 class="text-xs font-medium uppercase tracking-wide text-zinc-500">Omzet per maand (MRR)</h2>
                     <div class="mt-1 break-words text-3xl font-semibold text-zinc-900">&euro; {{ number_format($kpis['mrr_excl'], 2, ',', '.') }}</div>
                     <div class="mt-1 text-xs text-zinc-600">Excl. btw, alleen klanten met status Actief</div>
                 </div>
-                <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 sm:text-right">
+                <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 sm:text-right">
                     <div class="text-xs font-medium text-emerald-700">Incl. btw</div>
                     <div class="text-sm font-semibold text-emerald-800">&euro; {{ number_format($kpis['mrr_incl'], 2, ',', '.') }}</div>
                 </div>
@@ -99,64 +103,64 @@
             </div>
         </div>
 
-        <div class="flex h-full min-w-0 flex-col rounded-2xl border border-zinc-200 bg-white p-4 xl:col-span-3">
-            <div class="text-xs font-medium uppercase tracking-wide text-zinc-500">Klanten</div>
+        <div class="flex h-full min-w-0 flex-col rounded-xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5 xl:col-span-3">
+            <h2 class="text-xs font-medium uppercase tracking-wide text-zinc-500">Klanten</h2>
             <a href="{{ $customersUrl }}" class="mt-2 block rounded text-2xl font-semibold hover:text-indigo-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">{{ number_format($kpis['companies_total'], 0, ',', '.') }}</a>
             <a href="{{ $customersUrl }}?status=actief" class="mt-1 block rounded text-sm text-zinc-600 hover:text-indigo-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">Actief: {{ number_format($kpis['companies_active'], 0, ',', '.') }} ({{ $activeRatio }}%)</a>
             <div class="mt-auto pt-4">
                 <div class="h-2 overflow-hidden rounded-full bg-zinc-100">
-                    <div class="h-2 rounded-full bg-zinc-800" style="width: {{ min(100, max(0, $activeRatio)) }}%"></div>
+                    <div class="h-2 rounded-full bg-indigo-500" style="width: {{ min(100, max(0, $activeRatio)) }}%"></div>
                 </div>
             </div>
         </div>
 
-        <div class="flex h-full min-w-0 flex-col rounded-2xl border border-zinc-200 bg-white p-4 xl:col-span-3">
-            <div class="text-xs font-medium uppercase tracking-wide text-zinc-500">Instroom in periode</div>
+        <div class="flex h-full min-w-0 flex-col rounded-xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5 xl:col-span-3">
+            <h2 class="text-xs font-medium uppercase tracking-wide text-zinc-500">Instroom in periode</h2>
             <div class="mt-3 space-y-2 text-sm">
                 <div class="flex items-center justify-between">
                     <span class="text-zinc-600">Nieuw toegevoegd</span>
-                    <span class="font-semibold">{{ number_format($kpis['leads_new'], 0, ',', '.') }}</span>
+                    <span class="font-semibold tabular-nums text-zinc-900">{{ number_format($kpis['leads_new'], 0, ',', '.') }}</span>
                 </div>
                 <div class="flex items-center justify-between">
                     <span class="text-zinc-600">Demo aangevraagd</span>
-                    <span class="font-semibold">{{ number_format($kpis['demo_requested'], 0, ',', '.') }}</span>
+                    <span class="font-semibold tabular-nums text-zinc-900">{{ number_format($kpis['demo_requested'], 0, ',', '.') }}</span>
                 </div>
                 <div class="flex items-center justify-between">
                     <span class="text-zinc-600">Demo gestart</span>
-                    <span class="font-semibold">{{ number_format($kpis['demo_started'], 0, ',', '.') }}</span>
+                    <span class="font-semibold tabular-nums text-zinc-900">{{ number_format($kpis['demo_started'], 0, ',', '.') }}</span>
                 </div>
                 <div class="flex items-center justify-between">
                     <span class="text-zinc-600">Nieuw actief</span>
-                    <span class="font-semibold">{{ number_format($kpis['active_new'], 0, ',', '.') }}</span>
+                    <span class="font-semibold tabular-nums text-zinc-900">{{ number_format($kpis['active_new'], 0, ',', '.') }}</span>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="grid grid-cols-2 items-stretch gap-3 sm:grid-cols-3 xl:grid-cols-6">
-        <div class="h-full rounded-xl border border-zinc-200 bg-white px-3 py-2">
+    <div class="grid grid-cols-2 items-stretch gap-4 sm:grid-cols-3 xl:grid-cols-6">
+        <div class="{{ $tile }}">
             <div class="text-xs text-zinc-500">Mandaten actief</div>
-            <div class="text-sm font-semibold">{{ number_format($kpis['mandates_active'], 0, ',', '.') }}</div>
+            <div class="mt-1 text-lg font-semibold tabular-nums text-zinc-900">{{ number_format($kpis['mandates_active'], 0, ',', '.') }}</div>
         </div>
-        <div class="h-full rounded-xl border border-zinc-200 bg-white px-3 py-2">
+        <div class="{{ $tile }}">
             <div class="text-xs text-zinc-500">Mandaten in afwachting</div>
-            <div class="text-sm font-semibold">{{ number_format($kpis['mandates_pending'], 0, ',', '.') }}</div>
+            <div class="mt-1 text-lg font-semibold tabular-nums text-zinc-900">{{ number_format($kpis['mandates_pending'], 0, ',', '.') }}</div>
         </div>
-        <a href="{{ route('dashboard') }}" class="block h-full rounded-xl border border-zinc-200 bg-white px-3 py-2 transition hover:border-indigo-300 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
+        <a href="{{ route('dashboard') }}#sepa" class="{{ $tileLink }}">
             <div class="text-xs text-zinc-500">Actief zonder complete SEPA</div>
-            <div class="text-sm font-semibold">{{ number_format($kpis['active_without_mandate'], 0, ',', '.') }}</div>
+            <div class="mt-1 text-lg font-semibold tabular-nums text-zinc-900">{{ number_format($kpis['active_without_mandate'], 0, ',', '.') }}</div>
         </a>
-        <a href="{{ $customersUrl }}?status=opgezegd" class="block h-full rounded-xl border border-zinc-200 bg-white px-3 py-2 transition hover:border-indigo-300 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
+        <a href="{{ $customersUrl }}?status=opgezegd" class="{{ $tileLink }}">
             <div class="text-xs text-zinc-500">Opzeggingen</div>
-            <div class="text-sm font-semibold">{{ number_format($kpis['cancelled'], 0, ',', '.') }}</div>
+            <div class="mt-1 text-lg font-semibold tabular-nums text-zinc-900">{{ number_format($kpis['cancelled'], 0, ',', '.') }}</div>
         </a>
-        <a href="{{ $customersUrl }}?status=verloren" class="block h-full rounded-xl border border-zinc-200 bg-white px-3 py-2 transition hover:border-indigo-300 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
+        <a href="{{ $customersUrl }}?status=verloren" class="{{ $tileLink }}">
             <div class="text-xs text-zinc-500">Verloren</div>
-            <div class="text-sm font-semibold">{{ number_format($kpis['lost'], 0, ',', '.') }}</div>
+            <div class="mt-1 text-lg font-semibold tabular-nums text-zinc-900">{{ number_format($kpis['lost'], 0, ',', '.') }}</div>
         </a>
-        <a href="{{ route('crm.modules.index') }}" class="block h-full rounded-xl border border-zinc-200 bg-white px-3 py-2 transition hover:border-indigo-300 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
+        <a href="{{ route('crm.modules.index') }}" class="{{ $tileLink }}">
             <div class="text-xs text-zinc-500">Beschikbare modules</div>
-            <div class="text-sm font-semibold">{{ number_format($kpis['modules_total'], 0, ',', '.') }}</div>
+            <div class="mt-1 text-lg font-semibold tabular-nums text-zinc-900">{{ number_format($kpis['modules_total'], 0, ',', '.') }}</div>
         </a>
     </div>
 
@@ -194,15 +198,18 @@
         $euro = fn ($v) => '€ '.number_format((float) $v, 0, ',', '.');
     @endphp
 
-    <div class="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-12">
-        <div class="min-w-0 rounded-2xl border border-zinc-200 bg-white p-4 lg:col-span-7">
+    <div class="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-12">
+        <div class="min-w-0 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5 lg:col-span-7">
             <div class="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                    <div class="text-sm font-semibold">MRR per maand</div>
+                    <h2 class="text-base font-semibold text-zinc-900">MRR per maand</h2>
                     <div class="text-xs text-zinc-500">Laatste 12 maanden, excl. btw. Berekend uit start- en einddatums van modules (benadering, huidige maand is exact).</div>
                 </div>
-                <button type="button" class="rounded-md border border-zinc-200 px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600" wire:click="export('mrr')">CSV</button>
+                <button type="button" class="{{ $csvBtn }}" wire:click="export('mrr')" wire:loading.attr="disabled" wire:target="export" aria-label="MRR per maand exporteren als CSV">CSV</button>
             </div>
+            @if (array_sum($mrrValues) <= 0)
+                <p class="mt-3 rounded-lg border border-dashed border-zinc-300 bg-zinc-50/60 px-4 py-3 text-sm text-zinc-500">Nog geen omzet in de afgelopen 12 maanden. Koppel modules aan actieve klanten om de grafiek te vullen.</p>
+            @endif
             <svg viewBox="0 0 {{ $chartW }} {{ $chartH }}" class="mt-3 h-auto w-full" role="img" aria-label="Lijngrafiek MRR per maand, laatste 12 maanden">
                 @foreach ([0, 0.25, 0.5, 0.75, 1] as $f)
                     @php $gy = round($padT + $plotH - $plotH * $f, 1); @endphp
@@ -210,11 +217,11 @@
                     <text x="{{ $padL - 8 }}" y="{{ $gy + 4 }}" text-anchor="end" font-size="11" fill="#71717a">{{ $euro($mrrTop * $f) }}</text>
                 @endforeach
                 @if ($mrrArea !== '')
-                    <path d="{{ $mrrArea }}" fill="#4f46e5" fill-opacity="0.08" />
-                    <polyline points="{{ $mrrPath }}" fill="none" stroke="#4f46e5" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />
+                    <path d="{{ $mrrArea }}" fill="#aec22b" fill-opacity="0.15" />
+                    <polyline points="{{ $mrrPath }}" fill="none" stroke="#667319" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />
                 @endif
                 @foreach ($mrrPoints as $i => $p)
-                    <circle cx="{{ $p['x'] }}" cy="{{ $p['y'] }}" r="3.5" fill="#fff" stroke="#4f46e5" stroke-width="2">
+                    <circle cx="{{ $p['x'] }}" cy="{{ $p['y'] }}" r="3.5" fill="#fff" stroke="#667319" stroke-width="2">
                         <title>{{ $p['row']['label'] }}: {{ '€ '.number_format((float) $p['row']['excl'], 2, ',', '.') }}</title>
                     </circle>
                     @if ($i % 2 === (count($mrrPoints) - 1) % 2)
@@ -224,13 +231,13 @@
             </svg>
         </div>
 
-        <div class="min-w-0 rounded-2xl border border-zinc-200 bg-white p-4 lg:col-span-5">
+        <div class="min-w-0 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5 lg:col-span-5">
             <div class="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                    <div class="text-sm font-semibold">Instroom en uitstroom per maand</div>
+                    <h2 class="text-base font-semibold text-zinc-900">Instroom en uitstroom per maand</h2>
                     <div class="text-xs text-zinc-500">Nieuw actief (actief vanaf) tegenover opgezegd en verloren (op datum).</div>
                 </div>
-                <button type="button" class="rounded-md border border-zinc-200 px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600" wire:click="export('instroom')">CSV</button>
+                <button type="button" class="{{ $csvBtn }}" wire:click="export('instroom')" wire:loading.attr="disabled" wire:target="export" aria-label="Instroom en uitstroom exporteren als CSV">CSV</button>
             </div>
             <div class="mt-2 flex flex-wrap gap-3 text-xs text-zinc-600" aria-hidden="true">
                 <span class="inline-flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm bg-emerald-500"></span>Nieuw actief</span>
@@ -266,10 +273,10 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-12">
-        <div class="h-full rounded-2xl border border-zinc-200 bg-white p-4 lg:col-span-4">
+    <div class="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-12">
+        <div class="h-full rounded-xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5 lg:col-span-4">
             <div class="flex items-center justify-between gap-2">
-                <div class="text-sm font-semibold">Funnel overzicht</div>
+                <h2 class="text-base font-semibold text-zinc-900">Funnel overzicht</h2>
                 <div class="text-xs text-zinc-500">Totaalbestand</div>
             </div>
             <div class="mt-4 space-y-2">
@@ -278,58 +285,58 @@
                         $total = (int) ($funnel[$key] ?? 0);
                         $width = (int) round(($total / $funnelMax) * 100);
                     @endphp
-                    <a href="{{ $customersUrl }}?status={{ $key }}" class="block rounded-lg border border-zinc-100 px-3 py-2 transition hover:border-indigo-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
+                    <a href="{{ $customersUrl }}?status={{ $key }}" class="block rounded-lg border border-zinc-100 px-4 py-2.5 transition hover:border-indigo-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
                         <div class="mb-1 flex items-center justify-between text-xs">
                             <span class="text-zinc-600">{{ $label }}</span>
                             <span class="font-semibold text-zinc-800">{{ number_format($total, 0, ',', '.') }}</span>
                         </div>
                         <div class="h-1.5 overflow-hidden rounded-full bg-zinc-100">
-                            <div class="h-1.5 rounded-full bg-zinc-700" style="width: {{ min(100, max(0, $width)) }}%"></div>
+                            <div class="h-1.5 rounded-full bg-indigo-500" style="width: {{ min(100, max(0, $width)) }}%"></div>
                         </div>
                     </a>
                 @endforeach
             </div>
         </div>
 
-        <div class="flex h-full min-w-0 flex-col rounded-2xl border border-zinc-200 bg-white p-4 lg:col-span-8">
+        <div class="flex h-full min-w-0 flex-col rounded-xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5 lg:col-span-8">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div class="min-w-0">
-                    <div class="flex items-center gap-2"><div class="text-sm font-semibold">Modules prestaties</div><button type="button" class="rounded-md border border-zinc-200 px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600" wire:click="export('modules')">CSV</button></div>
+                    <div class="flex items-center gap-2"><h2 class="text-base font-semibold text-zinc-900">Modules prestaties</h2><button type="button" class="{{ $csvBtn }}" wire:click="export('modules')" wire:loading.attr="disabled" wire:target="export" aria-label="Modules prestaties exporteren als CSV">CSV</button></div>
                     <div class="mt-1 text-xs text-zinc-500">Alleen klanten met status Actief. Demo-klanten tellen niet mee.</div>
                 </div>
                 <div class="grid grid-cols-1 gap-2 sm:w-72">
                     @forelse($topModules as $module)
-                        <div class="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs">
+                        <div class="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs">
                             <div class="flex items-center justify-between gap-2">
                                 <span class="min-w-0 truncate font-medium text-zinc-700">{{ $module->naam }}</span>
                                 <span class="font-semibold text-zinc-900">&euro; {{ number_format((float) $module->mrr_excl, 2, ',', '.') }}</span>
                             </div>
                         </div>
                     @empty
-                        <div class="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-500">Nog geen module-omzet.</div>
+                        <div class="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-500">Nog geen module-omzet.</div>
                     @endforelse
                 </div>
             </div>
 
             <div class="mt-4 flex-1 overflow-x-auto rounded-lg border border-zinc-200">
-                <table class="min-w-full divide-y divide-zinc-100">
+                <table class="min-w-full divide-y divide-zinc-200 text-sm">
                     <thead class="bg-zinc-50">
                         <tr>
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-zinc-600">Module</th>
-                            <th class="px-3 py-2 text-right text-xs font-semibold text-zinc-600">Klanten</th>
-                            <th class="px-3 py-2 text-right text-xs font-semibold text-zinc-600">Aantal</th>
-                            <th class="px-3 py-2 text-right text-xs font-semibold text-zinc-600">MRR excl.</th>
-                            <th class="px-3 py-2 text-right text-xs font-semibold text-zinc-600">BTW %</th>
+                            <th class="{{ $th }} text-left">Module</th>
+                            <th class="{{ $th }} text-right">Klanten</th>
+                            <th class="{{ $th }} text-right">Aantal</th>
+                            <th class="{{ $th }} text-right">MRR excl.</th>
+                            <th class="{{ $th }} text-right">BTW %</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-zinc-100">
                         @forelse($modulesOverview as $row)
-                            <tr class="hover:bg-zinc-50">
-                                <td class="px-3 py-2 text-sm font-medium">{{ $row->naam }}</td>
-                                <td class="px-3 py-2 text-right text-sm">{{ number_format((int) $row->active_customers, 0, ',', '.') }}</td>
-                                <td class="px-3 py-2 text-right text-sm">{{ number_format((int) $row->total_aantal, 0, ',', '.') }}</td>
-                                <td class="px-3 py-2 text-right text-sm font-semibold">&euro; {{ number_format((float) $row->mrr_excl, 2, ',', '.') }}</td>
-                                <td class="px-3 py-2 text-right text-sm text-zinc-600">
+                            <tr class="hover:bg-zinc-50/80">
+                                <td class="px-4 py-2.5 text-sm font-medium">{{ $row->naam }}</td>
+                                <td class="px-4 py-2.5 text-right text-sm tabular-nums">{{ number_format((int) $row->active_customers, 0, ',', '.') }}</td>
+                                <td class="px-4 py-2.5 text-right text-sm tabular-nums">{{ number_format((int) $row->total_aantal, 0, ',', '.') }}</td>
+                                <td class="px-4 py-2.5 text-right text-sm tabular-nums font-semibold">&euro; {{ number_format((float) $row->mrr_excl, 2, ',', '.') }}</td>
+                                <td class="px-4 py-2.5 text-right text-sm tabular-nums text-zinc-600">
                                     @php
                                         $btwMin = (float) $row->btw_min;
                                         $btwMax = (float) $row->btw_max;
@@ -343,18 +350,18 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="px-3 py-6 text-center text-sm text-zinc-500">Nog geen modules.</td>
+                                <td colspan="5" class="px-4 py-10 text-center text-sm text-zinc-500">Nog geen modules. <a href="{{ route('crm.modules.index') }}" class="font-medium text-indigo-700 hover:underline">Module toevoegen</a></td>
                             </tr>
                         @endforelse
                     </tbody>
                     @if($modulesOverview->isNotEmpty())
                         <tfoot class="bg-zinc-50">
                             <tr>
-                                <td class="px-3 py-2 text-sm font-semibold">Totaal</td>
-                                <td class="px-3 py-2"></td>
-                                <td class="px-3 py-2 text-right text-sm font-semibold">{{ number_format($kpis['modules_total_aantal'], 0, ',', '.') }}</td>
-                                <td class="px-3 py-2 text-right text-sm font-semibold">&euro; {{ number_format($kpis['mrr_excl'], 2, ',', '.') }}</td>
-                                <td class="px-3 py-2"></td>
+                                <td class="px-4 py-2.5 text-sm font-semibold">Totaal</td>
+                                <td class="px-4 py-2.5"></td>
+                                <td class="px-4 py-2.5 text-right text-sm tabular-nums font-semibold">{{ number_format($kpis['modules_total_aantal'], 0, ',', '.') }}</td>
+                                <td class="px-4 py-2.5 text-right text-sm tabular-nums font-semibold">&euro; {{ number_format($kpis['mrr_excl'], 2, ',', '.') }}</td>
+                                <td class="px-4 py-2.5"></td>
                             </tr>
                         </tfoot>
                     @endif
@@ -363,30 +370,30 @@
         </div>
     </div>
 
-    <div class="min-w-0 rounded-2xl border border-zinc-200 bg-white p-4">
-            <div class="flex items-center justify-between gap-3">
-                <div class="text-sm font-semibold">Top 10 klanten op MRR</div>
-                <div class="flex items-center gap-2"><span class="text-xs text-zinc-500">Alleen status Actief. CSV bevat alle klanten.</span><button type="button" class="rounded-md border border-zinc-200 px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600" wire:click="export('klanten')">CSV</button></div>
+    <div class="min-w-0 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <h2 class="text-base font-semibold text-zinc-900">Top 10 klanten op MRR</h2>
+                <div class="flex flex-wrap items-center gap-2"><span class="text-xs text-zinc-500">Alleen status Actief. CSV bevat alle klanten.</span><button type="button" class="{{ $csvBtn }}" wire:click="export('klanten')" wire:loading.attr="disabled" wire:target="export" aria-label="Alle klanten op MRR exporteren als CSV">CSV</button></div>
             </div>
             <div class="mt-4 overflow-x-auto rounded-lg border border-zinc-200">
-                <table class="min-w-full divide-y divide-zinc-100">
+                <table class="min-w-full divide-y divide-zinc-200 text-sm">
                     <thead class="bg-zinc-50">
                         <tr>
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-zinc-600">Klant</th>
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-zinc-600">Plaats</th>
-                            <th class="px-3 py-2 text-right text-xs font-semibold text-zinc-600">MRR excl.</th>
+                            <th class="{{ $th }} text-left">Klant</th>
+                            <th class="{{ $th }} text-left">Plaats</th>
+                            <th class="{{ $th }} text-right">MRR excl.</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-zinc-100">
                         @forelse($topCustomers as $row)
-                            <tr class="hover:bg-zinc-50">
-                                <td class="px-3 py-2 text-sm font-medium"><a href="{{ route('crm.garage_companies.show', ['garageCompany' => $row->id]) }}" class="text-zinc-900 hover:text-indigo-700 hover:underline">{{ $row->bedrijfsnaam }}</a></td>
-                                <td class="px-3 py-2 text-sm text-zinc-600">{{ $row->plaats }}</td>
-                                <td class="px-3 py-2 text-right text-sm font-semibold">&euro; {{ number_format((float) $row->mrr_excl, 2, ',', '.') }}</td>
+                            <tr class="hover:bg-zinc-50/80">
+                                <td class="px-4 py-2.5 text-sm font-medium"><a href="{{ route('crm.garage_companies.show', ['garageCompany' => $row->id]) }}" class="text-zinc-900 hover:text-indigo-700 hover:underline">{{ $row->bedrijfsnaam }}</a></td>
+                                <td class="px-4 py-2.5 text-sm text-zinc-600">{{ filled($row->plaats) ? $row->plaats : '-' }}</td>
+                                <td class="px-4 py-2.5 text-right text-sm tabular-nums font-semibold">&euro; {{ number_format((float) $row->mrr_excl, 2, ',', '.') }}</td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="3" class="px-3 py-6 text-center text-sm text-zinc-500">Nog geen data.</td>
+                                <td colspan="3" class="px-4 py-10 text-center text-sm text-zinc-500">Nog geen actieve klanten met module-omzet.</td>
                             </tr>
                         @endforelse
                     </tbody>

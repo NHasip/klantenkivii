@@ -23,6 +23,15 @@ class Index extends Component
     public string $default_btw_percentage = '21';
     public bool $supportsDefaultPricing = false;
 
+    /**
+     * De route-middleware 'admin' geldt niet voor latere Livewire-requests;
+     * daarom bij elke request (ook acties) opnieuw controleren.
+     */
+    public function boot(): void
+    {
+        abort_unless(auth()->user()?->isAdmin(), 403);
+    }
+
     public function mount(): void
     {
         $this->supportsDefaultPricing = Schema::hasColumn('modules', 'default_prijs_maand_excl')
@@ -31,6 +40,7 @@ class Index extends Component
 
     public function startCreate(): void
     {
+        $this->resetValidation();
         $this->resetForm();
         $this->moduleId = null;
         $this->showForm = true;
@@ -39,6 +49,7 @@ class Index extends Component
     public function startEdit(int $id): void
     {
         $module = Module::findOrFail($id);
+        $this->resetValidation();
         $this->moduleId = $module->id;
         $this->naam = $module->naam;
         $this->omschrijving = $module->omschrijving;
@@ -54,6 +65,7 @@ class Index extends Component
 
     public function cancel(): void
     {
+        $this->resetValidation();
         $this->resetForm();
         $this->moduleId = null;
         $this->showForm = false;
@@ -72,9 +84,20 @@ class Index extends Component
             $rules['default_btw_percentage'] = ['required', 'numeric', 'min:0', 'max:100'];
         }
 
-        $data = $this->validate($rules);
+        $this->naam = trim($this->naam);
+        // Komma als decimaalteken (Nederlandse invoer) accepteren.
+        $this->default_prijs_maand_excl = str_replace(',', '.', trim($this->default_prijs_maand_excl));
+        $this->default_btw_percentage = str_replace(',', '.', trim($this->default_btw_percentage));
+
+        $data = $this->validate($rules, [], [
+            'naam' => 'naam',
+            'omschrijving' => 'omschrijving',
+            'default_prijs_maand_excl' => 'prijs',
+            'default_btw_percentage' => 'btw-percentage',
+        ]);
 
         $payload = $data;
+        $payload['omschrijving'] = filled($data['omschrijving'] ?? null) ? $data['omschrijving'] : null;
         if ($this->supportsDefaultPricing) {
             $payload['default_prijs_maand_excl'] = (float) $data['default_prijs_maand_excl'];
             $payload['default_btw_percentage'] = (float) $data['default_btw_percentage'];
@@ -105,6 +128,9 @@ class Index extends Component
 
         try {
             $module->delete();
+            if ($this->moduleId === $id) {
+                $this->cancel();
+            }
             session()->now('livewire_status', 'Module verwijderd.');
         } catch (Throwable $e) {
             report($e);
@@ -121,6 +147,9 @@ class Index extends Component
         }
 
         Module::findOrFail($id)->update(['archived_at' => now()]);
+        if ($this->moduleId === $id) {
+            $this->cancel();
+        }
         session()->now('livewire_status', 'Module gearchiveerd. Bestaande klantkoppelingen blijven ongewijzigd.');
     }
 

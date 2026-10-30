@@ -1,31 +1,20 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="theme-color" content="#aec22b">
-    <link rel="icon" type="image/png" href="{{ asset('brand/favicon.png') }}">
-    <link rel="apple-touch-icon" href="{{ asset('brand/favicon.png') }}">
+    @include('layouts.partials.head')
 
     {{-- Inertia root view (React) --}}
     @vite(['resources/css/app.css', 'resources/js/app.jsx'])
     @inertiaHead
     @livewireStyles
 </head>
-<body class="min-h-screen bg-zinc-50 text-zinc-900">
+<body class="min-h-full bg-zinc-50 font-sans text-zinc-900 antialiased">
+    <a href="#hoofdinhoud" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[80] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:shadow-lg focus:ring-2 focus:ring-indigo-600">Naar inhoud</a>
     <div class="min-h-screen">
         @include('layouts.partials.header')
 
-        <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-            @if(session('status'))
-                <div x-data="{ show: true }" x-show="show" role="status" class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                    <div class="flex items-start justify-between gap-3">
-                        <div>{{ session('status') }}</div>
-                        <button type="button" class="rounded text-emerald-700 hover:text-emerald-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" @click="show = false">Sluiten</button>
-                    </div>
-                </div>
-            @endif
+        <main id="hoofdinhoud" tabindex="-1" class="mx-auto max-w-7xl px-4 py-6 focus:outline-none sm:px-6 sm:py-8 lg:px-8">
+            @include('layouts.partials.status', ['statusClass' => 'mb-6'])
 
             @inertia
         </main>

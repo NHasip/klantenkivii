@@ -27,10 +27,17 @@ class AdminSystemSettings extends Component
 
     public bool $hasSmtpPassword = false;
 
-    public function mount(): void
+    /**
+     * Draait bij elke request (ook Livewire-acties), niet alleen bij mount:
+     * zo kan een gedegradeerde gebruiker geen oude snapshot meer gebruiken.
+     */
+    public function boot(): void
     {
         abort_unless(auth()->user()?->isAdmin(), 403);
+    }
 
+    public function mount(): void
+    {
         $smtp = SmtpSetting::query()->first();
         if ($smtp) {
             $this->smtpId = $smtp->id;
@@ -154,8 +161,11 @@ class AdminSystemSettings extends Component
             'mail.mailers.smtp.password' => $this->resolveSmtpPassword(),
             'mail.mailers.smtp.encryption' => $this->smtp['encryption'] ?: null,
             'mail.from.address' => $this->smtp['from_address'] ?? null,
-            'mail.from.name' => $this->smtp['from_name'] ?? config('app.name'),
+            'mail.from.name' => $this->smtp['from_name'] ?: config('app.name'),
         ]);
+
+        // Een eerder (met oude config) opgebouwde smtp-mailer niet hergebruiken.
+        Mail::purge('smtp');
     }
 
     public function render()

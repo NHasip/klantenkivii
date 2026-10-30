@@ -1,111 +1,116 @@
 <x-action-section>
-    <x-slot name="title">
-        {{ __('Two Factor Authentication') }}
-    </x-slot>
+    <x-slot name="title">Tweestapsverificatie (2FA)</x-slot>
 
-    <x-slot name="description">
-        {{ __('Add additional security to your account using two factor authentication.') }}
+    <x-slot name="description">Extra beveiliging: naast je wachtwoord vul je bij het inloggen een code uit je authenticator-app in.</x-slot>
+
+    <x-slot name="aside">
+        @if ($this->enabled && ! $showingConfirmation)
+            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800 ring-1 ring-inset ring-emerald-200">Aan</span>
+        @elseif ($this->enabled)
+            <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-200">Nog bevestigen</span>
+        @else
+            <span class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 ring-1 ring-inset ring-zinc-200">Uit</span>
+        @endif
     </x-slot>
 
     <x-slot name="content">
-        <h3 class="text-lg font-medium text-gray-900">
+        <p class="text-sm font-semibold text-zinc-900">
             @if ($this->enabled)
                 @if ($showingConfirmation)
-                    {{ __('Finish enabling two factor authentication.') }}
+                    Rond het inschakelen van tweestapsverificatie af.
                 @else
-                    {{ __('You have enabled two factor authentication.') }}
+                    Tweestapsverificatie staat aan.
                 @endif
             @else
-                {{ __('You have not enabled two factor authentication.') }}
+                Tweestapsverificatie staat nog uit.
             @endif
-        </h3>
+        </p>
 
-        <div class="mt-3 max-w-xl text-sm text-gray-600">
-            <p>
-                {{ __('When two factor authentication is enabled, you will be prompted for a secure, random token during authentication. You may retrieve this token from your phone\'s Google Authenticator application.') }}
-            </p>
-        </div>
+        <p class="mt-1 max-w-xl text-sm text-zinc-600">
+            Met 2FA vraagt het CRM bij het inloggen om een veilige, willekeurige code. Die code vind je in een authenticator-app op je telefoon, zoals Google Authenticator of Microsoft Authenticator.
+        </p>
 
         @if ($this->enabled)
             @if ($showingQrCode)
-                <div class="mt-4 max-w-xl text-sm text-gray-600">
-                    <p class="font-semibold">
+                <div class="mt-5 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                    <p class="max-w-xl text-sm font-medium text-zinc-800">
                         @if ($showingConfirmation)
-                            {{ __('To finish enabling two factor authentication, scan the following QR code using your phone\'s authenticator application or enter the setup key and provide the generated OTP code.') }}
+                            Scan de QR-code met je authenticator-app (of vul de sleutel handmatig in) en vul daarna de code uit de app in.
                         @else
-                            {{ __('Two factor authentication is now enabled. Scan the following QR code using your phone\'s authenticator application or enter the setup key.') }}
+                            Tweestapsverificatie staat aan. Scan de QR-code met je authenticator-app of vul de sleutel handmatig in.
                         @endif
                     </p>
-                </div>
 
-                <div class="mt-4 p-2 inline-block bg-white">
-                    {!! $this->user->twoFactorQrCodeSvg() !!}
-                </div>
+                    <div class="mt-4 flex flex-wrap items-start gap-5">
+                        <div class="inline-block rounded-lg bg-white p-2 ring-1 ring-zinc-200">
+                            {!! $this->user->twoFactorQrCodeSvg() !!}
+                        </div>
 
-                <div class="mt-4 max-w-xl text-sm text-gray-600">
-                    <p class="font-semibold">
-                        {{ __('Setup Key') }}: {{ decrypt($this->user->two_factor_secret) }}
-                    </p>
-                </div>
+                        <div class="min-w-0 space-y-4">
+                            <div>
+                                <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">Sleutel</p>
+                                <p class="mt-1 select-all break-all font-mono text-sm text-zinc-900">{{ decrypt($this->user->two_factor_secret) }}</p>
+                            </div>
 
-                @if ($showingConfirmation)
-                    <div class="mt-4">
-                        <x-label for="code" value="{{ __('Code') }}" />
-
-                        <x-input id="code" type="text" name="code" class="block mt-1 w-1/2" inputmode="numeric" autofocus autocomplete="one-time-code"
-                            wire:model="code"
-                            wire:keydown.enter="confirmTwoFactorAuthentication" />
-
-                        <x-input-error for="code" class="mt-2" />
+                            @if ($showingConfirmation)
+                                <div>
+                                    <x-label for="code" value="Code uit de app" />
+                                    <x-input id="code" type="text" name="code" class="mt-1 block w-40 text-center font-mono tracking-[0.3em]" inputmode="numeric" autofocus autocomplete="one-time-code"
+                                        wire:model="code"
+                                        wire:keydown.enter="confirmTwoFactorAuthentication" />
+                                    <x-input-error for="code" class="mt-1" />
+                                </div>
+                            @endif
+                        </div>
                     </div>
-                @endif
+                </div>
             @endif
 
             @if ($showingRecoveryCodes)
-                <div class="mt-4 max-w-xl text-sm text-gray-600">
-                    <p class="font-semibold">
-                        {{ __('Store these recovery codes in a secure password manager. They can be used to recover access to your account if your two factor authentication device is lost.') }}
+                <div class="mt-5">
+                    <p class="max-w-xl text-sm font-medium text-zinc-800">
+                        Bewaar deze herstelcodes op een veilige plek, bijvoorbeeld in je wachtwoordmanager. Je hebt ze nodig als je je telefoon kwijt bent.
                     </p>
-                </div>
 
-                <div class="grid gap-1 max-w-xl mt-4 px-4 py-4 font-mono text-sm bg-gray-100 rounded-lg">
-                    @foreach (json_decode(decrypt($this->user->two_factor_recovery_codes), true) as $code)
-                        <div>{{ $code }}</div>
-                    @endforeach
+                    <div class="mt-3 grid max-w-xl gap-1 rounded-lg border border-zinc-200 bg-zinc-50 p-4 font-mono text-sm text-zinc-900 sm:grid-cols-2">
+                        @foreach (json_decode(decrypt($this->user->two_factor_recovery_codes), true) as $code)
+                            <div class="select-all">{{ $code }}</div>
+                        @endforeach
+                    </div>
                 </div>
             @endif
         @endif
 
-        <div class="mt-5">
+        <div class="mt-5 flex flex-wrap items-center gap-2">
             @if (! $this->enabled)
-                <x-button type="button" wire:click="enableTwoFactorAuthentication" wire:loading.attr="disabled">
-                    {{ __('Enable') }}
+                <x-button type="button" wire:click="enableTwoFactorAuthentication" wire:loading.attr="disabled" wire:target="enableTwoFactorAuthentication">
+                    2FA inschakelen
                 </x-button>
             @else
                 @if ($showingRecoveryCodes)
-                    <x-secondary-button class="me-3" wire:click="regenerateRecoveryCodes" wire:loading.attr="disabled">
-                        {{ __('Regenerate Recovery Codes') }}
+                    <x-secondary-button wire:click="regenerateRecoveryCodes" wire:loading.attr="disabled">
+                        Nieuwe herstelcodes maken
                     </x-secondary-button>
                 @elseif ($showingConfirmation)
-                    <x-button type="button" class="me-3" wire:click="confirmTwoFactorAuthentication" wire:loading.attr="disabled">
-                        {{ __('Confirm') }}
+                    <x-button type="button" wire:click="confirmTwoFactorAuthentication" wire:loading.attr="disabled" wire:target="confirmTwoFactorAuthentication">
+                        Bevestigen
                     </x-button>
                 @else
-                    <x-secondary-button class="me-3" wire:click="showRecoveryCodes" wire:loading.attr="disabled">
-                        {{ __('Show Recovery Codes') }}
+                    <x-secondary-button wire:click="showRecoveryCodes" wire:loading.attr="disabled">
+                        Herstelcodes tonen
                     </x-secondary-button>
                 @endif
 
                 @if ($showingConfirmation)
                     <x-secondary-button wire:click="disableTwoFactorAuthentication" wire:loading.attr="disabled">
-                        {{ __('Cancel') }}
+                        Annuleren
                     </x-secondary-button>
                 @else
-                    <x-danger-button wire:click="disableTwoFactorAuthentication" wire:loading.attr="disabled">
-                        {{ __('Disable') }}
-                    </x-danger-button>
+                    <button type="button" class="inline-flex h-9 items-center rounded-lg px-3.5 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-600 disabled:opacity-50"
+                            wire:click="disableTwoFactorAuthentication" wire:confirm="Weet je zeker dat je tweestapsverificatie wilt uitschakelen?" wire:loading.attr="disabled">
+                        2FA uitschakelen
+                    </button>
                 @endif
-
             @endif
         </div>
     </x-slot>

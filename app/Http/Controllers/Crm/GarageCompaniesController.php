@@ -277,6 +277,12 @@ class GarageCompaniesController
     {
         // Bij een demo-aanvraag (lead) zijn alleen bedrijfsnaam, naam en e-mail verplicht.
         $isLead = GarageCompanyStatus::normalize((string) $request->input('status')) === GarageCompanyStatus::DemoAangevraagd->value;
+
+        // IBAN/BIC zonder spaties en in hoofdletters opslaan, zodat incasso-export en zoeken werken.
+        $request->merge([
+            'iban' => strtoupper(preg_replace('/\s+/', '', (string) $request->input('iban', ''))) ?: null,
+            'bic' => strtoupper(preg_replace('/\s+/', '', (string) $request->input('bic', ''))) ?: null,
+        ]);
         $leadOptional = fn (array $rules) => $isLead ? array_merge(['nullable'], $rules) : array_merge(['required'], $rules);
 
         $data = $request->validate([
@@ -295,8 +301,8 @@ class GarageCompaniesController
             'demo_duur_dagen' => ['nullable', 'integer', 'min:1', 'max:365'],
             'kvk_nummer' => ['nullable', 'string', 'max:50'],
 
-            'iban' => ['nullable', 'string', 'max:34'],
-            'bic' => ['nullable', 'string', 'max:11'],
+            'iban' => ['nullable', 'string', 'max:34', 'regex:/^[A-Z]{2}[0-9]{2}[A-Z0-9]{10,30}$/'],
+            'bic' => ['nullable', 'string', 'regex:/^[A-Z0-9]{8}([A-Z0-9]{3})?$/'],
             'plaats_van_tekenen' => ['nullable', 'string', 'max:255'],
             'datum_van_tekenen' => ['nullable', 'date'],
 
@@ -311,6 +317,8 @@ class GarageCompaniesController
             'login_password' => ['nullable', 'string', 'min:8'],
         ], [
             'voor_en_achternaam.regex' => 'Vul zowel voor- als achternaam in, gescheiden door een spatie.',
+            'iban.regex' => 'Dit lijkt geen geldig IBAN, bijvoorbeeld NL91ABNA0417164300.',
+            'bic.regex' => 'Een BIC bestaat uit 8 of 11 letters en cijfers.',
             'straatnaam_en_nummer.required_with' => 'Vul het adres in als je een IBAN opgeeft.',
             'postcode.required_with' => 'Vul de postcode in als je een IBAN opgeeft.',
             'plaats.required_with' => 'Vul de plaats in als je een IBAN opgeeft.',
@@ -324,6 +332,12 @@ class GarageCompaniesController
         $data['straatnaam_en_nummer'] = $data['straatnaam_en_nummer'] ?? null;
         $data['postcode'] = $data['postcode'] ?? null;
         $data['plaats'] = $data['plaats'] ?? '';
+        // Een demo-aanvraag heeft nog geen gestarte demo; aanvraagdatum vastleggen voor rapportages en demo-einde.
+        $data['demo_aangevraagd_op'] = null;
+        if ($data['status'] === GarageCompanyStatus::DemoAangevraagd->value) {
+            $data['proefperiode_start'] = null;
+            $data['demo_aangevraagd_op'] = now();
+        }
 
         // Demo-periode: standaardduur vanaf de demo startdatum.
         $data['demo_duur_dagen'] = null;
@@ -335,22 +349,24 @@ class GarageCompaniesController
         }
 
         $moduleRows = $request->input('moduleRows', []);
+        $moduleRows = is_array($moduleRows) ? $moduleRows : [];
         $rules = [];
         $messages = [];
         foreach ($moduleRows as $i => $row) {
+            $moduleNaam = is_array($row) && ! empty($row['naam']) ? (string) $row['naam'] : 'deze module';
             $rules["moduleRows.$i.module_id"] = ['required', 'integer', 'exists:modules,id'];
             $rules["moduleRows.$i.actief"] = ['boolean'];
             $rules["moduleRows.$i.aantal"] = ['required', 'integer', 'min:0', 'max:999'];
             $rules["moduleRows.$i.prijs_maand_excl"] = ['required', 'numeric', 'min:0'];
             $rules["moduleRows.$i.btw_percentage"] = ['required', 'numeric', 'min:0', 'max:100'];
-            $messages["moduleRows.$i.prijs_maand_excl.required"] = "Prijs is verplicht voor {$row['naam']}.";
+            $messages["moduleRows.$i.prijs_maand_excl.required"] = "Prijs is verplicht voor {$moduleNaam}.";
         }
 
         $validatedModules = Validator::make(['moduleRows' => $moduleRows], $rules, $messages)->validate();
         $moduleRows = $validatedModules['moduleRows'] ?? [];
 
         foreach ($moduleRows as $row) {
-            if ($row['actief'] && (int) $row['aantal'] < 1) {
+            if (! empty($row['actief']) && (int) $row['aantal'] < 1) {
                 return back()
                     ->withErrors(["moduleRows.{$this->moduleRowIndexByModuleId($moduleRows, (int) $row['module_id'])}.aantal" => 'Actieve module vereist aantal >= 1.'])
                     ->withInput();
@@ -396,6 +412,7 @@ class GarageCompaniesController
                 'demo_duur_dagen' => $data['demo_duur_dagen'],
                 'demo_eind_op' => $data['demo_eind_op'],
                 'proefperiode_start' => $data['proefperiode_start'] ?? null,
+                'demo_aangevraagd_op' => $data['demo_aangevraagd_op'],
                 'actief_vanaf' => $data['actief_vanaf'] ?? null,
                 'opgezegd_op' => $data['opgezegd_op'] ?? null,
                 'opzegreden' => $data['opzegreden'] ?? null,
@@ -473,7 +490,7 @@ class GarageCompaniesController
                     'garage_company_id' => $company->id,
                     'module_id' => (int) $row['module_id'],
                     'aantal' => (int) $row['aantal'],
-                    'actief' => (bool) $row['actief'],
+                    'actief' => (bool) ($row['actief'] ?? false),
                     'prijs_maand_excl' => (float) $row['prijs_maand_excl'],
                     'btw_percentage' => (float) $row['btw_percentage'],
                     'startdatum' => null,
@@ -719,8 +736,10 @@ class GarageCompaniesController
      */
     private function effectiveDemoEndSortExpression($baseQuery): array
     {
+        // Zelfde statussen als de kolom "Demo eindigt" in de lijst, anders klopt de sortering niet met wat je ziet.
+        $demoStatuses = $this->demoStatusValues();
         $computed = (clone $baseQuery)
-            ->whereIn('status', $this->statusVariants(GarageCompanyStatus::Proefperiode->value))
+            ->whereIn('status', $demoStatuses)
             ->whereNull('demo_eind_op')
             ->where(fn ($q) => $q->whereNotNull('proefperiode_start')->orWhereNotNull('demo_aangevraagd_op'))
             ->get(['garage_companies.id', 'demo_eind_op', 'demo_duur_dagen', 'proefperiode_start', 'demo_aangevraagd_op']);
@@ -737,13 +756,15 @@ class GarageCompaniesController
             $bindings[] = $end->format('Y-m-d H:i:s');
         }
 
-        if ($cases === []) {
-            return ['garage_companies.demo_eind_op', []];
-        }
+        // Niet-demo klanten (bijv. actief met een oude demo-einddatum) tonen geen datum en sorteren dus achteraan.
+        $statusPlaceholders = implode(', ', array_fill(0, count($demoStatuses), '?'));
+        $inner = $cases === []
+            ? 'garage_companies.demo_eind_op'
+            : 'CASE WHEN garage_companies.demo_eind_op IS NOT NULL THEN garage_companies.demo_eind_op ELSE CASE garage_companies.id '.implode(' ', $cases).' ELSE NULL END END';
 
         return [
-            'CASE WHEN garage_companies.demo_eind_op IS NOT NULL THEN garage_companies.demo_eind_op ELSE CASE garage_companies.id '.implode(' ', $cases).' ELSE NULL END END',
-            $bindings,
+            "CASE WHEN garage_companies.status IN ({$statusPlaceholders}) THEN {$inner} ELSE NULL END",
+            array_merge($demoStatuses, $bindings),
         ];
     }
 
@@ -1310,8 +1331,19 @@ class GarageCompaniesController
             'telefoon' => $data['hoofd_telefoon'],
         ];
 
+        // Geen hoofdcontact (bijv. vinkje weggehaald bij Contactpersonen): bestaande persoon met
+        // hetzelfde e-mailadres promoveren in plaats van een dubbele contactpersoon aan te maken.
+        $existingPerson = $garageCompany->primaryPerson
+            ? null
+            : CustomerPerson::query()
+                ->where('garage_company_id', $garageCompany->id)
+                ->where('email', $data['hoofd_email'])
+                ->first();
+
         if ($garageCompany->primaryPerson) {
             $garageCompany->primaryPerson->update($primaryPayload);
+        } elseif ($existingPerson) {
+            $existingPerson->update([...$primaryPayload, 'is_primary' => true]);
         } else {
             CustomerPerson::create([
                 ...$primaryPayload,
@@ -1481,32 +1513,39 @@ class GarageCompaniesController
     public function updateModules(Request $request, GarageCompany $garageCompany): RedirectResponse
     {
         $rows = $request->input('rows', []);
+        if (! is_array($rows)) {
+            $rows = [];
+        }
         $rules = [];
         $messages = [];
 
         foreach ($rows as $i => $row) {
+            $naam = is_array($row) && filled($row['naam'] ?? null) ? $row['naam'] : 'deze module';
             $rules["rows.$i.module_id"] = ['required', 'integer', 'exists:modules,id'];
             $rules["rows.$i.aantal"] = ['required', 'integer', 'min:0', 'max:999'];
             $rules["rows.$i.prijs_maand_excl"] = ['required', 'numeric', 'min:0'];
             $rules["rows.$i.btw_percentage"] = ['required', 'numeric', 'min:0', 'max:100'];
             $rules["rows.$i.actief"] = ['boolean'];
-            $messages["rows.$i.prijs_maand_excl.required"] = "Prijs is verplicht voor {$row['naam']}.";
+            $messages["rows.$i.aantal.required"] = "Aantal is verplicht voor {$naam}.";
+            $messages["rows.$i.prijs_maand_excl.required"] = "Prijs is verplicht voor {$naam}.";
+            $messages["rows.$i.btw_percentage.required"] = "Btw is verplicht voor {$naam}.";
         }
 
         $validated = Validator::make(['rows' => $rows], $rules, $messages)->validate();
+        $validatedRows = $validated['rows'] ?? [];
 
-        foreach ($validated['rows'] as $row) {
-            if ($row['actief'] && (int) $row['aantal'] < 1) {
+        foreach ($validatedRows as $i => $row) {
+            if (! empty($row['actief']) && (int) $row['aantal'] < 1) {
                 return back()
-                    ->withErrors(["rows.{$this->rowIndexByModuleId($validated['rows'], (int) $row['module_id'])}.aantal" => 'Actieve module vereist aantal >= 1.'])
+                    ->withErrors(["rows.{$i}.aantal" => 'Een actieve module heeft minimaal aantal 1.'])
                     ->withInput();
             }
         }
 
-        DB::transaction(function () use ($garageCompany, $validated) {
-            foreach ($validated['rows'] as $row) {
+        DB::transaction(function () use ($garageCompany, $validatedRows) {
+            foreach ($validatedRows as $row) {
                 $updates = [
-                    'actief' => (bool) $row['actief'],
+                    'actief' => ! empty($row['actief']),
                     'prijs_maand_excl' => $row['prijs_maand_excl'],
                     'btw_percentage' => $row['btw_percentage'],
                 ];
@@ -1630,7 +1669,10 @@ class GarageCompaniesController
 
         $huidigEind = $garageCompany->effectiveDemoEnd();
         if (! $huidigEind) {
-            return back()->with('status', 'Stel eerst een demo einddatum in.');
+            // Als validatiefout teruggeven: de frontend sluit het paneel dan niet en toont de melding bij het veld.
+            return back()->withErrors([
+                'demo_verleng_dagen' => 'Stel eerst een demo start of aanvraagdatum in bij Demo-datums.',
+            ]);
         }
 
         $extraDagen = (int) $data['demo_verleng_dagen'];
@@ -1646,7 +1688,7 @@ class GarageCompaniesController
         Activity::create([
             'garage_company_id' => $garageCompany->id,
             'type' => ActivityType::Demo,
-            'titel' => "Demo verlengd met {$data['demo_verleng_dagen']} dagen",
+            'titel' => "Demo verlengd met {$extraDagen} ".($extraDagen === 1 ? 'dag' : 'dagen'),
             'inhoud' => $data['demo_verleng_notitie'] ?: null,
             'created_by' => auth()->id(),
         ]);
@@ -2096,8 +2138,8 @@ class GarageCompaniesController
             'garage_company_id' => $garageCompany->id,
             'type' => $type,
             'titel' => $data['titel'],
-            'inhoud' => $data['inhoud'],
-            'due_at' => $data['due_at'],
+            'inhoud' => $data['inhoud'] ?? null,
+            'due_at' => $data['due_at'] ?? null,
             'created_by' => auth()->id(),
         ]);
 
@@ -2107,7 +2149,7 @@ class GarageCompaniesController
                 'garage_company_id' => $garageCompany->id,
                 'activity_id' => $activity->id,
                 'titel' => $data['titel'],
-                'message' => $data['inhoud'],
+                'message' => $data['inhoud'] ?? null,
                 'remind_at' => $data['remind_at'] ?? $data['due_at'] ?? now()->addHour(),
                 'channel' => ReminderChannel::from($data['channel']),
                 'status' => ReminderStatus::Gepland,
@@ -2119,12 +2161,16 @@ class GarageCompaniesController
 
     public function markTaskDone(GarageCompany $garageCompany, Activity $activity): RedirectResponse
     {
+        abort_unless($activity->garage_company_id === $garageCompany->id, 404);
+
+        // Alleen open items afronden: een dubbele klik overschrijft het afrondmoment niet.
         Activity::query()
             ->where('garage_company_id', $garageCompany->id)
             ->whereKey($activity->id)
+            ->whereNull('done_at')
             ->update(['done_at' => now()]);
 
-        return back()->with('status', 'Afgehandeld.');
+        return back()->with('status', 'Afgerond.');
     }
 
     public function refreshWelcomeEmail(GarageCompany $garageCompany): RedirectResponse
@@ -2172,6 +2218,10 @@ class GarageCompaniesController
 
         if (! $smtp || ! $smtp->isComplete()) {
             return back()->with('status', 'SMTP instellingen ontbreken. Voeg ze toe via profiel > systeem-instellingen.');
+        }
+
+        if (! filled($draft->to_email) || ! filter_var($draft->to_email, FILTER_VALIDATE_EMAIL)) {
+            return back()->withErrors(['to_email' => 'Vul een geldig e-mailadres in als ontvanger.']);
         }
 
         try {

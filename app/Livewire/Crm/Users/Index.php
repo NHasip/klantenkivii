@@ -20,8 +20,18 @@ class Index extends Component
     public bool $active = true;
     public ?string $password = null;
 
+    /**
+     * De route-middleware 'admin' geldt niet voor latere Livewire-requests;
+     * daarom bij elke request (ook acties) opnieuw controleren.
+     */
+    public function boot(): void
+    {
+        abort_unless(auth()->user()?->isAdmin(), 403);
+    }
+
     public function startCreate(): void
     {
+        $this->resetValidation();
         $this->resetForm();
         $this->userId = null;
         $this->showForm = true;
@@ -29,8 +39,10 @@ class Index extends Component
 
     public function startEdit(int $id): void
     {
-        $user = User::findOrFail($id);
+        // Alleen CRM-gebruikers; klantlogins horen niet in dit beheer.
+        $user = User::query()->crmUsers()->findOrFail($id);
 
+        $this->resetValidation();
         $this->userId = $user->id;
         $this->name = $user->name;
         $this->email = $user->email;
@@ -43,6 +55,7 @@ class Index extends Component
 
     public function cancel(): void
     {
+        $this->resetValidation();
         $this->resetForm();
         $this->userId = null;
         $this->showForm = false;
@@ -64,10 +77,20 @@ class Index extends Component
             $rules['password'] = ['string', 'min:10'];
         }
 
-        $data = $this->validate($rules);
+        $this->name = trim($this->name);
+        $this->email = trim($this->email);
+
+        $data = $this->validate($rules, [], [
+            'name' => 'naam',
+            'email' => 'e-mailadres',
+            'phone' => 'telefoon',
+            'role' => 'rol',
+            'active' => 'actief',
+            'password' => 'wachtwoord',
+        ]);
 
         if ($this->userId) {
-            $existing = User::query()->findOrFail($this->userId);
+            $existing = User::query()->crmUsers()->findOrFail($this->userId);
             $willBeAdmin = $data['role'] === UserRole::Admin->value;
             $willBeActive = (bool) $data['active'];
 
@@ -99,7 +122,7 @@ class Index extends Component
         $values = [
             'name' => $data['name'],
             'email' => $data['email'],
-            'phone' => $data['phone'] ?? null,
+            'phone' => filled($data['phone'] ?? null) ? trim($data['phone']) : null,
             'role' => UserRole::from($data['role']),
             'active' => (bool) $data['active'],
         ];
@@ -108,7 +131,7 @@ class Index extends Component
             $values['password'] = $data['password'];
         }
 
-        $user = User::updateOrCreate(
+        User::updateOrCreate(
             ['id' => $this->userId],
             $values,
         );

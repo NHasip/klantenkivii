@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useConfirm } from '../../../components/ConfirmProvider';
 import StatusBadge, { FOCUS_SCOPE } from '../../../components/StatusBadge';
+import { Button, Card, EmptyState, PageHeader, Spinner, Stat, buttonClasses, cx, inputClasses, tableClasses } from '../../../components/ui';
 
 const SOURCE_LABELS = {
     website_formulier: 'Websiteformulier',
@@ -97,10 +98,6 @@ function toLocalDateInput(date) {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-function cx(...parts) {
-    return parts.filter(Boolean).join(' ');
-}
-
 function PhoneIcon() {
     return (
         <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
@@ -176,14 +173,14 @@ function SortHeader({ field, label, sort, dir, onSort, className }) {
     const active = sort === field;
     const ariaSort = active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none';
     return (
-        <th scope="col" aria-sort={ariaSort} className={cx('px-4 py-3 text-left text-xs font-semibold text-zinc-600', className)}>
+        <th scope="col" aria-sort={ariaSort} className={cx(tableClasses.th, 'whitespace-nowrap', className)}>
             <button
                 type="button"
                 onClick={() => onSort(field)}
-                className="inline-flex items-center gap-1 rounded hover:text-zinc-900"
+                className={cx('-mx-1 inline-flex items-center gap-1 rounded px-1 py-0.5 uppercase tracking-wide hover:text-zinc-900', active && 'text-zinc-900')}
             >
                 {label}
-                <span aria-hidden="true" className={cx('text-[10px]', active ? 'text-zinc-900' : 'text-zinc-300')}>
+                <span aria-hidden="true" className={cx('text-[10px]', active ? 'text-indigo-700' : 'text-zinc-300')}>
                     {active ? (dir === 'asc' ? '▲' : '▼') : '▲▼'}
                 </span>
             </button>
@@ -196,18 +193,19 @@ function Pagination({ links, lastPage }) {
     if (lastPage !== undefined && lastPage !== null && Number(lastPage) <= 1) return null;
 
     return (
-        <nav aria-label="Paginering" className="mt-6 flex flex-wrap gap-2">
+        <nav aria-label="Paginering" className="flex flex-wrap items-center gap-1.5">
             {links.map((link, idx) =>
                 link.url ? (
                     <Link
                         key={`${link.label}-${idx}`}
                         href={link.url}
                         aria-current={link.active ? 'page' : undefined}
+                        preserveScroll={false}
                         className={cx(
-                            'rounded-md border px-3 py-1.5 text-sm',
+                            'inline-flex h-9 min-w-[2.25rem] items-center justify-center rounded-lg border px-3 text-sm font-medium',
                             link.active
                                 ? 'border-indigo-600 bg-indigo-600 text-white'
-                                : 'border-zinc-200 text-zinc-700 hover:bg-zinc-50'
+                                : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
                         )}
                         dangerouslySetInnerHTML={{ __html: link.label }}
                     />
@@ -215,7 +213,7 @@ function Pagination({ links, lastPage }) {
                     <span
                         key={`${link.label}-${idx}`}
                         aria-disabled="true"
-                        className="cursor-not-allowed rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-700 opacity-50"
+                        className="inline-flex h-9 min-w-[2.25rem] cursor-not-allowed items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-500 opacity-60"
                         dangerouslySetInnerHTML={{ __html: link.label }}
                     />
                 )
@@ -224,21 +222,25 @@ function Pagination({ links, lastPage }) {
     );
 }
 
-function EmptyState({ isTrashView, hasActiveFilters, onClear }) {
-    if (isTrashView && !hasActiveFilters) return <span>Prullenbak is leeg.</span>;
+function ListEmptyState({ isTrashView, hasActiveFilters, onClear, createUrl }) {
+    if (hasActiveFilters) {
+        return (
+            <EmptyState
+                title="Geen klanten gevonden"
+                description="Er zijn geen klanten die aan deze filters voldoen. Pas de zoekterm aan of wis de filters."
+                action={<Button variant="secondary" onClick={onClear}>Filters wissen</Button>}
+            />
+        );
+    }
+    if (isTrashView) {
+        return <EmptyState title="De prullenbak is leeg" description="Verwijderde klanten verschijnen hier en kun je terugzetten." />;
+    }
     return (
-        <div className="flex flex-col items-center gap-2">
-            <span>Geen klanten gevonden.</span>
-            {hasActiveFilters && (
-                <button
-                    type="button"
-                    onClick={onClear}
-                    className="text-sm font-semibold text-indigo-700 underline underline-offset-2 hover:text-indigo-900"
-                >
-                    Filters wissen
-                </button>
-            )}
-        </div>
+        <EmptyState
+            title="Nog geen klanten"
+            description="Voeg je eerste garagebedrijf toe om demo's, modules en incasso bij te houden."
+            action={createUrl ? <Link href={createUrl} className={buttonClasses()}>Nieuwe klant</Link> : null}
+        />
     );
 }
 
@@ -452,6 +454,7 @@ export default function Index({ companies, totals, statusCounts, trashCount, fil
     const [bulkTag, setBulkTag] = useState('');
     const [bulkTagOpen, setBulkTagOpen] = useState(false);
     const [bulkBusy, setBulkBusy] = useState(false);
+    const [bulkTagError, setBulkTagError] = useState('');
 
     const exportSelected = () => {
         if (!safeUrls.export_csv || selected.length === 0) return;
@@ -463,6 +466,11 @@ export default function Index({ companies, totals, statusCounts, trashCount, fil
         event.preventDefault();
         const tag = bulkTag.trim();
         if (!safeUrls.bulk_tag || !tag || selected.length === 0) return;
+        if (tag.includes(',')) {
+            setBulkTagError('Een tag mag geen komma bevatten.');
+            return;
+        }
+        setBulkTagError('');
         router.post(
             safeUrls.bulk_tag,
             { ids: selected, tag },
@@ -471,6 +479,9 @@ export default function Index({ companies, totals, statusCounts, trashCount, fil
                 preserveState: true,
                 onStart: () => setBulkBusy(true),
                 onFinish: () => setBulkBusy(false),
+                onError: (errors) => {
+                    setBulkTagError(errors?.tag || errors?.ids || 'De tag kon niet worden toegevoegd.');
+                },
                 onSuccess: () => {
                     setBulkTag('');
                     setBulkTagOpen(false);
@@ -492,90 +503,88 @@ export default function Index({ companies, totals, statusCounts, trashCount, fil
         window.location.href = `${safeUrls.export_incasso_batch}?${query.toString()}`;
     };
 
-    const columnCount = bulkEnabled ? 10 : 9;
+    // Bulkselectie kolom alleen in de actieve lijst, actiekolom alleen in de prullenbak.
+    const columnCount = 8 + (bulkEnabled ? 1 : 0) + (isTrashView ? 1 : 0);
+    const totalCount = Number(safeCompanies.total || 0);
+    const telHref = (phone) => `tel:${String(phone).replace(/[^\d+]/g, '')}`;
+    const filterSummary = [
+        activeStatus !== 'alle' ? `Status: ${safeStatusLabels[activeStatus] || activeStatus}` : null,
+        data.search.trim() ? `Zoek: "${data.search.trim()}"` : null,
+        data.tag.trim() ? `Tag: "${data.tag.trim()}"` : null,
+        data.bron ? `Bron: ${SOURCE_LABELS[data.bron] || data.bron}` : null,
+    ].filter(Boolean);
+
+    const viewToggleClass = (active) =>
+        cx(
+            'inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md px-3 text-sm font-semibold transition-colors sm:flex-none',
+            active ? 'bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200' : 'text-zinc-600 hover:text-zinc-900'
+        );
 
     return (
-        <div className={cx('space-y-6', FOCUS_SCOPE)}>
-            <Head title="Klanten" />
+        <div className={cx('space-y-5', FOCUS_SCOPE)}>
+            <Head title={isTrashView ? 'Prullenbak klanten' : 'Klanten'} />
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h1 className="text-xl font-semibold text-zinc-900">Klanten</h1>
-                    <p className="mt-1 text-sm text-zinc-500">
-                        {isTrashView ? 'Herstel verwijderde klanten vanuit de prullenbak.' : 'Overzicht van garagebedrijven en hun status.'}
-                    </p>
+            <PageHeader
+                title={isTrashView ? 'Prullenbak' : 'Klanten'}
+                description={isTrashView ? 'Herstel verwijderde klanten of verwijder ze definitief.' : 'Overzicht van garagebedrijven, hun status en volgende acties.'}
+                actions={
+                    <>
+                        {!isTrashView && safeUrls.export_incasso_batch && (
+                            <Button
+                                variant="secondary"
+                                onClick={() => setExportOpen((open) => !open)}
+                                aria-expanded={exportOpen}
+                                aria-controls="incasso-export-panel"
+                            >
+                                Incasso exporteren
+                            </Button>
+                        )}
+                        {!isTrashView && safeUrls.create && (
+                            <Link href={safeUrls.create} className={buttonClasses({ size: 'md' })}>
+                                <span aria-hidden="true" className="text-base leading-none">+</span>
+                                Nieuwe klant
+                            </Link>
+                        )}
+                        {isTrashView && safeUrls.purge_trash && Number(trashCount || 0) > 0 && (
+                            <Button variant="danger" onClick={purgeTrash}>
+                                Prullenbak leegmaken
+                            </Button>
+                        )}
+                    </>
+                }
+            >
+                <div className="mt-3 inline-flex w-full rounded-lg bg-zinc-100 p-1 sm:w-auto" role="group" aria-label="Lijst kiezen">
+                    <button type="button" onClick={() => switchView('actief')} aria-pressed={!isTrashView} className={viewToggleClass(!isTrashView)}>
+                        Klanten
+                    </button>
+                    <button type="button" onClick={() => switchView('prullenbak')} aria-pressed={isTrashView} className={viewToggleClass(isTrashView)}>
+                        Prullenbak
+                        <span className="rounded-full bg-zinc-200 px-1.5 text-xs tabular-nums text-zinc-700">{Number(trashCount || 0)}</span>
+                    </button>
                 </div>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <div className="inline-flex w-full rounded-md border border-zinc-200 bg-white p-1 sm:w-auto">
-                        <button
-                            type="button"
-                            onClick={() => switchView('actief')}
-                            aria-pressed={!isTrashView}
-                            className={cx(
-                                'flex-1 rounded px-3 py-1.5 text-sm font-semibold transition sm:flex-none',
-                                !isTrashView ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-zinc-100'
-                            )}
-                        >
-                            Actief
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => switchView('prullenbak')}
-                            aria-pressed={isTrashView}
-                            className={cx(
-                                'flex-1 rounded px-3 py-1.5 text-sm font-semibold transition sm:flex-none',
-                                isTrashView ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-zinc-100'
-                            )}
-                        >
-                            Prullenbak ({Number(trashCount || 0)})
-                        </button>
-                    </div>
-                    {!isTrashView && safeUrls.export_incasso_batch && (
-                        <button
-                            type="button"
-                            onClick={() => setExportOpen((open) => !open)}
-                            aria-expanded={exportOpen}
-                            aria-controls="incasso-export-panel"
-                            className="w-full rounded-md border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 sm:w-auto"
-                        >
-                            Incasso exporteren
-                        </button>
-                    )}
-                    {!isTrashView && safeUrls.create && (
-                        <Link
-                            href={safeUrls.create}
-                            className="w-full rounded-md bg-indigo-600 px-4 py-2 text-center text-sm font-semibold text-white hover:bg-indigo-700 sm:w-auto"
-                        >
-                            Nieuwe klant
-                        </Link>
-                    )}
-                    {isTrashView && safeUrls.purge_trash && Number(trashCount || 0) > 0 && (
-                        <button
-                            type="button"
-                            onClick={purgeTrash}
-                            className="w-full rounded-md border border-rose-300 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 sm:w-auto"
-                        >
-                            Prullenbak leegmaken
-                        </button>
-                    )}
+            </PageHeader>
+
+            {!isTrashView && (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <Stat
+                        label={activeStatus === 'alle' && extraFilterCount === 0 ? 'Bedrijven' : 'Bedrijven (gefilterd)'}
+                        value={Number(totals?.bedrijven ?? totalCount).toLocaleString('nl-NL')}
+                    />
+                    <Stat label="MRR actieve klanten" value={formatEuro(totals?.omzet_excl ?? 0)} sub="Excl. btw, alleen status Actief" tone="success" />
+                    <Stat label="Demo-pijplijn" value={formatEuro(totals?.omzet_demo_excl ?? 0)} sub="Excl. btw, klanten in demo" tone="warning" />
                 </div>
-            </div>
+            )}
 
             {!isTrashView && exportOpen && (
-                <div id="incasso-export-panel" className="rounded-xl border border-zinc-200 bg-white p-4">
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
+                <Card id="incasso-export-panel" aria-labelledby="incasso-export-title">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-6 md:items-end">
                         <div className="md:col-span-2">
-                            <div className="text-sm font-semibold text-zinc-900">Exporteer ING incasso</div>
-                            <div className="mt-1 text-xs text-zinc-500">Exporteert alle klanten met status Actief en complete SEPA gegevens.</div>
+                            <h2 id="incasso-export-title" className="text-base font-semibold text-zinc-900">ING incasso exporteren</h2>
+                            <p className="mt-0.5 text-sm text-zinc-500">Alle klanten met status Actief en complete SEPA gegevens.</p>
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600" htmlFor="exportForm-maand">Maand</label>
-                            <select
-                                id="exportForm-maand"
-                                className="mt-1 rounded-md border-zinc-300 text-sm"
-                                value={exportForm.data.maand}
-                                onChange={(e) => exportForm.setData('maand', e.target.value)}
-                            >
+                            <label className="mb-1 block text-sm font-medium text-zinc-800" htmlFor="exportForm-maand">Maand</label>
+                            <select id="exportForm-maand" className={inputClasses} value={exportForm.data.maand} onChange={(e) => exportForm.setData('maand', e.target.value)}>
                                 {maandOpties.map((optie) => (
                                     <option key={optie.value} value={optie.value}>
                                         {optie.label}
@@ -584,13 +593,8 @@ export default function Index({ companies, totals, statusCounts, trashCount, fil
                             </select>
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600" htmlFor="exportForm-jaar">Jaar</label>
-                            <select
-                                id="exportForm-jaar"
-                                className="mt-1 rounded-md border-zinc-300 text-sm"
-                                value={exportForm.data.jaar}
-                                onChange={(e) => exportForm.setData('jaar', e.target.value)}
-                            >
+                            <label className="mb-1 block text-sm font-medium text-zinc-800" htmlFor="exportForm-jaar">Jaar</label>
+                            <select id="exportForm-jaar" className={inputClasses} value={exportForm.data.jaar} onChange={(e) => exportForm.setData('jaar', e.target.value)}>
                                 {jaarOpties.map((jaar) => (
                                     <option key={jaar} value={jaar}>
                                         {jaar}
@@ -599,388 +603,346 @@ export default function Index({ companies, totals, statusCounts, trashCount, fil
                             </select>
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-zinc-600" htmlFor="exportForm-uitvoerdatum">Uitvoerdatum</label>
+                            <label className="mb-1 block text-sm font-medium text-zinc-800" htmlFor="exportForm-uitvoerdatum">Uitvoerdatum</label>
                             <input
                                 id="exportForm-uitvoerdatum"
                                 type="date"
-                                className="mt-1 rounded-md border-zinc-300 text-sm"
+                                className={inputClasses}
                                 value={exportForm.data.uitvoerdatum}
                                 onChange={(e) => exportForm.setData('uitvoerdatum', e.target.value)}
                             />
                         </div>
-                        <button
-                            type="button"
-                            onClick={exportIncasso}
-                            disabled={!exportForm.data.uitvoerdatum || !safeUrls.export_incasso_batch}
-                            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60 md:self-end"
-                        >
-                            Exporteer alle actieve klanten
-                        </button>
+                        <Button onClick={exportIncasso} disabled={!exportForm.data.uitvoerdatum || !safeUrls.export_incasso_batch}>
+                            Exporteren
+                        </Button>
                     </div>
-                </div>
+                </Card>
             )}
 
-            <nav aria-label="Filter op status" className="-mx-1 overflow-x-auto">
-                <ul className="flex min-w-max gap-1 px-1">
-                    {STATUS_TABS.map((tab) => {
-                        const active = activeStatus === tab.value;
-                        const label = tab.value === 'alle' ? tab.label : safeStatusLabels[tab.value] || tab.label;
-                        return (
-                            <li key={tab.value}>
-                                <button
-                                    type="button"
-                                    onClick={() => updateAndRun({ status: tab.value })}
-                                    aria-pressed={active}
-                                    className={cx(
-                                        'inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-semibold transition',
-                                        active
-                                            ? 'border-indigo-600 bg-indigo-600 text-white'
-                                            : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
-                                    )}
-                                >
-                                    {label}
-                                    <span
+            <div className="space-y-3">
+                <nav aria-label="Filter op status" className="-mx-1 overflow-x-auto pb-1">
+                    <ul className="flex min-w-max gap-1.5 px-1">
+                        {STATUS_TABS.map((tab) => {
+                            const active = activeStatus === tab.value;
+                            const label = tab.value === 'alle' ? tab.label : safeStatusLabels[tab.value] || tab.label;
+                            return (
+                                <li key={tab.value}>
+                                    <button
+                                        type="button"
+                                        onClick={() => updateAndRun({ status: tab.value })}
+                                        aria-pressed={active}
                                         className={cx(
-                                            'rounded-full px-1.5 text-xs',
-                                            active ? 'bg-white/20 text-white' : 'bg-zinc-100 text-zinc-700'
+                                            'inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors',
+                                            active ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm' : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50'
                                         )}
                                     >
-                                        {Number(safeCounts[tab.value] || 0).toLocaleString('nl-NL')}
-                                    </span>
-                                </button>
-                            </li>
-                        );
-                    })}
-                </ul>
-            </nav>
+                                        {label}
+                                        <span className={cx('rounded-full px-1.5 text-xs tabular-nums', active ? 'bg-white/20 text-white' : 'bg-zinc-100 text-zinc-600')}>
+                                            {Number(safeCounts[tab.value] || 0).toLocaleString('nl-NL')}
+                                        </span>
+                                    </button>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </nav>
 
-            <div className="md:hidden">
-                <button
-                    type="button"
-                    onClick={() => setFiltersOpen((open) => !open)}
-                    aria-expanded={filtersOpen}
-                    aria-controls="gc-filters"
-                    className="inline-flex w-full items-center justify-between rounded-md border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50"
-                >
-                    <span className="inline-flex items-center gap-2">
-                        Filters
-                        {extraFilterCount > 0 && (
-                            <span className="rounded-full bg-indigo-600 px-2 text-xs text-white">
-                                {extraFilterCount}
-                                <span className="sr-only"> actief</span>
-                            </span>
-                        )}
-                    </span>
-                    <span aria-hidden="true">{filtersOpen ? '▲' : '▼'}</span>
-                </button>
-            </div>
-
-            <form
-                id="gc-filters"
-                onSubmit={submit}
-                className={cx('rounded-xl border border-zinc-200 bg-white p-4 md:block', filtersOpen ? 'block' : 'hidden')}
-            >
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-                    <div>
-                        <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-search">Zoek</label>
-                        <input
-                            id="gc-search"
-                            type="search"
-                            className="mt-1 w-full rounded-md border-zinc-300 text-sm"
-                            aria-describedby="gc-search-hint"
-                            value={data.search}
-                            onChange={(e) => setData('search', e.target.value)}
-                            onKeyDown={submitOnEnter}
-                            placeholder="Bedrijfsnaam, e-mail, IBAN..."
-                        />
-                        <div id="gc-search-hint" className="sr-only">De lijst wordt bijgewerkt terwijl je typt.</div>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-tag">Tag</label>
-                        <input
-                            id="gc-tag"
-                            className="mt-1 w-full rounded-md border-zinc-300 text-sm"
-                            value={data.tag}
-                            onChange={(e) => setData('tag', e.target.value)}
-                            onKeyDown={submitOnEnter}
-                            placeholder="bijv. premium"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-bron">Bron</label>
-                        <select
-                            id="gc-bron"
-                            className="mt-1 w-full rounded-md border-zinc-300 text-sm"
-                            value={data.bron}
-                            onChange={(e) => updateAndRun({ bron: e.target.value })}
-                        >
-                            <option value="">Alle bronnen</option>
-                            {safeSourceOptions.map((source) => (
-                                <option key={source} value={source}>
-                                    {SOURCE_LABELS[source] || source}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-perPage">Per pagina</label>
-                        <select
-                            id="gc-perPage"
-                            className="mt-1 w-full rounded-md border-zinc-300 text-sm"
-                            value={data.perPage}
-                            onChange={(e) => updateAndRun({ perPage: Number(e.target.value) })}
-                        >
-                            {[10, 15, 25, 50].map((value) => (
-                                <option key={value} value={value}>
-                                    {value}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="md:hidden">
-                        <label className="block text-xs font-medium text-zinc-600" htmlFor="gc-sort-mobile">Sortering</label>
-                        <select
-                            id="gc-sort-mobile"
-                            className="mt-1 w-full rounded-md border-zinc-300 text-sm"
-                            value={`${activeSort}:${activeDir}`}
-                            onChange={(e) => {
-                                const [sort, dir] = e.target.value.split(':');
-                                updateAndRun({ sort, dir });
-                            }}
-                        >
-                            {!MOBILE_SORT_OPTIONS.some((o) => o.value === `${activeSort}:${activeDir}`) && (
-                                <option value={`${activeSort}:${activeDir}`}>Huidige sortering</option>
-                            )}
-                            {MOBILE_SORT_OPTIONS.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                    {option.label}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-500" aria-live="polite">
-                    <span>
-                        {filtering ? 'Bezig met laden...' : `Totaal: ${Number(safeCompanies.total || 0).toLocaleString('nl-NL')} bedrijven`}
-                    </span>
-                </div>
-            </form>
-
-            {hasActiveFilters && (
-                <div className="flex flex-wrap items-center gap-3 rounded-md border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm text-indigo-900">
-                    <span className="font-semibold">Filters actief</span>
-                    <span className="text-indigo-800">
-                        {[
-                            activeStatus !== 'alle' ? `Status: ${safeStatusLabels[activeStatus] || activeStatus}` : null,
-                            data.search.trim() ? `Zoek: "${data.search.trim()}"` : null,
-                            data.tag.trim() ? `Tag: "${data.tag.trim()}"` : null,
-                            data.bron ? `Bron: ${SOURCE_LABELS[data.bron] || data.bron}` : null,
-                        ]
-                            .filter(Boolean)
-                            .join(', ')}
-                    </span>
-                    <button
-                        type="button"
-                        onClick={clearFilters}
-                        className="ml-auto font-semibold text-indigo-700 underline underline-offset-2 hover:text-indigo-900"
+                <div className="md:hidden">
+                    <Button
+                        variant="secondary"
+                        className="w-full justify-between"
+                        onClick={() => setFiltersOpen((open) => !open)}
+                        aria-expanded={filtersOpen}
+                        aria-controls="gc-filters"
                     >
-                        Wissen
-                    </button>
+                        <span className="inline-flex items-center gap-2">
+                            Zoeken en filters
+                            {extraFilterCount > 0 && (
+                                <span className="rounded-full bg-indigo-600 px-2 text-xs text-white">
+                                    {extraFilterCount}
+                                    <span className="sr-only"> actief</span>
+                                </span>
+                            )}
+                        </span>
+                        <span aria-hidden="true" className="text-xs">{filtersOpen ? '▲' : '▼'}</span>
+                    </Button>
                 </div>
-            )}
+
+                <Card as="form" id="gc-filters" role="search" onSubmit={submit} className={cx('md:block', filtersOpen ? 'block' : 'hidden')}>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
+                        <div className="md:col-span-5">
+                            <label className="mb-1 block text-sm font-medium text-zinc-800" htmlFor="gc-search">Zoeken</label>
+                            <div className="relative">
+                                <input
+                                    id="gc-search"
+                                    type="search"
+                                    className={cx(inputClasses, 'pr-9')}
+                                    aria-describedby="gc-search-hint"
+                                    value={data.search}
+                                    onChange={(e) => setData('search', e.target.value)}
+                                    onKeyDown={submitOnEnter}
+                                    placeholder="Bedrijfsnaam, e-mail, telefoon, plaats of IBAN"
+                                />
+                                {filtering && (
+                                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-zinc-400">
+                                        <Spinner className="h-4 w-4" />
+                                    </span>
+                                )}
+                            </div>
+                            <p id="gc-search-hint" className="sr-only">De lijst wordt bijgewerkt terwijl je typt.</p>
+                        </div>
+                        <div className="md:col-span-3">
+                            <label className="mb-1 block text-sm font-medium text-zinc-800" htmlFor="gc-tag">Tag</label>
+                            <input
+                                id="gc-tag"
+                                className={inputClasses}
+                                value={data.tag}
+                                onChange={(e) => setData('tag', e.target.value)}
+                                onKeyDown={submitOnEnter}
+                                placeholder="bijv. premium"
+                            />
+                        </div>
+                        <div className="md:col-span-2">
+                            <label className="mb-1 block text-sm font-medium text-zinc-800" htmlFor="gc-bron">Bron</label>
+                            <select id="gc-bron" className={inputClasses} value={data.bron} onChange={(e) => updateAndRun({ bron: e.target.value })}>
+                                <option value="">Alle bronnen</option>
+                                {safeSourceOptions.map((source) => (
+                                    <option key={source} value={source}>
+                                        {SOURCE_LABELS[source] || source}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="md:col-span-2">
+                            <label className="mb-1 block text-sm font-medium text-zinc-800" htmlFor="gc-perPage">Per pagina</label>
+                            <select id="gc-perPage" className={inputClasses} value={data.perPage} onChange={(e) => updateAndRun({ perPage: Number(e.target.value) })}>
+                                {[10, 15, 25, 50].map((value) => (
+                                    <option key={value} value={value}>
+                                        {value}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="md:hidden">
+                            <label className="mb-1 block text-sm font-medium text-zinc-800" htmlFor="gc-sort-mobile">Sortering</label>
+                            <select
+                                id="gc-sort-mobile"
+                                className={inputClasses}
+                                value={`${activeSort}:${activeDir}`}
+                                onChange={(e) => {
+                                    const [sort, dir] = e.target.value.split(':');
+                                    updateAndRun({ sort, dir });
+                                }}
+                            >
+                                {!MOBILE_SORT_OPTIONS.some((o) => o.value === `${activeSort}:${activeDir}`) && (
+                                    <option value={`${activeSort}:${activeDir}`}>Huidige sortering</option>
+                                )}
+                                {MOBILE_SORT_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                </Card>
+
+                <div className="flex min-h-[2rem] flex-wrap items-center gap-x-3 gap-y-1 px-1 text-sm" aria-live="polite">
+                    <span className="font-medium text-zinc-700">
+                        {filtering ? 'Bezig met laden...' : `${totalCount.toLocaleString('nl-NL')} ${totalCount === 1 ? 'klant' : 'klanten'}`}
+                    </span>
+                    {hasActiveFilters && (
+                        <>
+                            <span className="text-zinc-500">{filterSummary.join(', ')}</span>
+                            <button type="button" onClick={clearFilters} className="font-semibold text-indigo-700 underline underline-offset-2 hover:text-indigo-900">
+                                Filters wissen
+                            </button>
+                        </>
+                    )}
+                </div>
+            </div>
 
             {bulkEnabled && selected.length > 0 && (
                 <div
                     role="region"
                     aria-label="Bulkacties"
-                    className="flex flex-col gap-3 rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm sm:flex-row sm:flex-wrap sm:items-center"
+                    className="sticky top-2 z-10 flex flex-col gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm shadow-sm sm:flex-row sm:flex-wrap sm:items-center"
                 >
-                    <span className="font-semibold text-zinc-900">{selected.length} geselecteerd</span>
-                    {safeUrls.export_csv && (
-                        <button
-                            type="button"
-                            onClick={exportSelected}
-                            className="rounded-md border border-zinc-200 bg-white px-3 py-1.5 font-semibold text-zinc-700 hover:bg-zinc-100"
-                        >
-                            Exporteren (CSV)
-                        </button>
-                    )}
-                    {safeUrls.bulk_tag && !bulkTagOpen && (
-                        <button
-                            type="button"
-                            onClick={() => setBulkTagOpen(true)}
-                            className="rounded-md border border-zinc-200 bg-white px-3 py-1.5 font-semibold text-zinc-700 hover:bg-zinc-100"
-                        >
-                            Tag toevoegen
-                        </button>
-                    )}
-                    {safeUrls.bulk_tag && bulkTagOpen && (
-                        <form onSubmit={addTagToSelected} className="flex items-center gap-2">
-                            <label htmlFor="gc-bulk-tag" className="sr-only">Tag</label>
-                            <input
-                                id="gc-bulk-tag"
-                                autoFocus
-                                className="w-40 rounded-md border-zinc-300 text-sm"
-                                value={bulkTag}
-                                maxLength={50}
-                                onChange={(e) => setBulkTag(e.target.value)}
-                                placeholder="Nieuwe tag"
-                            />
-                            <button
-                                type="submit"
-                                disabled={bulkBusy || !bulkTag.trim()}
-                                className="rounded-md bg-indigo-600 px-3 py-1.5 font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                                {bulkBusy ? 'Bezig...' : 'Toevoegen'}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setBulkTagOpen(false);
-                                    setBulkTag('');
-                                }}
-                                className="text-zinc-600 underline underline-offset-2 hover:text-zinc-900"
-                            >
-                                Annuleren
-                            </button>
-                        </form>
-                    )}
-                    <button
-                        type="button"
-                        onClick={() => setSelected([])}
-                        className="text-zinc-600 underline underline-offset-2 hover:text-zinc-900 sm:ml-auto"
-                    >
+                    <span className="font-semibold text-indigo-900">{selected.length} geselecteerd</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                        {safeUrls.export_csv && (
+                            <Button variant="secondary" size="sm" onClick={exportSelected}>
+                                Exporteren (CSV)
+                            </Button>
+                        )}
+                        {safeUrls.bulk_tag && !bulkTagOpen && (
+                            <Button variant="secondary" size="sm" onClick={() => setBulkTagOpen(true)}>
+                                Tag toevoegen
+                            </Button>
+                        )}
+                        {safeUrls.bulk_tag && bulkTagOpen && (
+                            <form onSubmit={addTagToSelected} className="flex flex-wrap items-center gap-2">
+                                <label htmlFor="gc-bulk-tag" className="sr-only">Tag</label>
+                                <input
+                                    id="gc-bulk-tag"
+                                    autoFocus
+                                    className={cx(inputClasses, 'h-8 w-44 py-1')}
+                                    value={bulkTag}
+                                    maxLength={50}
+                                    aria-invalid={bulkTagError ? 'true' : undefined}
+                                    aria-describedby={bulkTagError ? 'gc-bulk-tag-error' : undefined}
+                                    onChange={(e) => {
+                                        setBulkTag(e.target.value);
+                                        if (bulkTagError) setBulkTagError('');
+                                    }}
+                                    placeholder="Nieuwe tag"
+                                />
+                                <Button type="submit" size="sm" loading={bulkBusy} disabled={!bulkTag.trim()}>
+                                    Toevoegen
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                        setBulkTagOpen(false);
+                                        setBulkTag('');
+                                        setBulkTagError('');
+                                    }}
+                                >
+                                    Annuleren
+                                </Button>
+                                {bulkTagError && (
+                                    <p id="gc-bulk-tag-error" role="alert" className="w-full text-xs font-medium text-rose-700">
+                                        {bulkTagError}
+                                    </p>
+                                )}
+                            </form>
+                        )}
+                    </div>
+                    <Button variant="ghost" size="sm" className="sm:ml-auto" onClick={() => setSelected([])}>
                         Selectie wissen
-                    </button>
+                    </Button>
                 </div>
             )}
 
-            <div className="space-y-3 md:hidden">
+            <div className={cx('space-y-3 transition-opacity md:hidden', filtering && 'opacity-60')} aria-busy={filtering || undefined}>
                 {bulkEnabled && rows.length > 0 && (
-                    <label className="flex items-center gap-2 px-1 text-sm text-zinc-700">
-                        <input type="checkbox" className="rounded border-zinc-300" checked={allSelected} onChange={toggleAll} />
+                    <label className="flex min-h-[2.5rem] items-center gap-3 px-1 text-sm text-zinc-700">
+                        <input type="checkbox" className="h-5 w-5 rounded border-zinc-300 text-indigo-600" checked={allSelected} onChange={toggleAll} />
                         Alles op deze pagina selecteren
                     </label>
                 )}
                 {rows.length === 0 && (
-                    <div className="rounded-xl border border-zinc-200 bg-white px-4 py-10 text-center text-sm text-zinc-600">
-                        <EmptyState isTrashView={isTrashView} hasActiveFilters={hasActiveFilters} onClear={clearFilters} />
-                    </div>
+                    <ListEmptyState isTrashView={isTrashView} hasActiveFilters={hasActiveFilters} onClear={clearFilters} createUrl={safeUrls.create} />
                 )}
-                {rows.map((company) => (
-                    <div
-                        key={company.id}
-                        onClick={(e) => openCompany(e, company)}
-                        className={cx(
-                            'rounded-xl border bg-white p-4',
-                            selected.includes(company.id) ? 'border-indigo-300 ring-1 ring-indigo-200' : 'border-zinc-200',
-                            company.show_url && 'cursor-pointer'
-                        )}
-                    >
-                        <div className="flex items-start justify-between gap-3">
-                            <div className="flex min-w-0 items-start gap-3">
-                                {bulkEnabled && (
-                                    <input
-                                        type="checkbox"
-                                        className="mt-0.5 rounded border-zinc-300"
-                                        checked={selected.includes(company.id)}
-                                        onChange={() => toggleOne(company.id)}
-                                        aria-label={`Selecteer ${company.bedrijfsnaam}`}
-                                    />
-                                )}
-                                <div className="min-w-0">
-                                    {company.show_url ? (
-                                        <Link href={company.show_url} className="text-sm font-semibold text-zinc-900 hover:underline">
-                                            {company.bedrijfsnaam}
-                                        </Link>
-                                    ) : (
-                                        <div className="text-sm font-semibold text-zinc-900">{company.bedrijfsnaam}</div>
+                {rows.map((company) => {
+                    const isSelected = selected.includes(company.id);
+                    return (
+                        <article
+                            key={company.id}
+                            onClick={(e) => openCompany(e, company)}
+                            className={cx(
+                                'rounded-xl border bg-white p-4 shadow-sm',
+                                isSelected ? 'border-indigo-300 ring-1 ring-indigo-200' : 'border-zinc-200',
+                                company.show_url && 'cursor-pointer'
+                            )}
+                        >
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="flex min-w-0 items-start gap-3">
+                                    {bulkEnabled && (
+                                        <input
+                                            type="checkbox"
+                                            className="mt-0.5 h-5 w-5 shrink-0 rounded border-zinc-300 text-indigo-600"
+                                            checked={isSelected}
+                                            onChange={() => toggleOne(company.id)}
+                                            aria-label={`Selecteer ${company.bedrijfsnaam}`}
+                                        />
                                     )}
-                                    <div className="text-xs text-zinc-500">{company.plaats || '-'}</div>
+                                    <div className="min-w-0">
+                                        {company.show_url ? (
+                                            <Link href={company.show_url} className="break-words text-base font-semibold text-zinc-900 hover:underline">
+                                                {company.bedrijfsnaam}
+                                            </Link>
+                                        ) : (
+                                            <h3 className="break-words text-base font-semibold text-zinc-900">{company.bedrijfsnaam}</h3>
+                                        )}
+                                        <div className="text-sm text-zinc-500">{company.plaats || 'Plaats onbekend'}</div>
+                                    </div>
                                 </div>
+                                <StatusBadge status={company.status} labels={safeStatusLabels} />
                             </div>
-                            <StatusBadge status={company.status} labels={safeStatusLabels} />
-                        </div>
-                        <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                            <div className="text-zinc-500">Contact</div>
-                            <div className="break-all text-right text-zinc-700">
-                                {company.hoofd_email ? <a href={`mailto:${company.hoofd_email}`} className="hover:underline">{company.hoofd_email}</a> : '-'}
-                            </div>
-                            <div className="text-zinc-500">Telefoon</div>
-                            <div className="text-right text-zinc-700">
-                                {company.hoofd_telefoon ? <a href={`tel:${company.hoofd_telefoon.replace(/[^\d+]/g, '')}`} className="hover:underline">{company.hoofd_telefoon}</a> : '-'}
-                            </div>
-                            {!isTrashView && (
-                                <>
-                                    <div className="text-zinc-500">Volgende actie</div>
-                                    <div className="text-right"><NextAction action={company.volgende_actie} /></div>
-                                    <div className="text-zinc-500">Demo eindigt</div>
-                                    <div className="text-right"><DemoEnd value={company.demo_eind_op} status={company.status} computed={company.demo_eind_berekend} /></div>
-                                </>
-                            )}
-                            <div className="text-zinc-500">Gebruikers</div>
-                            <div className="text-right text-zinc-700">{company.actieve_seats}</div>
-                            <div className="text-zinc-500">Omzet excl.</div>
-                            <div className="text-right text-zinc-700">{formatEuro(company.omzet_excl)}</div>
-                            <div className="text-zinc-500">{isTrashView ? 'Verwijderd op' : 'Laatst bijgewerkt'}</div>
-                            <div className="text-right text-zinc-700">
-                                {isTrashView ? formatDateTime(company.deleted_at) : formatDateTime(company.updated_at)}
-                            </div>
-                        </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                            {company.hoofd_telefoon && (
-                                <a
-                                    href={`tel:${company.hoofd_telefoon.replace(/[^\d+]/g, '')}`}
-                                    className="inline-flex min-h-[40px] items-center gap-1.5 rounded-md border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
-                                >
-                                    <PhoneIcon />
-                                    Bellen
-                                </a>
-                            )}
-                            {company.hoofd_email && (
-                                <a
-                                    href={`mailto:${company.hoofd_email}`}
-                                    className="inline-flex min-h-[40px] items-center gap-1.5 rounded-md border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
-                                >
-                                    <MailIcon />
-                                    Mailen
-                                </a>
-                            )}
-                            {isTrashView ? (
-                                <>
-                                    <button
-                                        type="button"
-                                        onClick={() => restoreCompany(company)}
-                                        className="rounded-md border border-emerald-200 px-2.5 py-1.5 text-xs text-emerald-700 hover:bg-emerald-50"
-                                    >
-                                        Herstel
-                                    </button>
-                                    {company.force_delete_url && (
-                                        <button
-                                            type="button"
-                                            onClick={() => forceDeleteCompany(company)}
-                                            className="rounded-md border border-rose-200 px-2.5 py-1.5 text-xs text-rose-600 hover:bg-rose-50"
-                                        >
-                                            Definitief verwijderen
-                                        </button>
+
+                            <dl className="mt-3 grid grid-cols-[auto,1fr] gap-x-4 gap-y-2 text-sm">
+                                {!isTrashView && (
+                                    <>
+                                        <dt className="text-zinc-500">Volgende actie</dt>
+                                        <dd className="min-w-0 text-right"><NextAction action={company.volgende_actie} /></dd>
+                                        {['demo_aangevraagd', 'proefperiode'].includes(company.status) && (
+                                            <>
+                                                <dt className="text-zinc-500">Demo eindigt</dt>
+                                                <dd className="text-right"><DemoEnd value={company.demo_eind_op} status={company.status} computed={company.demo_eind_berekend} /></dd>
+                                            </>
+                                        )}
+                                    </>
+                                )}
+                                {company.hoofd_email && (
+                                    <>
+                                        <dt className="text-zinc-500">E-mail</dt>
+                                        <dd className="min-w-0 truncate text-right text-zinc-700" title={company.hoofd_email}>{company.hoofd_email}</dd>
+                                    </>
+                                )}
+                                <dt className="text-zinc-500">Gebruikers</dt>
+                                <dd className="text-right tabular-nums text-zinc-700">{company.actieve_seats}</dd>
+                                <dt className="text-zinc-500">Omzet excl.</dt>
+                                <dd className="text-right tabular-nums text-zinc-700">{formatEuro(company.omzet_excl)}</dd>
+                                <dt className="text-zinc-500">{isTrashView ? 'Verwijderd op' : 'Bijgewerkt'}</dt>
+                                <dd className="text-right text-zinc-700">{formatDateTime(isTrashView ? company.deleted_at : company.updated_at)}</dd>
+                            </dl>
+
+                            {(company.hoofd_telefoon || company.hoofd_email || isTrashView) && (
+                                <div className="mt-3 flex flex-wrap gap-2 border-t border-zinc-100 pt-3">
+                                    {company.hoofd_telefoon && (
+                                        <a href={telHref(company.hoofd_telefoon)} className={buttonClasses({ variant: 'secondary', size: 'lg', className: 'flex-1' })}>
+                                            <PhoneIcon />
+                                            Bellen
+                                        </a>
                                     )}
-                                </>
-                            ) : null}
-                        </div>
-                    </div>
-                ))}
+                                    {company.hoofd_email && (
+                                        <a href={`mailto:${company.hoofd_email}`} className={buttonClasses({ variant: 'secondary', size: 'lg', className: 'flex-1' })}>
+                                            <MailIcon />
+                                            Mailen
+                                        </a>
+                                    )}
+                                    {isTrashView && company.restore_url && (
+                                        <Button variant="secondary" size="lg" className="flex-1" onClick={() => restoreCompany(company)}>
+                                            Herstellen
+                                        </Button>
+                                    )}
+                                    {isTrashView && company.force_delete_url && (
+                                        <Button variant="danger-ghost" size="lg" className="flex-1" onClick={() => forceDeleteCompany(company)}>
+                                            Definitief verwijderen
+                                        </Button>
+                                    )}
+                                </div>
+                            )}
+                        </article>
+                    );
+                })}
             </div>
 
-            <div className="hidden overflow-x-auto rounded-xl border border-zinc-200 bg-white md:block">
-                <table className="min-w-full divide-y divide-zinc-100">
-                    <thead className="bg-zinc-50">
+            <div className={cx(tableClasses.wrapper, 'hidden transition-opacity md:block', filtering && 'opacity-60')} aria-busy={filtering || undefined}>
+                <table className={tableClasses.table}>
+                    <caption className="sr-only">
+                        {isTrashView ? 'Verwijderde klanten' : 'Klanten'}, sorteerbaar via de kolomkoppen
+                    </caption>
+                    <thead className={tableClasses.thead}>
                         <tr>
                             {bulkEnabled && (
-                                <th scope="col" className="w-10 px-4 py-3">
+                                <th scope="col" className="w-10 px-4 py-2.5">
                                     <input
                                         ref={selectAllRef}
                                         type="checkbox"
-                                        className="rounded border-zinc-300"
+                                        className="rounded border-zinc-300 text-indigo-600"
                                         checked={allSelected}
                                         onChange={toggleAll}
                                         disabled={rows.length === 0}
@@ -991,129 +953,106 @@ export default function Index({ companies, totals, statusCounts, trashCount, fil
                             <SortHeader field="naam" label="Bedrijf" sort={activeSort} dir={activeDir} onSort={onSort} />
                             <SortHeader field="status" label="Status" sort={activeSort} dir={activeDir} onSort={onSort} />
                             <SortHeader field="plaats" label="Plaats" sort={activeSort} dir={activeDir} onSort={onSort} />
-                            <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Contact</th>
+                            <th scope="col" className={tableClasses.th}>Contact</th>
                             <SortHeader field="volgende_actie" label="Volgende actie" sort={activeSort} dir={activeDir} onSort={onSort} />
                             <SortHeader field="demo_eind" label="Demo eindigt" sort={activeSort} dir={activeDir} onSort={onSort} />
-                            <SortHeader field="omzet" label="Omzet excl." sort={activeSort} dir={activeDir} onSort={onSort} />
+                            <SortHeader field="omzet" label="Omzet excl." sort={activeSort} dir={activeDir} onSort={onSort} className="text-right" />
                             {isTrashView ? (
-                                <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-zinc-600">Verwijderd op</th>
+                                <th scope="col" className={tableClasses.th}>Verwijderd op</th>
                             ) : (
                                 <SortHeader field="bijgewerkt" label="Bijgewerkt" sort={activeSort} dir={activeDir} onSort={onSort} />
                             )}
-                            <th scope="col" className="px-4 py-3">
-                                <span className="sr-only">Acties</span>
-                            </th>
+                            {isTrashView && (
+                                <th scope="col" className={tableClasses.th}>
+                                    <span className="sr-only">Acties</span>
+                                </th>
+                            )}
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-zinc-100">
+                    <tbody className={tableClasses.tbody}>
                         {rows.length === 0 && (
                             <tr>
-                                <td colSpan={columnCount} className="px-4 py-10 text-center text-sm text-zinc-600">
-                                    <EmptyState isTrashView={isTrashView} hasActiveFilters={hasActiveFilters} onClear={clearFilters} />
+                                <td colSpan={columnCount} className="p-4">
+                                    <ListEmptyState isTrashView={isTrashView} hasActiveFilters={hasActiveFilters} onClear={clearFilters} createUrl={safeUrls.create} />
                                 </td>
                             </tr>
                         )}
-                        {rows.map((company) => (
-                            <tr
-                                key={company.id}
-                                onClick={(e) => openCompany(e, company)}
-                                className={cx(
-                                    'hover:bg-zinc-50',
-                                    company.show_url && 'cursor-pointer',
-                                    selected.includes(company.id) && 'bg-indigo-50/50'
-                                )}
-                            >
-                                {bulkEnabled && (
-                                    <td className="px-4 py-3">
-                                        <input
-                                            type="checkbox"
-                                            className="rounded border-zinc-300"
-                                            checked={selected.includes(company.id)}
-                                            onChange={() => toggleOne(company.id)}
-                                            aria-label={`Selecteer ${company.bedrijfsnaam}`}
-                                        />
-                                    </td>
-                                )}
-                                <td className="px-4 py-3 text-sm font-semibold">
-                                    {company.show_url ? (
-                                        <Link href={company.show_url} className="text-zinc-900 hover:underline">
-                                            {company.bedrijfsnaam}
-                                        </Link>
-                                    ) : (
-                                        company.bedrijfsnaam
+                        {rows.map((company) => {
+                            const isSelected = selected.includes(company.id);
+                            return (
+                                <tr
+                                    key={company.id}
+                                    onClick={(e) => openCompany(e, company)}
+                                    className={cx(tableClasses.tr, company.show_url && 'cursor-pointer', isSelected && 'bg-indigo-50/60')}
+                                >
+                                    {bulkEnabled && (
+                                        <td className="px-4 py-3">
+                                            <input
+                                                type="checkbox"
+                                                className="rounded border-zinc-300 text-indigo-600"
+                                                checked={isSelected}
+                                                onChange={() => toggleOne(company.id)}
+                                                aria-label={`Selecteer ${company.bedrijfsnaam}`}
+                                            />
+                                        </td>
                                     )}
-                                </td>
-                                <td className="px-4 py-3 text-sm">
-                                    <StatusBadge status={company.status} labels={safeStatusLabels} />
-                                </td>
-                                <td className="px-4 py-3 text-sm text-zinc-700">{company.plaats || '-'}</td>
-                                <td className="px-4 py-3 text-sm">
-                                    <div className="break-all">
+                                    <td className={cx(tableClasses.td, 'font-semibold text-zinc-900')}>
+                                        {company.show_url ? (
+                                            <Link href={company.show_url} className="hover:text-indigo-700 hover:underline">
+                                                {company.bedrijfsnaam}
+                                            </Link>
+                                        ) : (
+                                            company.bedrijfsnaam
+                                        )}
+                                    </td>
+                                    <td className={tableClasses.td}>
+                                        <StatusBadge status={company.status} labels={safeStatusLabels} />
+                                    </td>
+                                    <td className={tableClasses.td}>{company.plaats || <span className="text-zinc-400">-</span>}</td>
+                                    <td className={cx(tableClasses.td, 'max-w-[16rem]')}>
                                         {company.hoofd_email ? (
-                                            <a href={`mailto:${company.hoofd_email}`} className="text-zinc-800 hover:text-indigo-700 hover:underline">
+                                            <a href={`mailto:${company.hoofd_email}`} className="block truncate text-zinc-800 hover:text-indigo-700 hover:underline" title={company.hoofd_email}>
                                                 {company.hoofd_email}
                                             </a>
-                                        ) : '-'}
-                                    </div>
-                                    <div className="text-xs text-zinc-500">
+                                        ) : (
+                                            <span className="text-zinc-400">Geen e-mail</span>
+                                        )}
                                         {company.hoofd_telefoon ? (
-                                            <a href={`tel:${company.hoofd_telefoon.replace(/[^\d+]/g, '')}`} className="hover:text-indigo-700 hover:underline">
+                                            <a href={telHref(company.hoofd_telefoon)} className="block text-xs text-zinc-500 hover:text-indigo-700 hover:underline">
                                                 {company.hoofd_telefoon}
                                             </a>
-                                        ) : '-'}
-                                    </div>
-                                </td>
-                                <td className="px-4 py-3 text-sm"><NextAction action={company.volgende_actie} /></td>
-                                <td className="px-4 py-3 text-sm"><DemoEnd value={company.demo_eind_op} status={company.status} computed={company.demo_eind_berekend} /></td>
-                                <td className="px-4 py-3 text-sm">{formatEuro(company.omzet_excl)}</td>
-                                <td className="px-4 py-3 text-sm text-zinc-600">
-                                    {isTrashView ? formatDateTime(company.deleted_at) : formatDateTime(company.updated_at)}
-                                </td>
-                                <td className="px-4 py-3 text-right">
-                                    {isTrashView ? (
-                                        <div className="flex items-center justify-end gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => restoreCompany(company)}
-                                                className="rounded-md border border-emerald-200 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50"
-                                            >
-                                                Herstel
-                                            </button>
-                                            {company.force_delete_url && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => forceDeleteCompany(company)}
-                                                    className="rounded-md border border-rose-200 px-2 py-1 text-xs text-rose-600 hover:bg-rose-50"
-                                                >
-                                                    Definitief verwijderen
-                                                </button>
-                                            )}
-                                        </div>
-                                    ) : null}
-                                </td>
-                            </tr>
-                        ))}
+                                        ) : null}
+                                    </td>
+                                    <td className={tableClasses.td}><NextAction action={company.volgende_actie} /></td>
+                                    <td className={cx(tableClasses.td, 'whitespace-nowrap')}><DemoEnd value={company.demo_eind_op} status={company.status} computed={company.demo_eind_berekend} /></td>
+                                    <td className={cx(tableClasses.td, 'whitespace-nowrap text-right tabular-nums')}>{formatEuro(company.omzet_excl)}</td>
+                                    <td className={cx(tableClasses.td, 'whitespace-nowrap text-zinc-500')}>
+                                        {formatDateTime(isTrashView ? company.deleted_at : company.updated_at)}
+                                    </td>
+                                    {isTrashView && (
+                                        <td className={cx(tableClasses.td, 'text-right')}>
+                                            <div className="flex items-center justify-end gap-2">
+                                                {company.restore_url && (
+                                                    <Button variant="secondary" size="sm" onClick={() => restoreCompany(company)}>
+                                                        Herstellen
+                                                    </Button>
+                                                )}
+                                                {company.force_delete_url && (
+                                                    <Button variant="danger-ghost" size="sm" onClick={() => forceDeleteCompany(company)}>
+                                                        Definitief verwijderen
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    )}
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>
 
             <Pagination links={safeCompanies.links} lastPage={safeCompanies.last_page} />
-
-            <div className="rounded-xl border border-zinc-200 bg-white p-4">
-                <div className="mb-3 text-sm font-semibold text-zinc-900">Totaal overzicht</div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3">
-                        <div className="text-xs font-medium text-zinc-500">Totale bedrijven</div>
-                        <div className="mt-1 text-xl font-semibold text-zinc-900">
-                            {Number(totals?.bedrijven ?? safeCompanies.total ?? 0).toLocaleString('nl-NL')}
-                        </div>
-                    </div>
-                    <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3">
-                        <div className="text-xs font-medium text-zinc-500">MRR actieve klanten excl. btw</div>
-                        <div className="mt-1 text-xl font-semibold text-zinc-900">{formatEuro(totals?.omzet_excl ?? 0)}</div>
-                    </div>
-                </div>
-            </div>
         </div>
     );
 }

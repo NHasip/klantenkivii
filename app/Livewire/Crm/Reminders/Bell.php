@@ -124,7 +124,10 @@ class Bell extends Component
                     ->get(['id', 'garage_company_id', 'titel', 'due_at'])
                     ->map(fn (Activity $activity) => [
                         'label' => $activity->titel,
-                        'meta' => trim(($activity->garageCompany?->bedrijfsnaam ?? '').' · '.$activity->due_at?->format('d-m-Y H:i'), ' ·'),
+                        'meta' => implode(' · ', array_filter([
+                            $activity->garageCompany?->bedrijfsnaam,
+                            $activity->due_at?->format('d-m-Y H:i'),
+                        ], fn ($part) => filled($part))) ?: null,
                         'url' => route('crm.garage_companies.show', ['garageCompany' => $activity->garage_company_id, 'tab' => 'taken_afspraken']),
                         'overdue' => $activity->due_at?->lt($now) ?? false,
                     ])->all(),
@@ -154,6 +157,8 @@ class Bell extends Component
                             'meta' => ($end->lt($now) ? 'Verlopen op ' : 'Eindigt op ').$end->format('d-m-Y').($company->demoEndIsComputed() ? ' (berekend)' : ''),
                             'url' => route('crm.garage_companies.show', ['garageCompany' => $company->id, 'tab' => 'demo_status']),
                             'overdue' => $end->lt($now),
+                            // De meta zegt al "Verlopen op", geen extra "Te laat"-label nodig.
+                            'overdueLabel' => false,
                         ];
                     })->values()->all(),
             ];

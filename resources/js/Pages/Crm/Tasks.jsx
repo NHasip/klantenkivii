@@ -6,6 +6,8 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities';
 import { useDialog } from '../../components/useDialog';
 import { MultiSelectChips } from '../../components/MultiSelectChips';
+import { useConfirm } from '../../components/ConfirmProvider';
+import { Badge, Button, EmptyState, PageHeader, Spinner, cx, inputClasses, tableClasses } from '../../components/ui';
 
 function dedupeById(list) {
     const seen = new Set();
@@ -78,12 +80,20 @@ function priorityMeta(value) {
         case 'kritiek':
             return { label: 'Kritiek', className: 'bg-rose-600 text-white' };
         case 'hoog':
-            return { label: 'Hoog', className: 'bg-amber-500 text-white' };
+            return { label: 'Hoog', className: 'bg-amber-100 text-amber-900 ring-1 ring-inset ring-amber-300' };
         case 'laag':
-            return { label: 'Laag', className: 'bg-zinc-200 text-zinc-800' };
+            return { label: 'Laag', className: 'bg-zinc-100 text-zinc-700 ring-1 ring-inset ring-zinc-200' };
         default:
-            return { label: 'Normaal', className: 'bg-indigo-50 text-indigo-700' };
+            return { label: 'Normaal', className: 'bg-indigo-50 text-indigo-800 ring-1 ring-inset ring-indigo-200' };
     }
+}
+
+function statusTone(value) {
+    return { open: 'neutral', in_behandeling: 'info', wacht_op_klant: 'warning', afgerond: 'success' }[value] ?? 'neutral';
+}
+
+function countLabel(n, one, many) {
+    return `${n} ${n === 1 ? one : many}`;
 }
 
 function initials(name) {
@@ -95,10 +105,6 @@ function initials(name) {
         .join('')
         .slice(0, 2)
         .toUpperCase();
-}
-
-function cx(...parts) {
-    return parts.filter(Boolean).join(' ');
 }
 
 function parseId(value) {
@@ -123,6 +129,36 @@ function isOverdue(task) {
 function OverdueBadge() {
     return <span className="inline-flex shrink-0 items-center rounded-full bg-rose-600 px-2 py-0.5 text-[11px] font-semibold text-white">Te laat</span>;
 }
+
+const EMPTY_TASK_FORM = {
+    titel: '',
+    omschrijving: '',
+    task_project_id: '',
+    status: 'open',
+    prioriteit: 'normaal',
+    deadline: '',
+    labels: '',
+    assignees: [],
+    customer: null,
+};
+
+// Velden van het detailformulier, om niet opgeslagen wijzigingen te herkennen.
+function detailSnapshot(task) {
+    if (!task) return '';
+    return JSON.stringify([
+        task.titel ?? '',
+        task.omschrijving ?? '',
+        task.labels ?? '',
+        task.prioriteit ?? '',
+        task.task_project_id ?? null,
+        toLocalInputValue(task.deadline),
+        task.customer?.id ?? null,
+        task.status ?? '',
+        (task.assignees ?? []).map((a) => Number(a.id)).sort((a, b) => a - b),
+    ]);
+}
+
+const FILTER_LABEL = 'block text-xs font-medium text-zinc-600';
 
 const VIEW_TO_URL = { list: 'lijst', board: 'bord', team: 'team' };
 const URL_TO_VIEW = { lijst: 'list', bord: 'board', team: 'team' };
@@ -224,7 +260,7 @@ function CustomerPicker({ id, value, onChange, placeholder = 'Zoek een klant...'
                 aria-autocomplete="list"
                 aria-activedescendant={active >= 0 ? `${listId}-${active}` : undefined}
                 autoComplete="off"
-                className="w-full rounded-md border-zinc-300 text-sm"
+                className={inputClasses}
                 placeholder={placeholder}
                 value={query}
                 onFocus={() => setOpen(true)}
@@ -278,18 +314,6 @@ function CustomerPicker({ id, value, onChange, placeholder = 'Zoek een klant...'
     );
 }
 
-function Button({ tone = 'primary', className = '', ...props }) {
-    const base =
-        'inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60';
-    const tones = {
-        primary: 'bg-indigo-600 text-white hover:bg-indigo-700',
-        secondary: 'bg-white text-zinc-900 ring-1 ring-zinc-200 hover:bg-zinc-50',
-        ghost: 'bg-transparent text-zinc-700 hover:bg-zinc-100',
-        danger: 'bg-rose-600 text-white hover:bg-rose-500',
-    };
-    return <button type="button" className={cx(base, tones[tone], className)} {...props} />;
-}
-
 function Pill({ children, className = '' }) {
     return (
         <span className={cx('inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-700', className)}>
@@ -307,15 +331,19 @@ function SortableTaskCard({ task, onOpen }) {
         <div
             ref={setNodeRef}
             style={style}
-            className={cx('cursor-grab rounded-xl border bg-white p-3 shadow-sm', isDragging ? 'opacity-60' : 'opacity-100')}
+            className={cx(
+                'cursor-grab touch-manipulation rounded-lg border bg-white p-3 shadow-sm transition-shadow hover:border-zinc-300 hover:shadow active:cursor-grabbing',
+                isOverdue(task) ? 'border-rose-200 border-l-4 border-l-rose-500' : 'border-zinc-200',
+                isDragging ? 'opacity-50' : 'opacity-100',
+            )}
             aria-roledescription={attributes['aria-roledescription']}
             {...listeners}
         >
             {/* Alleen de knop is focusbaar; de kaart zelf is geen extra tab-stop. */}
-            <button type="button" className="w-full rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400" onClick={() => onOpen(task.id)} title={task.titel}>
+            <button type="button" className="w-full rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2" onClick={() => onOpen(task.id)} title={task.titel}>
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold text-zinc-900">{task.titel}</div>
+                        <div className="line-clamp-2 text-sm font-semibold text-zinc-900">{task.titel}</div>
                         {task.project?.naam ? <div className="mt-1 truncate text-xs text-zinc-500">{task.project.naam}</div> : null}
                     </div>
                     <span className={cx('shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold', priorityMeta(task.prioriteit).className)}>
@@ -330,15 +358,16 @@ function SortableTaskCard({ task, onOpen }) {
                         ) : (
                             <Pill className="text-zinc-400">Geen deadline</Pill>
                         )}
-                        {task.counts?.comments ? <Pill>{task.counts.comments} {task.counts.comments === 1 ? 'reactie' : 'reacties'}</Pill> : null}
-                        {task.counts?.attachments ? <Pill>{task.counts.attachments} bijlagen</Pill> : null}
+                        {task.counts?.comments ? <Pill>{countLabel(task.counts.comments, 'reactie', 'reacties')}</Pill> : null}
+                        {task.counts?.attachments ? <Pill>{countLabel(task.counts.attachments, 'bijlage', 'bijlagen')}</Pill> : null}
                     </div>
                     <div className="flex items-center gap-1">
                         {task.assignees?.slice(0, 2).map((a) => (
                             <span
                                 key={a.id}
-                                className="grid h-7 w-7 place-items-center rounded-full bg-zinc-100 text-xs font-bold text-zinc-700"
+                                className="grid h-7 w-7 place-items-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-800 ring-2 ring-white"
                                 title={a.name}
+                                aria-label={a.name}
                             >
                                 {initials(a.name) || '--'}
                             </span>
@@ -371,7 +400,10 @@ function DroppableBody({ id, children }) {
     return (
         <div
             ref={setNodeRef}
-            className={cx('min-h-[6rem] flex-1 space-y-3 overflow-y-auto px-4 py-3 transition-colors', isOver && 'bg-indigo-50/60')}
+            className={cx(
+                'min-h-[6rem] flex-1 space-y-2 overflow-y-auto p-3 transition-colors lg:max-h-[calc(100vh-22rem)]',
+                isOver && 'bg-indigo-50/70 ring-2 ring-inset ring-indigo-300',
+            )}
         >
             {children}
         </div>
@@ -380,20 +412,22 @@ function DroppableBody({ id, children }) {
 
 function Column({ title, subtitle, count, children, footer, droppableId = null }) {
     return (
-        <div className="flex w-[min(340px,85vw)] flex-col rounded-2xl border border-zinc-200 bg-zinc-50/60">
-            <div className="flex items-start justify-between gap-3 border-b border-zinc-200 px-4 py-3">
+        <div className="flex w-[min(320px,85vw)] flex-col rounded-xl border border-zinc-200 bg-zinc-50">
+            <div className="flex items-start justify-between gap-3 border-b border-zinc-200 px-3 py-3">
                 <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-zinc-900">{title}</div>
+                    <h2 className="truncate text-sm font-semibold text-zinc-900" title={title}>{title}</h2>
                     {subtitle ? <div className="mt-0.5 truncate text-xs text-zinc-500">{subtitle}</div> : null}
                 </div>
-                <span className="shrink-0 rounded-full bg-zinc-200 px-2 py-0.5 text-xs font-semibold text-zinc-700">{count}</span>
+                <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-semibold tabular-nums text-zinc-700 ring-1 ring-inset ring-zinc-200" aria-label={countLabel(count, 'taak', 'taken')}>
+                    {count}
+                </span>
             </div>
             {droppableId ? (
                 <DroppableBody id={droppableId}>{children}</DroppableBody>
             ) : (
-                <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">{children}</div>
+                <div className="flex-1 space-y-2 overflow-y-auto p-3">{children}</div>
             )}
-            {footer ? <div className="border-t border-zinc-200 px-4 py-3">{footer}</div> : null}
+            {footer ? <div className="border-t border-zinc-200 p-3">{footer}</div> : null}
         </div>
     );
 }
@@ -401,7 +435,7 @@ function Column({ title, subtitle, count, children, footer, droppableId = null }
 function TaskOverlay({ task }) {
     if (!task) return null;
     return (
-        <div className="w-[min(330px,80vw)] rounded-xl border bg-white p-3 shadow-lg">
+        <div className="w-[min(300px,80vw)] rotate-1 cursor-grabbing rounded-lg border border-indigo-200 bg-white p-3 shadow-xl">
             <div className="truncate text-sm font-semibold text-zinc-900">{task.titel}</div>
             <div className="mt-2 flex items-center justify-between">
                 <span className={cx('rounded-full px-2 py-0.5 text-[11px] font-semibold', priorityMeta(task.prioriteit).className)}>
@@ -413,8 +447,15 @@ function TaskOverlay({ task }) {
     );
 }
 
-function buildColumnSpecs({ view, groupBoardBy, projects, users, statusOptions }) {
+function normalizeName(name) {
+    return String(name || '').trim().toLowerCase();
+}
+
+function buildColumnSpecs({ view, groupBoardBy, projects, users, statusOptions, tasks = [] }) {
     const columns = [];
+    // userId -> kolom-userId. Toegewezenen die niet in de keuzelijst staan (dubbele naam of
+    // geen CRM-gebruiker) krijgen zo toch een kolom, anders verdwijnt hun taak uit de teamweergave.
+    const assigneeAlias = {};
     const group = view === 'team' ? 'assignee' : groupBoardBy;
 
     if (group === 'project') {
@@ -431,10 +472,28 @@ function buildColumnSpecs({ view, groupBoardBy, projects, users, statusOptions }
         statusOptions.forEach((s) => columns.push({ id: `col-status-${s}`, title: statusLabel(s), subtitle: null, status: s }));
     } else {
         columns.push({ id: 'col-assignee-unassigned', title: 'Niet toegewezen', subtitle: null, assigneeId: null });
-        users.forEach((u) => columns.push({ id: `col-assignee-${u.id}`, title: u.name, subtitle: null, assigneeId: u.id }));
+        const byName = new Map();
+        users.forEach((u) => {
+            assigneeAlias[u.id] = u.id;
+            if (!byName.has(normalizeName(u.name))) byName.set(normalizeName(u.name), u.id);
+            columns.push({ id: `col-assignee-${u.id}`, title: u.name, subtitle: null, assigneeId: u.id });
+        });
+        tasks.forEach((task) => {
+            (task.assignees ?? []).forEach((a) => {
+                const aid = Number(a.id);
+                if (!aid || assigneeAlias[aid]) return;
+                const sameName = byName.get(normalizeName(a.name));
+                if (sameName) {
+                    assigneeAlias[aid] = sameName;
+                    return;
+                }
+                assigneeAlias[aid] = aid;
+                columns.push({ id: `col-assignee-${aid}`, title: a.name || 'Onbekend', subtitle: 'Niet in de keuzelijst', assigneeId: aid });
+            });
+        });
     }
 
-    return { group, columns };
+    return { group, columns, assigneeAlias };
 }
 
 function taskPrimaryAssigneeId(task) {
@@ -442,18 +501,20 @@ function taskPrimaryAssigneeId(task) {
     return first ?? null;
 }
 
-function columnIdForTask(task, group) {
+function columnIdForTask(task, group, assigneeAlias = {}) {
     if (group === 'project') return task.task_project_id ? `col-project-${task.task_project_id}` : 'col-project-inbox';
     if (group === 'status') return `col-status-${task.status}`;
     const assigneeId = taskPrimaryAssigneeId(task);
-    return assigneeId ? `col-assignee-${assigneeId}` : 'col-assignee-unassigned';
+    if (!assigneeId) return 'col-assignee-unassigned';
+    return `col-assignee-${assigneeAlias[assigneeId] ?? assigneeId}`;
 }
 
-function buildItemsByColumn(tasks, columns, group) {
+function buildItemsByColumn(tasks, columns, group, assigneeAlias) {
     const base = Object.fromEntries(columns.map((c) => [c.id, []]));
+    const orderById = Object.fromEntries(tasks.map((t) => [t.id, t.sort_order ?? 0]));
 
     tasks.forEach((task) => {
-        const colId = columnIdForTask(task, group);
+        const colId = columnIdForTask(task, group, assigneeAlias);
         if (!base[colId]) base[colId] = [];
         base[colId].push(`task-${task.id}`);
     });
@@ -463,10 +524,8 @@ function buildItemsByColumn(tasks, columns, group) {
             .map((id) => ({ id, taskId: parseId(id) }))
             .filter((row) => row.taskId)
             .sort((a, b) => {
-                const ta = tasks.find((t) => t.id === a.taskId);
-                const tb = tasks.find((t) => t.id === b.taskId);
-                const oa = ta?.sort_order ?? 0;
-                const ob = tb?.sort_order ?? 0;
+                const oa = orderById[a.taskId] ?? 0;
+                const ob = orderById[b.taskId] ?? 0;
                 if (oa !== ob) return oa - ob;
                 return a.taskId - b.taskId;
             })
@@ -484,6 +543,9 @@ function findContainerId(itemsByColumn, id) {
 
 export default function Tasks({ initial, filters, customerFilter, urls }) {
     const currentUserId = Number(usePage().props?.auth?.user?.id) || null;
+    const confirm = useConfirm();
+    const detailBaselineRef = useRef('');
+    const confirmingRef = useRef(false);
     const [urlInit] = useState(() => readUrlState());
     const [tasks, setTasks] = useState(initial?.tasks ?? []);
     const [projects, setProjects] = useState(initial?.projects ?? []);
@@ -512,17 +574,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
     const [projectSaving, setProjectSaving] = useState(false);
 
     const [showTaskModal, setShowTaskModal] = useState(false);
-    const [taskForm, setTaskForm] = useState({
-        titel: '',
-        omschrijving: '',
-        task_project_id: '',
-        status: 'open',
-        prioriteit: 'normaal',
-        deadline: '',
-        labels: '',
-        assignees: [],
-        customer: null,
-    });
+    const [taskForm, setTaskForm] = useState(EMPTY_TASK_FORM);
     const [taskFiles, setTaskFiles] = useState([]);
     const [taskErrors, setTaskErrors] = useState({});
     const [taskSaving, setTaskSaving] = useState(false);
@@ -589,17 +641,19 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
 
     const taskById = useMemo(() => Object.fromEntries(tasks.map((t) => [t.id, t])), [tasks]);
 
-    const { group, columns } = useMemo(
-        () => buildColumnSpecs({ view, groupBoardBy, projects, users, statusOptions }),
-        [view, groupBoardBy, projects, users, statusOptions],
+    // Alleen de teamweergave leidt kolommen af uit de taken (extra toegewezenen).
+    const tasksForColumns = view === 'team' ? tasks : null;
+    const { group, columns, assigneeAlias } = useMemo(
+        () => buildColumnSpecs({ view, groupBoardBy, projects, users, statusOptions, tasks: tasksForColumns ?? [] }),
+        [view, groupBoardBy, projects, users, statusOptions, tasksForColumns],
     );
 
-    const [itemsByColumn, setItemsByColumn] = useState(() => buildItemsByColumn(tasks, columns, group));
+    const [itemsByColumn, setItemsByColumn] = useState(() => buildItemsByColumn(tasks, columns, group, assigneeAlias));
     const [activeDragId, setActiveDragId] = useState(null);
 
     useEffect(() => {
-        setItemsByColumn(buildItemsByColumn(tasks, columns, group));
-    }, [tasks, columns, group]);
+        setItemsByColumn(buildItemsByColumn(tasks, columns, group, assigneeAlias));
+    }, [tasks, columns, group, assigneeAlias]);
 
     const activeDragTask = useMemo(() => {
         const tid = parseId(activeDragId);
@@ -607,7 +661,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
     }, [activeDragId, taskById]);
 
     const openTaskSeqRef = useRef(0);
-    const openTask = useCallback(async (taskId) => {
+    const loadTask = useCallback(async (taskId) => {
         const seq = ++openTaskSeqRef.current;
         setSelectedTaskId(taskId);
         setSelectedTask(null);
@@ -617,7 +671,9 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
         try {
             const response = await axios.get(`/taken/${taskId}`);
             if (seq !== openTaskSeqRef.current) return;
-            setSelectedTask(response.data.task ?? null);
+            const loaded = response.data.task ?? null;
+            detailBaselineRef.current = detailSnapshot(loaded);
+            setSelectedTask(loaded);
         } catch {
             if (seq !== openTaskSeqRef.current) return;
             setNotice({ tone: 'error', text: 'Taak laden mislukt.' });
@@ -626,13 +682,41 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
         }
     }, []);
 
-    const closeTask = useCallback(() => {
+    // Vraagt bevestiging als het detailformulier niet opgeslagen wijzigingen heeft.
+    const confirmDiscardDetail = useCallback(async () => {
+        if (!selectedTask || detailSnapshot(selectedTask) === detailBaselineRef.current) return true;
+        if (confirmingRef.current) return false;
+        confirmingRef.current = true;
+        try {
+            return await confirm({
+                title: 'Niet opgeslagen wijzigingen',
+                message: 'Je hebt wijzigingen in deze taak die nog niet zijn opgeslagen. Wil je deze verwerpen?',
+                confirmText: 'Verwerpen',
+                cancelText: 'Blijven',
+                tone: 'danger',
+            });
+        } finally {
+            confirmingRef.current = false;
+        }
+    }, [confirm, selectedTask]);
+
+    const openTask = useCallback(
+        async (taskId) => {
+            if (selectedTaskId && Number(taskId) !== Number(selectedTaskId) && !(await confirmDiscardDetail())) return;
+            loadTask(taskId);
+        },
+        [confirmDiscardDetail, loadTask, selectedTaskId],
+    );
+
+    const closeTask = useCallback(async () => {
+        if (!(await confirmDiscardDetail())) return;
         openTaskSeqRef.current += 1;
+        detailBaselineRef.current = '';
         setSelectedTaskId(null);
         setSelectedTask(null);
         setDetailLoading(false);
         setDetailErrors({});
-    }, []);
+    }, [confirmDiscardDetail]);
 
     // Weergave, filters en open taak in de URL bewaren (deelbaar en herlaadbaar).
     useEffect(() => {
@@ -657,26 +741,35 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
     }, [view, groupBoardBy, filterProject, filterAssignee, filterStatus, filterPriority, search, sortMode, filterCustomer, showAppointments, selectedTaskId]);
 
     useEffect(() => {
-        if (urlInit.taskId) openTask(urlInit.taskId);
+        if (urlInit.taskId) loadTask(urlInit.taskId);
         // Alleen bij het laden van de pagina.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const completeSelectedTask = useCallback(async () => {
-        if (!selectedTask) return;
+        if (!selectedTask || detailSaving) return;
         setDetailSaving(true);
         try {
             const response = await axios.patch(`/taken/tasks/${selectedTask.id}/status`, { status: 'afgerond' });
             const updated = response.data.task;
             setTasks((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
-            setSelectedTask((prev) => (prev && prev.id === updated.id ? { ...prev, status: updated.status } : prev));
+            setSelectedTask((prev) => {
+                if (!prev || prev.id !== updated.id) return prev;
+                // Alleen de status is opgeslagen; overige niet opgeslagen wijzigingen blijven 'vuil'.
+                const base = JSON.parse(detailBaselineRef.current || 'null');
+                if (Array.isArray(base)) {
+                    base[7] = updated.status;
+                    detailBaselineRef.current = JSON.stringify(base);
+                }
+                return { ...prev, status: updated.status };
+            });
             setNotice({ tone: 'success', text: 'Taak afgerond.' });
         } catch (error) {
             setNotice({ tone: 'error', text: firstError(error, 'Afronden mislukt.') });
         } finally {
             setDetailSaving(false);
         }
-    }, [selectedTask]);
+    }, [selectedTask, detailSaving]);
 
     const completeAppointment = useCallback((appointment) => {
         if (!appointment?.done_url) return;
@@ -710,7 +803,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
     const saveTaskDetails = useCallback(
         async (event) => {
             event.preventDefault();
-            if (!selectedTask) return;
+            if (!selectedTask || detailSaving) return;
             if (!String(selectedTask.titel ?? '').trim()) {
                 setDetailErrors({ titel: ['Titel is verplicht.'] });
                 return;
@@ -719,19 +812,26 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
             setDetailErrors({});
             try {
                     const response = await axios.patch(`/taken/tasks/${selectedTask.id}`, {
-                        titel: selectedTask.titel,
+                        titel: String(selectedTask.titel).trim(),
                         omschrijving: selectedTask.omschrijving ?? null,
                         labels: selectedTask.labels ?? null,
                         prioriteit: selectedTask.prioriteit ?? 'normaal',
                         task_project_id: selectedTask.task_project_id ?? null,
-                        deadline: selectedTask.deadline ?? null,
+                        // Altijd als lokale datum/tijd versturen (zoals bij aanmaken), zodat een
+                        // ongewijzigde deadline niet verschuift door de tijdzone in de ISO-string.
+                        deadline: toLocalInputValue(selectedTask.deadline) || null,
                         garage_company_id: selectedTask.customer?.id ?? null,
                         status: selectedTask.status ?? 'open',
                         assignees: (selectedTask.assignees ?? []).map((a) => a.id),
                     });
                 const updated = response.data.task;
                 setTasks((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
-                setSelectedTask((prev) => (prev && prev.id === updated.id ? { ...prev, ...updated } : prev));
+                setSelectedTask((prev) => {
+                    if (!prev || prev.id !== updated.id) return prev;
+                    const merged = { ...prev, ...updated };
+                    detailBaselineRef.current = detailSnapshot(merged);
+                    return merged;
+                });
                 setNotice({ tone: 'success', text: 'Taak opgeslagen.' });
             } catch (error) {
                 setDetailErrors(error?.response?.data?.errors ?? {});
@@ -740,13 +840,13 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                 setDetailSaving(false);
             }
         },
-        [selectedTask],
+        [selectedTask, detailSaving],
     );
 
     const addComment = useCallback(
         async (event) => {
             event.preventDefault();
-            if (!selectedTaskId || !commentBody.trim()) return;
+            if (!selectedTaskId || !commentBody.trim() || commentSaving) return;
             setCommentSaving(true);
             try {
                 const response = await axios.post(`/taken/tasks/${selectedTaskId}/comments`, { body: commentBody.trim() });
@@ -766,7 +866,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                 setCommentSaving(false);
             }
         },
-        [commentBody, selectedTaskId],
+        [commentBody, commentSaving, selectedTaskId],
     );
 
     const uploadAttachments = useCallback(
@@ -982,9 +1082,10 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                 const current = taskById[movedTaskId]?.assignees ?? [];
                 if (toAssigneeId) {
                     // Vervang alleen de persoon van de bronkolom; overige toegewezenen blijven behouden.
-                    const others = current.filter((a) => a.id !== fromCol?.assigneeId && a.id !== toAssigneeId);
+                    const colOf = (a) => assigneeAlias[a.id] ?? a.id;
+                    const others = current.filter((a) => colOf(a) !== fromCol?.assigneeId && colOf(a) !== toAssigneeId);
                     const toUser = users.find((u) => u.id === toAssigneeId);
-                    movedAssignees = [{ id: toAssigneeId, name: toUser?.name ?? '' }, ...others];
+                    movedAssignees = [{ id: toAssigneeId, name: toUser?.name ?? toCol?.title ?? '' }, ...others];
                 } else {
                     movedAssignees = [];
                 }
@@ -1021,12 +1122,17 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
             });
             await persistReorder(changes);
         },
-        [applyItemsToState, columns, fetchTasks, group, itemsByColumn, persistReorder, taskById, users],
+        [applyItemsToState, assigneeAlias, columns, fetchTasks, group, itemsByColumn, persistReorder, taskById, users],
     );
 
     const createProject = useCallback(
         async (event) => {
             event.preventDefault();
+            if (projectSaving) return;
+            if (!projectForm.naam.trim()) {
+                setProjectErrors({ naam: ['Naam is verplicht.'] });
+                return;
+            }
             setProjectSaving(true);
             setProjectErrors({});
             try {
@@ -1043,7 +1149,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                 setProjectSaving(false);
             }
         },
-        [projectForm],
+        [projectForm, projectSaving],
     );
 
     const quickCreateTask = useCallback(
@@ -1055,12 +1161,16 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                 const payload = {
                     titel: trimmed,
                     omschrijving: null,
+                    // Neem actieve filters over, anders verdwijnt de nieuwe taak bij de volgende verversing.
                     task_project_id: group === 'project' ? column.projectId : (filterProject ? Number(filterProject) : null),
-                    status: group === 'status' ? column.status : 'open',
-                    prioriteit: 'normaal',
+                    status: group === 'status' ? column.status : (filterStatus || 'open'),
+                    prioriteit: filterPriority || 'normaal',
                     deadline: null,
                     labels: null,
-                    assignees: view === 'team' ? (column.assigneeId ? [column.assigneeId] : []) : [],
+                    assignees:
+                        view === 'team'
+                            ? (column.assigneeId ? [column.assigneeId] : [])
+                            : (filterAssignee ? [Number(filterAssignee)] : []),
                     garage_company_id: filterCustomer?.id ?? null,
                 };
                 const response = await axios.post('/taken/tasks', payload);
@@ -1073,17 +1183,22 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                 setQuickAddSaving((prev) => ({ ...prev, [column.id]: false }));
             }
         },
-        [filterCustomer, filterProject, group, quickAddSaving, view],
+        [filterAssignee, filterCustomer, filterPriority, filterProject, filterStatus, group, quickAddSaving, view],
     );
 
     const createTask = useCallback(
         async (event) => {
             event.preventDefault();
+            if (taskSaving) return;
+            if (!taskForm.titel.trim()) {
+                setTaskErrors({ titel: ['Titel is verplicht.'] });
+                return;
+            }
             setTaskSaving(true);
             setTaskErrors({});
             try {
                 const form = new FormData();
-                form.append('titel', taskForm.titel);
+                form.append('titel', taskForm.titel.trim());
                 if (taskForm.omschrijving) form.append('omschrijving', taskForm.omschrijving);
                 if (taskForm.task_project_id) form.append('task_project_id', taskForm.task_project_id);
                 form.append('status', taskForm.status);
@@ -1095,17 +1210,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                 taskFiles.forEach((file) => form.append('attachments[]', file));
 
                 await axios.post('/taken/tasks', form);
-                setTaskForm({
-                    titel: '',
-                    omschrijving: '',
-                    task_project_id: '',
-                    status: 'open',
-                    prioriteit: 'normaal',
-                    deadline: '',
-                    labels: '',
-                    assignees: [],
-                    customer: null,
-                });
+                setTaskForm(EMPTY_TASK_FORM);
                 setTaskFiles([]);
                 setShowTaskModal(false);
                 setNotice({ tone: 'success', text: 'Taak toegevoegd.' });
@@ -1118,11 +1223,39 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                 setTaskSaving(false);
             }
         },
-        [taskForm, taskFiles, fetchTasks],
+        [taskForm, taskFiles, taskSaving, fetchTasks],
     );
 
     // De server sorteert al volgens de gekozen sortering; niet opnieuw sorteren.
     const listRows = tasks;
+
+    const hasActiveFilters = Boolean(filterProject || filterAssignee || filterStatus || filterPriority || search.trim() || filterCustomer);
+    const resetFilters = useCallback(() => {
+        setFilterProject('');
+        setFilterAssignee('');
+        setFilterStatus('');
+        setFilterPriority('');
+        setSearch('');
+        setFilterCustomer(null);
+    }, []);
+
+    const emptyTasksState = hasActiveFilters ? (
+        <EmptyState
+            title="Geen taken gevonden"
+            description="Er zijn geen taken die passen bij de huidige filters."
+            action={
+                <Button variant="secondary" onClick={resetFilters}>
+                    Filters wissen
+                </Button>
+            }
+        />
+    ) : (
+        <EmptyState
+            title={loading ? 'Taken laden...' : 'Nog geen taken'}
+            description={loading ? null : 'Maak je eerste taak aan om het werk te verdelen.'}
+            action={loading ? null : <Button onClick={openNewTaskModal}>Nieuwe taak</Button>}
+        />
+    );
 
     const closeProjectModal = useCallback(() => setShowProjectModal(false), []);
     const closeTaskModal = useCallback(() => setShowTaskModal(false), []);
@@ -1134,44 +1267,18 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
         <>
             <Head title="Taken" />
             <div className="pb-16">
-                <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold text-zinc-900">Taken</h1>
-                        <p className="mt-1 text-sm text-zinc-500">Overzicht per taak, project en team.</p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <div className="flex items-center rounded-lg bg-white p-1 ring-1 ring-zinc-200" role="group" aria-label="Weergave">
-                            <button
-                                type="button"
-                                aria-pressed={view === 'list'}
-                                className={cx('rounded-md px-3 py-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600', view === 'list' ? 'bg-indigo-600 text-white' : 'text-zinc-700 hover:bg-zinc-100')}
-                                onClick={() => setView('list')}
-                            >
-                                Lijst
-                            </button>
-                            <button
-                                type="button"
-                                aria-pressed={view === 'board'}
-                                className={cx('rounded-md px-3 py-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600', view === 'board' ? 'bg-indigo-600 text-white' : 'text-zinc-700 hover:bg-zinc-100')}
-                                onClick={() => setView('board')}
-                            >
-                                Bord
-                            </button>
-                            <button
-                                type="button"
-                                aria-pressed={view === 'team'}
-                                className={cx('rounded-md px-3 py-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600', view === 'team' ? 'bg-indigo-600 text-white' : 'text-zinc-700 hover:bg-zinc-100')}
-                                onClick={() => setView('team')}
-                            >
-                                Team
-                            </button>
-                        </div>
-                        <Button onClick={openNewTaskModal}>Nieuwe taak</Button>
-                        <Button tone="secondary" onClick={() => setShowProjectModal(true)}>
-                            Nieuw project
-                        </Button>
-                    </div>
-                </div>
+                <PageHeader
+                    title="Taken"
+                    description="Plan, verdeel en volg taken per status, project of collega."
+                    actions={
+                        <>
+                            <Button variant="secondary" onClick={() => setShowProjectModal(true)}>
+                                Nieuw project
+                            </Button>
+                            <Button onClick={openNewTaskModal}>Nieuwe taak</Button>
+                        </>
+                    }
+                />
 
                 {notice ? (
                     <div
@@ -1184,39 +1291,103 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                     >
                         <div className="flex items-start justify-between gap-3">
                             <div>{notice.text}</div>
-                            <button type="button" className="text-xs font-semibold" onClick={() => setNotice(null)}>
+                            <button
+                                type="button"
+                                className="shrink-0 rounded text-xs font-semibold underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
+                                onClick={() => setNotice(null)}
+                            >
                                 Sluiten
                             </button>
                         </div>
                     </div>
                 ) : null}
 
-                <div className="mt-6 rounded-2xl border border-zinc-200 bg-white p-4">
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
-                        <div>
-                            <label htmlFor="tasks-filter-zoeken" className="block text-xs font-semibold text-zinc-500">Zoeken</label>
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div className="inline-flex rounded-lg bg-zinc-100 p-1" role="group" aria-label="Weergave">
+                        {[
+                            ['board', 'Bord'],
+                            ['list', 'Lijst'],
+                            ['team', 'Team'],
+                        ].map(([key, label]) => (
+                            <button
+                                key={key}
+                                type="button"
+                                aria-pressed={view === key}
+                                className={cx(
+                                    'h-8 rounded-md px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600',
+                                    view === key ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-600 hover:text-zinc-900',
+                                )}
+                                onClick={() => setView(key)}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                        {view === 'board' ? (
+                            <label htmlFor="tasks-filter-groepeer" className="inline-flex items-center gap-2 text-sm text-zinc-600">
+                                Groepeer op
+                                <select
+                                    id="tasks-filter-groepeer"
+                                    className={cx(inputClasses, 'w-auto py-1.5')}
+                                    value={groupBoardBy}
+                                    onChange={(e) => setGroupBoardBy(e.target.value)}
+                                >
+                                    <option value="status">Status</option>
+                                    <option value="project">Project</option>
+                                </select>
+                            </label>
+                        ) : null}
+                        {view === 'list' ? (
+                            <label htmlFor="tasks-filter-sorteren" className="inline-flex items-center gap-2 text-sm text-zinc-600">
+                                Sorteren op
+                                <select
+                                    id="tasks-filter-sorteren"
+                                    className={cx(inputClasses, 'w-auto py-1.5')}
+                                    value={sortMode}
+                                    onChange={(e) => setSortMode(e.target.value)}
+                                >
+                                    <option value="deadline">Deadline</option>
+                                    <option value="prioriteit">Prioriteit</option>
+                                    <option value="nieuwste">Nieuwste</option>
+                                </select>
+                            </label>
+                        ) : null}
+                    </div>
+                </div>
+
+                <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
+                        <div className="sm:col-span-2">
+                            <label htmlFor="tasks-filter-zoeken" className={FILTER_LABEL}>Zoeken</label>
                             <input
                                 id="tasks-filter-zoeken"
-                                className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                type="search"
+                                className={cx(inputClasses, 'mt-1')}
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                placeholder="Zoek op titel, omschrijving, labels"
+                                placeholder="Titel, omschrijving, label of klant"
                             />
                         </div>
                         <div>
-                            <label htmlFor="tasks-filter-project" className="block text-xs font-semibold text-zinc-500">Project</label>
-                            <select id="tasks-filter-project" className="mt-1 w-full rounded-md border-zinc-300 text-sm" value={filterProject} onChange={(e) => setFilterProject(e.target.value)}>
-                                <option value="">Alle projecten</option>
-                                {projects.map((p) => (
-                                    <option key={p.id} value={p.id}>
-                                        {p.naam}
+                            <label htmlFor="tasks-filter-klant" className={FILTER_LABEL}>Klant</label>
+                            <CustomerPicker id="tasks-filter-klant" value={filterCustomer} onChange={setFilterCustomer} placeholder="Alle klanten" clearLabel="Wissen" />
+                        </div>
+                        <div>
+                            <label htmlFor="tasks-filter-toegewezen-aan" className={FILTER_LABEL}>Toegewezen aan</label>
+                            <select id="tasks-filter-toegewezen-aan" className={cx(inputClasses, 'mt-1')} value={filterAssignee} onChange={(e) => setFilterAssignee(e.target.value)}>
+                                <option value="">Iedereen</option>
+                                {currentUserId && users.some((u) => Number(u.id) === currentUserId) ? <option value={String(currentUserId)}>Mijn taken</option> : null}
+                                {users.map((u) => (
+                                    <option key={u.id} value={u.id}>
+                                        {u.name}
                                     </option>
                                 ))}
                             </select>
                         </div>
                         <div>
-                            <label htmlFor="tasks-filter-status" className="block text-xs font-semibold text-zinc-500">Status</label>
-                            <select id="tasks-filter-status" className="mt-1 w-full rounded-md border-zinc-300 text-sm" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                            <label htmlFor="tasks-filter-status" className={FILTER_LABEL}>Status</label>
+                            <select id="tasks-filter-status" className={cx(inputClasses, 'mt-1')} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
                                 <option value="">Alle statussen</option>
                                 {statusOptions.map((s) => (
                                     <option key={s} value={s}>
@@ -1226,8 +1397,8 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                             </select>
                         </div>
                         <div>
-                            <label htmlFor="tasks-filter-prioriteit" className="block text-xs font-semibold text-zinc-500">Prioriteit</label>
-                            <select id="tasks-filter-prioriteit" className="mt-1 w-full rounded-md border-zinc-300 text-sm" value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)}>
+                            <label htmlFor="tasks-filter-prioriteit" className={FILTER_LABEL}>Prioriteit</label>
+                            <select id="tasks-filter-prioriteit" className={cx(inputClasses, 'mt-1')} value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)}>
                                 <option value="">Alle prioriteiten</option>
                                 {priorityOptions.map((p) => (
                                     <option key={p} value={p}>
@@ -1236,44 +1407,25 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                 ))}
                             </select>
                         </div>
-                        <div>
-                            <label htmlFor="tasks-filter-klant" className="block text-xs font-semibold text-zinc-500">Klant</label>
-                            <CustomerPicker id="tasks-filter-klant" value={filterCustomer} onChange={setFilterCustomer} placeholder="Alle klanten" clearLabel="Wissen" />
-                        </div>
-                        <div>
-                            <label htmlFor="tasks-filter-toegewezen-aan" className="block text-xs font-semibold text-zinc-500">Toegewezen aan</label>
-                            <select id="tasks-filter-toegewezen-aan" className="mt-1 w-full rounded-md border-zinc-300 text-sm" value={filterAssignee} onChange={(e) => setFilterAssignee(e.target.value)}>
-                                <option value="">Iedereen</option>
-                                {users.map((u) => (
-                                    <option key={u.id} value={u.id}>
-                                        {u.name}
+                        <div className="sm:col-span-2 lg:col-span-2">
+                            <label htmlFor="tasks-filter-project" className={FILTER_LABEL}>Project</label>
+                            <select id="tasks-filter-project" className={cx(inputClasses, 'mt-1')} value={filterProject} onChange={(e) => setFilterProject(e.target.value)}>
+                                <option value="">Alle projecten</option>
+                                {projects.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                        {p.naam}
                                     </option>
                                 ))}
                             </select>
                         </div>
-                        <div>
-                            <label htmlFor="tasks-filter-sorteren" className="block text-xs font-semibold text-zinc-500">Sorteren</label>
-                            <select id="tasks-filter-sorteren" className="mt-1 w-full rounded-md border-zinc-300 text-sm" value={sortMode} onChange={(e) => setSortMode(e.target.value)}>
-                                <option value="deadline">Deadline</option>
-                                <option value="prioriteit">Prioriteit</option>
-                                <option value="nieuwste">Nieuwste</option>
-                            </select>
-                        </div>
-                        {view === 'board' ? (
-                            <div>
-                                <label htmlFor="tasks-filter-groepeer" className="block text-xs font-semibold text-zinc-500">Groepeer</label>
-                                <select id="tasks-filter-groepeer" className="mt-1 w-full rounded-md border-zinc-300 text-sm" value={groupBoardBy} onChange={(e) => setGroupBoardBy(e.target.value)}>
-                                    <option value="project">Project</option>
-                                    <option value="status">Status</option>
-                                </select>
-                            </div>
-                        ) : null}
                     </div>
-                    <div className="mt-4 flex items-center justify-between text-xs text-zinc-500">
-                        <div className="flex items-center gap-2">
-                            {loading ? <span className="font-semibold text-zinc-700" role="status">Laden...</span> : null}
-                            <span>{tasks.length === 1 ? '1 taak' : `${tasks.length} taken`}</span>
-                            <label className="ml-3 inline-flex items-center gap-2 text-sm font-semibold text-zinc-700">
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 pt-3">
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-zinc-600">
+                            <span className="inline-flex items-center gap-2 tabular-nums" aria-live="polite">
+                                {loading ? <Spinner className="h-4 w-4 text-indigo-600" /> : null}
+                                {loading ? 'Laden...' : countLabel(tasks.length, 'taak', 'taken')}
+                            </span>
+                            <label className="inline-flex items-center gap-2 font-medium text-zinc-700">
                                 <input
                                     type="checkbox"
                                     className="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-600"
@@ -1283,192 +1435,218 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                 Toon klantafspraken
                             </label>
                         </div>
-                        <Button tone="ghost" onClick={() => fetchTasks()} disabled={loading}>
-                            Vernieuwen
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            {hasActiveFilters ? (
+                                <Button variant="ghost" size="sm" onClick={resetFilters}>
+                                    Filters wissen
+                                </Button>
+                            ) : null}
+                            <Button variant="secondary" size="sm" onClick={() => fetchTasks()} disabled={loading}>
+                                Vernieuwen
+                            </Button>
+                        </div>
                     </div>
                 </div>
 
                 {showAppointments ? (
-                    <section className="mt-6 overflow-hidden rounded-2xl border border-zinc-200 bg-white" aria-labelledby="tasks-klantafspraken-title">
+                    <section className={cx(tableClasses.wrapper, 'mt-6')} aria-labelledby="tasks-klantafspraken-title">
                         <div className="flex items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3">
                             <div>
-                                <h2 id="tasks-klantafspraken-title" className="text-sm font-semibold text-zinc-900">Klantafspraken</h2>
-                                <p className="mt-0.5 text-xs text-zinc-500">Open taken en afspraken vanaf de klantpagina's.</p>
+                                <h2 id="tasks-klantafspraken-title" className="text-base font-semibold text-zinc-900">Klantafspraken</h2>
+                                <p className="mt-0.5 text-sm text-zinc-500">Open taken en afspraken vanaf de klantpagina's.</p>
                             </div>
-                            <span className="rounded-full bg-zinc-200 px-2 py-0.5 text-xs font-semibold text-zinc-700">{appointments.length}</span>
+                            <Badge>{appointments.length}</Badge>
                         </div>
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-zinc-200 text-sm">
-                                <thead className="bg-zinc-50">
+                        {appointments.length === 0 ? (
+                            <div className="p-4">
+                                <EmptyState
+                                    title={loading ? 'Klantafspraken laden...' : 'Geen open klantafspraken'}
+                                    description={loading ? null : 'Alles is afgehandeld voor de huidige filters.'}
+                                />
+                            </div>
+                        ) : (
+                            <table className={tableClasses.table}>
+                                <thead className={tableClasses.thead}>
                                     <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">Type</th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">Titel</th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">Klant</th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">Datum</th>
-                                        <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500">Actie</th>
+                                        <th scope="col" className={tableClasses.th}>Type</th>
+                                        <th scope="col" className={tableClasses.th}>Titel</th>
+                                        <th scope="col" className={tableClasses.th}>Klant</th>
+                                        <th scope="col" className={tableClasses.th}>Datum</th>
+                                        <th scope="col" className={cx(tableClasses.th, 'text-right')}>
+                                            <span className="sr-only">Actie</span>
+                                        </th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-zinc-200">
-                                    {appointments.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={5} className="px-4 py-6 text-center text-sm text-zinc-500">
-                                                {loading ? 'Laden...' : 'Geen open klantafspraken.'}
+                                <tbody className={tableClasses.tbody}>
+                                    {appointments.map((a) => (
+                                        <tr key={a.id} className={tableClasses.tr}>
+                                            <td className={tableClasses.td}>
+                                                <Badge tone={a.type === 'afspraak' ? 'info' : 'neutral'}>{a.type === 'afspraak' ? 'Afspraak' : 'Taak'}</Badge>
+                                            </td>
+                                            <td className={tableClasses.td}>
+                                                <div className="font-medium text-zinc-900">{a.titel || 'Zonder titel'}</div>
+                                                {a.inhoud ? <div className="mt-0.5 line-clamp-2 text-xs text-zinc-500">{a.inhoud}</div> : null}
+                                            </td>
+                                            <td className={tableClasses.td}>
+                                                {a.customer ? (
+                                                    <a href={`${a.customer.url}?tab=taken_afspraken`} className="font-medium text-indigo-700 hover:underline">
+                                                        {a.customer.naam}
+                                                    </a>
+                                                ) : (
+                                                    <span className="text-zinc-400">-</span>
+                                                )}
+                                            </td>
+                                            <td className={cx(tableClasses.td, 'whitespace-nowrap')}>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className={a.overdue ? 'font-semibold text-rose-700' : 'text-zinc-600'}>{a.due_at ? formatDateTime(a.due_at) : '-'}</span>
+                                                    {a.overdue ? <OverdueBadge /> : null}
+                                                </div>
+                                            </td>
+                                            <td className={cx(tableClasses.td, 'text-right')}>
+                                                <Button
+                                                    variant="secondary"
+                                                    size="xs"
+                                                    loading={Boolean(appointmentBusy[a.id])}
+                                                    aria-label={`${a.titel || 'Klantafspraak'} afronden`}
+                                                    onClick={() => completeAppointment(a)}
+                                                >
+                                                    Afronden
+                                                </Button>
                                             </td>
                                         </tr>
-                                    ) : (
-                                        appointments.map((a) => (
-                                            <tr key={a.id} className="hover:bg-zinc-50">
-                                                <td className="px-4 py-3 text-zinc-600">{a.type === 'afspraak' ? 'Afspraak' : 'Taak'}</td>
-                                                <td className="px-4 py-3">
-                                                    <div className="font-semibold text-zinc-900">{a.titel}</div>
-                                                    {a.inhoud ? <div className="mt-0.5 line-clamp-2 text-xs text-zinc-500">{a.inhoud}</div> : null}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    {a.customer ? (
-                                                        <a href={`${a.customer.url}?tab=taken_afspraken`} className="font-semibold text-indigo-700 hover:underline">
-                                                            {a.customer.naam}
-                                                        </a>
-                                                    ) : (
-                                                        '-'
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <div className="flex flex-wrap items-center gap-2">
-                                                        <span className={a.overdue ? 'font-semibold text-rose-700' : 'text-zinc-600'}>{a.due_at ? formatDateTime(a.due_at) : '-'}</span>
-                                                        {a.overdue ? <OverdueBadge /> : null}
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <Button tone="secondary" className="px-2 py-1 text-xs" disabled={Boolean(appointmentBusy[a.id])} onClick={() => completeAppointment(a)}>
-                                                        {appointmentBusy[a.id] ? 'Bezig...' : 'Afronden'}
-                                                    </Button>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
+                                    ))}
                                 </tbody>
                             </table>
-                        </div>
+                        )}
                     </section>
                 ) : null}
 
                 {view === 'list' ? (
-                    <div className="mt-6 overflow-hidden rounded-2xl border border-zinc-200 bg-white">
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-zinc-200 text-sm">
-                                <thead className="bg-zinc-50">
+                    listRows.length === 0 ? (
+                        <div className="mt-6">{emptyTasksState}</div>
+                    ) : (
+                        <div className={cx(tableClasses.wrapper, 'mt-6', loading && 'opacity-60')} aria-busy={loading || undefined}>
+                            <table className={tableClasses.table}>
+                                <thead className={tableClasses.thead}>
                                     <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">Taak</th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">Klant</th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">Project</th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">Status</th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">Prioriteit</th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">Deadline</th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">Toegewezen aan</th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">Info</th>
+                                        <th scope="col" className={tableClasses.th}>Taak</th>
+                                        <th scope="col" className={tableClasses.th}>Klant</th>
+                                        <th scope="col" className={tableClasses.th}>Project</th>
+                                        <th scope="col" className={tableClasses.th}>Status</th>
+                                        <th scope="col" className={tableClasses.th}>Prioriteit</th>
+                                        <th scope="col" className={tableClasses.th}>Deadline</th>
+                                        <th scope="col" className={tableClasses.th}>Toegewezen aan</th>
+                                        <th scope="col" className={tableClasses.th}>Info</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-zinc-200">
-                                    {listRows.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={8} className="px-4 py-10 text-center text-sm text-zinc-500">
-                                                {loading ? 'Laden...' : 'Geen taken gevonden.'}
+                                <tbody className={tableClasses.tbody}>
+                                    {listRows.map((task) => (
+                                        <tr key={task.id} className={cx(tableClasses.tr, isOverdue(task) && 'bg-rose-50/40')}>
+                                            <td className={tableClasses.td}>
+                                                <button
+                                                    type="button"
+                                                    className="max-w-xs truncate rounded text-left font-semibold text-zinc-900 hover:text-indigo-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
+                                                    title={task.titel}
+                                                    onClick={() => openTask(task.id)}
+                                                >
+                                                    {task.titel}
+                                                </button>
+                                            </td>
+                                            <td className={tableClasses.td}>
+                                                {task.customer ? (
+                                                    <a href={task.customer.url} className="font-medium text-indigo-700 hover:underline">
+                                                        {task.customer.naam}
+                                                    </a>
+                                                ) : (
+                                                    <span className="text-zinc-400">-</span>
+                                                )}
+                                            </td>
+                                            <td className={tableClasses.td}>{task.project?.naam ?? <span className="text-zinc-400">-</span>}</td>
+                                            <td className={tableClasses.td}>
+                                                <Badge tone={statusTone(task.status)}>{statusLabel(task.status)}</Badge>
+                                            </td>
+                                            <td className={tableClasses.td}>
+                                                <span className={cx('inline-flex rounded-full px-2 py-0.5 text-xs font-semibold', priorityMeta(task.prioriteit).className)}>
+                                                    {priorityMeta(task.prioriteit).label}
+                                                </span>
+                                            </td>
+                                            <td className={cx(tableClasses.td, 'whitespace-nowrap')}>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className={isOverdue(task) ? 'font-semibold text-rose-700' : 'text-zinc-600'}>
+                                                        {task.deadline ? formatDateTime(task.deadline) : '-'}
+                                                    </span>
+                                                    {isOverdue(task) ? <OverdueBadge /> : null}
+                                                </div>
+                                            </td>
+                                            <td className={tableClasses.td}>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {task.assignees?.length ? task.assignees.map((a) => <Pill key={a.id}>{a.name}</Pill>) : <span className="text-zinc-400">-</span>}
+                                                </div>
+                                            </td>
+                                            <td className={tableClasses.td}>
+                                                <div className="flex items-center gap-1.5">
+                                                    {task.counts?.comments ? <Pill>{countLabel(task.counts.comments, 'reactie', 'reacties')}</Pill> : null}
+                                                    {task.counts?.attachments ? <Pill>{countLabel(task.counts.attachments, 'bijlage', 'bijlagen')}</Pill> : null}
+                                                </div>
                                             </td>
                                         </tr>
-                                    ) : (
-                                        listRows.map((task) => (
-                                            <tr key={task.id} className="hover:bg-zinc-50">
-                                                <td className="px-4 py-3">
-                                                    <button type="button" className="font-semibold text-zinc-900 hover:underline" onClick={() => openTask(task.id)}>
-                                                        {task.titel}
-                                                    </button>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    {task.customer ? (
-                                                        <a href={task.customer.url} className="font-semibold text-indigo-700 hover:underline">
-                                                            {task.customer.naam}
-                                                        </a>
-                                                    ) : (
-                                                        <span className="text-zinc-400">-</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3 text-zinc-600">{task.project?.naam ?? '-'}</td>
-                                                <td className="px-4 py-3 text-zinc-600">{statusLabel(task.status)}</td>
-                                                <td className="px-4 py-3">
-                                                    <span className={cx('rounded-full px-2 py-0.5 text-xs font-semibold', priorityMeta(task.prioriteit).className)}>
-                                                        {priorityMeta(task.prioriteit).label}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <div className="flex flex-wrap items-center gap-2">
-                                                        <span className={isOverdue(task) ? 'font-semibold text-rose-700' : 'text-zinc-600'}>
-                                                            {task.deadline ? formatDateTime(task.deadline) : '-'}
-                                                        </span>
-                                                        {isOverdue(task) ? <OverdueBadge /> : null}
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {task.assignees?.length ? task.assignees.map((a) => <Pill key={a.id}>{a.name}</Pill>) : <span className="text-zinc-400">-</span>}
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-zinc-600">
-                                                    <div className="flex items-center gap-2">
-                                                        {task.counts?.comments ? <Pill>{task.counts.comments} {task.counts.comments === 1 ? 'reactie' : 'reacties'}</Pill> : null}
-                                                        {task.counts?.attachments ? <Pill>{task.counts.attachments} bijlagen</Pill> : null}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
+                                    ))}
                                 </tbody>
                             </table>
                         </div>
-                    </div>
+                    )
                 ) : (
-                    <div className="mt-6">
+                    <div className={cx('mt-6', loading && 'opacity-70 transition-opacity')} aria-busy={loading || undefined}>
+                        {tasks.length === 0 && hasActiveFilters && !loading ? <div className="mb-4">{emptyTasksState}</div> : null}
+                        <p className="mb-2 text-xs text-zinc-500">
+                            Sleep kaarten om de volgorde of {view === 'team' ? 'de toegewezen persoon' : group === 'project' ? 'het project' : 'de status'} te wijzigen. Open een kaart om dit met het toetsenbord te doen.
+                        </p>
                         <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
-                            <div className="flex gap-4 overflow-x-auto pb-4">
+                            <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain px-4 pb-4 sm:mx-0 sm:snap-none sm:px-0" role="list" aria-label="Kolommen">
                                 {columns.map((col) => {
                                     const taskIds = itemsByColumn[col.id] ?? [];
+                                    const quickValue = quickAdd[col.id] ?? '';
+                                    const quickBusy = Boolean(quickAddSaving[col.id]);
                                     return (
-                                        <div key={col.id} className="shrink-0">
+                                        <div key={col.id} className="shrink-0 snap-start" role="listitem">
                                             <Column
                                                 droppableId={col.id}
                                                 title={col.title}
                                                 subtitle={col.subtitle}
                                                 count={taskIds.length}
                                                 footer={
-                                                    <div className="flex items-center gap-2">
+                                                    <form
+                                                        className="flex items-center gap-2"
+                                                        onSubmit={(e) => {
+                                                            e.preventDefault();
+                                                            quickCreateTask({ column: col, title: quickValue });
+                                                        }}
+                                                    >
                                                         <input
-                                                            className="w-full rounded-md border-zinc-300 bg-white text-sm"
-                                                            placeholder="Taak toevoegen..."
+                                                            className={inputClasses}
+                                                            placeholder="Snel een taak toevoegen"
                                                             aria-label={`Taak toevoegen aan ${col.title}`}
-                                                            disabled={Boolean(quickAddSaving[col.id])}
-                                                            value={quickAdd[col.id] ?? ''}
+                                                            readOnly={quickBusy}
+                                                            maxLength={255}
+                                                            value={quickValue}
                                                             onChange={(e) => setQuickAdd((prev) => ({ ...prev, [col.id]: e.target.value }))}
-                                                            onKeyDown={(e) => {
-                                                                if (e.key === 'Enter') {
-                                                                    e.preventDefault();
-                                                                    quickCreateTask({ column: col, title: quickAdd[col.id] ?? '' });
-                                                                }
-                                                            }}
                                                         />
                                                         <Button
-                                                            tone="secondary"
+                                                            type="submit"
+                                                            variant="secondary"
+                                                            className="w-9 shrink-0 px-0"
                                                             aria-label={`Taak toevoegen aan ${col.title}`}
-                                                            disabled={Boolean(quickAddSaving[col.id]) || !String(quickAdd[col.id] ?? '').trim()}
-                                                            onClick={() => quickCreateTask({ column: col, title: quickAdd[col.id] ?? '' })}
+                                                            loading={quickBusy}
+                                                            disabled={!quickValue.trim()}
                                                         >
-                                                            {quickAddSaving[col.id] ? '...' : '+'}
+                                                            {quickBusy ? null : <span aria-hidden="true">+</span>}
                                                         </Button>
-                                                    </div>
+                                                    </form>
                                                 }
                                             >
                                                 <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
                                                     {taskIds.length === 0 ? (
-                                                        <div className="rounded-lg border border-dashed border-zinc-200 bg-white px-4 py-6 text-center text-sm text-zinc-500">Geen taken.</div>
+                                                        <div className="rounded-lg border border-dashed border-zinc-300 px-4 py-6 text-center text-sm text-zinc-500">Sleep een taak hierheen</div>
                                                     ) : null}
                                                     {taskIds.map((taskKey) => {
                                                         const tid = parseId(taskKey);
@@ -1501,54 +1679,58 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                         aria-modal="true"
                         aria-labelledby="project-modal-title"
                         tabIndex={-1}
-                        className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
+                        className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-6"
                     >
                         <div className="flex items-start justify-between gap-4">
                             <div>
-                                <div id="project-modal-title" className="text-lg font-bold text-zinc-900">Nieuw project</div>
+                                <h2 id="project-modal-title" className="text-lg font-semibold text-zinc-900">Nieuw project</h2>
                                 <div className="mt-1 text-sm text-zinc-500">Maak een nieuwe projectkolom voor je bord.</div>
                             </div>
-                            <Button tone="ghost" type="button" onClick={closeProjectModal}>
+                            <Button variant="ghost" size="sm" type="button" onClick={closeProjectModal} aria-label="Venster sluiten">
                                 Sluiten
                             </Button>
                         </div>
                         <form className="mt-6 space-y-4" onSubmit={createProject}>
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div className="md:col-span-2">
-                                    <label htmlFor="tasks-project-naam" className="block text-xs font-semibold text-zinc-500">Naam</label>
+                                    <label htmlFor="tasks-project-naam" className="block text-sm font-medium text-zinc-800">Naam<span className="ml-0.5 text-rose-600" aria-hidden="true">*</span></label>
                                     <input
                                         id="tasks-project-naam"
-                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        data-autofocus
+                                        required
+                                        maxLength={255}
+                                        aria-invalid={projectErrors.naam ? true : undefined}
+                                        className={cx(inputClasses, 'mt-1')}
                                         value={projectForm.naam}
                                         onChange={(e) => setProjectForm((p) => ({ ...p, naam: e.target.value }))}
                                     />
-                                    {projectErrors.naam ? <div className="mt-1 text-xs text-rose-600" role="alert">{projectErrors.naam?.[0]}</div> : null}
+                                    {projectErrors.naam ? <div className="mt-1 text-xs font-medium text-rose-700" role="alert">{projectErrors.naam?.[0]}</div> : null}
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label htmlFor="tasks-project-omschrijving" className="block text-xs font-semibold text-zinc-500">Omschrijving</label>
+                                    <label htmlFor="tasks-project-omschrijving" className="block text-sm font-medium text-zinc-800">Omschrijving</label>
                                     <textarea
                                         id="tasks-project-omschrijving"
-                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        className={cx(inputClasses, 'mt-1')}
                                         rows={3}
                                         value={projectForm.omschrijving}
                                         onChange={(e) => setProjectForm((p) => ({ ...p, omschrijving: e.target.value }))}
                                     />
                                 </div>
                                 <div>
-                                    <label htmlFor="tasks-project-deadline" className="block text-xs font-semibold text-zinc-500">Deadline</label>
+                                    <label htmlFor="tasks-project-deadline" className="block text-sm font-medium text-zinc-800">Deadline</label>
                                     <input
                                         id="tasks-project-deadline"
                                         type="datetime-local"
-                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        className={cx(inputClasses, 'mt-1')}
                                         value={projectForm.deadline}
                                         onChange={(e) => setProjectForm((p) => ({ ...p, deadline: e.target.value }))}
                                     />
                                 </div>
                                 <div>
-                                    <label htmlFor="tasks-project-kleur-optioneel" className="block text-xs font-semibold text-zinc-500">Kleur (optioneel)</label>
+                                    <label htmlFor="tasks-project-kleur-optioneel" className="block text-sm font-medium text-zinc-800">Kleur (optioneel)</label>
                                     <input
                                         id="tasks-project-kleur-optioneel"
-                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        className={cx(inputClasses, 'mt-1')}
                                         placeholder="#aabbcc"
                                         value={projectForm.kleur}
                                         onChange={(e) => setProjectForm((p) => ({ ...p, kleur: e.target.value }))}
@@ -1556,12 +1738,12 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                 </div>
                             </div>
                             <ErrorList errors={projectErrors} exclude={['naam']} />
-                            <div className="flex items-center justify-end gap-2">
-                                <Button tone="secondary" type="button" onClick={closeProjectModal}>
+                            <div className="flex flex-col-reverse gap-2 border-t border-zinc-100 pt-4 sm:flex-row sm:justify-end">
+                                <Button variant="secondary" type="button" onClick={closeProjectModal}>
                                     Annuleren
                                 </Button>
-                                <Button type="submit" disabled={projectSaving}>
-                                    {projectSaving ? 'Opslaan...' : 'Opslaan'}
+                                <Button type="submit" loading={projectSaving}>
+                                    {projectSaving ? 'Opslaan...' : 'Project toevoegen'}
                                 </Button>
                             </div>
                         </form>
@@ -1581,44 +1763,48 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                         aria-modal="true"
                         aria-labelledby="task-modal-title"
                         tabIndex={-1}
-                        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
+                        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-6"
                     >
                         <div className="flex items-start justify-between gap-4">
                             <div>
-                                <div id="task-modal-title" className="text-lg font-bold text-zinc-900">Nieuwe taak</div>
+                                <h2 id="task-modal-title" className="text-lg font-semibold text-zinc-900">Nieuwe taak</h2>
                                 <div className="mt-1 text-sm text-zinc-500">Maak snel een taak aan en koppel deze aan een project.</div>
                             </div>
-                            <Button tone="ghost" type="button" onClick={closeTaskModal}>
+                            <Button variant="ghost" size="sm" type="button" onClick={closeTaskModal} aria-label="Venster sluiten">
                                 Sluiten
                             </Button>
                         </div>
                         <form className="mt-6 space-y-4" onSubmit={createTask}>
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div className="md:col-span-2">
-                                    <label htmlFor="tasks-task-titel" className="block text-xs font-semibold text-zinc-500">Titel</label>
+                                    <label htmlFor="tasks-task-titel" className="block text-sm font-medium text-zinc-800">Titel<span className="ml-0.5 text-rose-600" aria-hidden="true">*</span></label>
                                     <input
                                         id="tasks-task-titel"
-                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        data-autofocus
+                                        required
+                                        maxLength={255}
+                                        aria-invalid={taskErrors.titel ? true : undefined}
+                                        className={cx(inputClasses, 'mt-1')}
                                         value={taskForm.titel}
                                         onChange={(e) => setTaskForm((t) => ({ ...t, titel: e.target.value }))}
                                     />
-                                    {taskErrors.titel ? <div className="mt-1 text-xs text-rose-600" role="alert">{taskErrors.titel?.[0]}</div> : null}
+                                    {taskErrors.titel ? <div className="mt-1 text-xs font-medium text-rose-700" role="alert">{taskErrors.titel?.[0]}</div> : null}
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label htmlFor="tasks-task-omschrijving" className="block text-xs font-semibold text-zinc-500">Omschrijving</label>
+                                    <label htmlFor="tasks-task-omschrijving" className="block text-sm font-medium text-zinc-800">Omschrijving</label>
                                     <textarea
                                         id="tasks-task-omschrijving"
-                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        className={cx(inputClasses, 'mt-1')}
                                         rows={3}
                                         value={taskForm.omschrijving}
                                         onChange={(e) => setTaskForm((t) => ({ ...t, omschrijving: e.target.value }))}
                                     />
                                 </div>
                                 <div>
-                                    <label htmlFor="tasks-task-project" className="block text-xs font-semibold text-zinc-500">Project</label>
+                                    <label htmlFor="tasks-task-project" className="block text-sm font-medium text-zinc-800">Project</label>
                                     <select
                                         id="tasks-task-project"
-                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        className={cx(inputClasses, 'mt-1')}
                                         value={taskForm.task_project_id}
                                         onChange={(e) => setTaskForm((t) => ({ ...t, task_project_id: e.target.value }))}
                                     >
@@ -1631,10 +1817,10 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                     </select>
                                 </div>
                                 <div>
-                                    <label htmlFor="tasks-task-status" className="block text-xs font-semibold text-zinc-500">Status</label>
+                                    <label htmlFor="tasks-task-status" className="block text-sm font-medium text-zinc-800">Status</label>
                                     <select
                                         id="tasks-task-status"
-                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        className={cx(inputClasses, 'mt-1')}
                                         value={taskForm.status}
                                         onChange={(e) => setTaskForm((t) => ({ ...t, status: e.target.value }))}
                                     >
@@ -1646,10 +1832,10 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                     </select>
                                 </div>
                                 <div>
-                                    <label htmlFor="tasks-task-prioriteit" className="block text-xs font-semibold text-zinc-500">Prioriteit</label>
+                                    <label htmlFor="tasks-task-prioriteit" className="block text-sm font-medium text-zinc-800">Prioriteit</label>
                                     <select
                                         id="tasks-task-prioriteit"
-                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        className={cx(inputClasses, 'mt-1')}
                                         value={taskForm.prioriteit}
                                         onChange={(e) => setTaskForm((t) => ({ ...t, prioriteit: e.target.value }))}
                                     >
@@ -1661,11 +1847,11 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                     </select>
                                 </div>
                                 <div>
-                                    <label htmlFor="tasks-task-deadline" className="block text-xs font-semibold text-zinc-500">Deadline</label>
+                                    <label htmlFor="tasks-task-deadline" className="block text-sm font-medium text-zinc-800">Deadline</label>
                                     <input
                                         id="tasks-task-deadline"
                                         type="datetime-local"
-                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        className={cx(inputClasses, 'mt-1')}
                                         value={taskForm.deadline}
                                         onChange={(e) => setTaskForm((t) => ({ ...t, deadline: e.target.value }))}
                                     />
@@ -1687,21 +1873,21 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                     </div>
                                 </div>
                                 <div>
-                                    <label htmlFor="tasks-task-klant" className="block text-xs font-semibold text-zinc-500">Klant</label>
+                                    <label htmlFor="tasks-task-klant" className="block text-sm font-medium text-zinc-800">Klant</label>
                                     <CustomerPicker id="tasks-task-klant" value={taskForm.customer} onChange={(customer) => setTaskForm((t) => ({ ...t, customer }))} />
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label htmlFor="tasks-task-labels" className="block text-xs font-semibold text-zinc-500">Labels</label>
+                                    <label htmlFor="tasks-task-labels" className="block text-sm font-medium text-zinc-800">Labels</label>
                                     <input
                                         id="tasks-task-labels"
-                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        className={cx(inputClasses, 'mt-1')}
                                         placeholder="bijv. lead, demo, urgent"
                                         value={taskForm.labels}
                                         onChange={(e) => setTaskForm((t) => ({ ...t, labels: e.target.value }))}
                                     />
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label htmlFor="tasks-task-toegewezen-aan" className="block text-xs font-semibold text-zinc-500">Toegewezen aan</label>
+                                    <label htmlFor="tasks-task-toegewezen-aan" className="block text-sm font-medium text-zinc-800">Toegewezen aan</label>
                                     <MultiSelectChips
                                         id="tasks-task-toegewezen-aan"
                                         options={users}
@@ -1711,29 +1897,49 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                     />
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label htmlFor="tasks-task-bijlagen" className="block text-xs font-semibold text-zinc-500">Bijlagen</label>
+                                    <label htmlFor="tasks-task-bijlagen" className="block text-sm font-medium text-zinc-800">Bijlagen</label>
                                     <input
                                         id="tasks-task-bijlagen"
                                         type="file"
-                                        className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                        className="mt-1 block w-full text-sm text-zinc-700 file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-zinc-800 hover:file:bg-zinc-200"
                                         multiple
                                         accept={ATTACHMENT_ACCEPT}
-                                        onChange={(e) => setTaskFiles(Array.from(e.target.files ?? []))}
+                                        onChange={(e) => {
+                                            const picked = Array.from(e.target.files ?? []);
+                                            // Leegmaken, zodat hetzelfde bestand opnieuw gekozen kan worden.
+                                            e.target.value = '';
+                                            setTaskFiles((prev) => [...prev, ...picked]);
+                                        }}
                                     />
                                     <div className="mt-1 text-xs text-zinc-500">{ATTACHMENT_HINT}</div>
                                     {taskFiles.length > 0 ? (
-                                        <div className="mt-1 text-xs text-zinc-600">
-                                            {taskFiles.length === 1 ? '1 bestand gekozen' : `${taskFiles.length} bestanden gekozen`}
-                                        </div>
+                                        <ul className="mt-2 divide-y divide-zinc-100 rounded-lg border border-zinc-200" aria-label="Gekozen bestanden">
+                                            {taskFiles.map((file, idx) => (
+                                                <li key={`${file.name}-${idx}`} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                                                    <span className="min-w-0 truncate text-zinc-800">
+                                                        {file.name}
+                                                        {formatFileSize(file.size) ? <span className="ml-2 text-xs text-zinc-500">{formatFileSize(file.size)}</span> : null}
+                                                    </span>
+                                                    <Button
+                                                        variant="danger-ghost"
+                                                        size="xs"
+                                                        aria-label={`${file.name} verwijderen`}
+                                                        onClick={() => setTaskFiles((prev) => prev.filter((_, i) => i !== idx))}
+                                                    >
+                                                        Verwijderen
+                                                    </Button>
+                                                </li>
+                                            ))}
+                                        </ul>
                                     ) : null}
                                 </div>
                             </div>
                             <ErrorList errors={taskErrors} exclude={['titel']} />
-                            <div className="flex items-center justify-end gap-2">
-                                <Button tone="secondary" type="button" onClick={closeTaskModal}>
+                            <div className="flex flex-col-reverse gap-2 border-t border-zinc-100 pt-4 sm:flex-row sm:justify-end">
+                                <Button variant="secondary" type="button" onClick={closeTaskModal}>
                                     Annuleren
                                 </Button>
-                                <Button type="submit" disabled={taskSaving}>
+                                <Button type="submit" loading={taskSaving}>
                                     {taskSaving ? 'Opslaan...' : 'Taak toevoegen'}
                                 </Button>
                             </div>
@@ -1754,52 +1960,67 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                         aria-modal="true"
                         aria-labelledby="task-detail-title"
                         tabIndex={-1}
-                        className="h-full w-full max-w-xl overflow-y-auto bg-white shadow-2xl"
+                        className="h-full w-full max-w-xl overflow-y-auto overscroll-contain bg-white shadow-2xl"
                     >
-                        <div className="flex items-start justify-between gap-4 border-b border-zinc-200 p-6">
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <div id="task-detail-title" className="text-lg font-bold text-zinc-900">Taak</div>
+                        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-zinc-200 bg-white px-4 py-4 sm:px-6">
+                            <div className="min-w-0">
+                                <h2 id="task-detail-title" className="truncate text-lg font-semibold text-zinc-900">
+                                    {selectedTask?.titel?.trim() || 'Taak'}
+                                </h2>
+                                <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-zinc-500">
+                                    {selectedTask ? <Badge tone={statusTone(selectedTask.status)}>{statusLabel(selectedTask.status)}</Badge> : null}
                                     {isOverdue(selectedTask) ? <OverdueBadge /> : null}
+                                    <span className="truncate">{selectedTask?.project?.naam ?? (selectedTask ? 'Geen project' : '')}</span>
                                 </div>
-                                <div className="mt-1 text-sm text-zinc-500">{selectedTask?.project?.naam ?? 'Geen project'}</div>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex shrink-0 items-center gap-2">
                                 {selectedTask && selectedTask.status !== 'afgerond' ? (
-                                    <Button onClick={completeSelectedTask} disabled={detailSaving}>
+                                    <Button variant="secondary" size="sm" onClick={completeSelectedTask} disabled={detailSaving}>
                                         Afronden
                                     </Button>
-                                ) : selectedTask ? (
-                                    <Pill className="bg-emerald-50 text-emerald-700">Afgerond</Pill>
                                 ) : null}
-                                <Button tone="ghost" onClick={closeTask}>
+                                <Button variant="ghost" size="sm" onClick={closeTask} aria-label="Taakdetails sluiten">
                                     Sluiten
                                 </Button>
                             </div>
                         </div>
                         {detailLoading ? (
-                            <div className="p-6 text-sm text-zinc-600">Laden...</div>
+                            <div className="flex items-center gap-2 p-6 text-sm text-zinc-600" role="status">
+                                <Spinner className="h-4 w-4 text-indigo-600" /> Taak laden...
+                            </div>
                         ) : !selectedTask ? (
-                            <div className="p-6 text-sm text-zinc-600">Taak niet gevonden.</div>
-                        ) : (
                             <div className="p-6">
+                                <EmptyState
+                                    title="Taak niet gevonden"
+                                    description="Deze taak bestaat niet (meer) of kon niet worden geladen."
+                                    action={
+                                        <Button variant="secondary" onClick={() => loadTask(selectedTaskId)}>
+                                            Opnieuw proberen
+                                        </Button>
+                                    }
+                                />
+                            </div>
+                        ) : (
+                            <div className="px-4 py-6 sm:px-6">
                                 <form className="space-y-6" onSubmit={saveTaskDetails}>
                                     <div>
-                                        <label htmlFor="tasks-detail-titel" className="block text-xs font-semibold text-zinc-500">Titel</label>
+                                        <label htmlFor="tasks-detail-titel" className="block text-sm font-medium text-zinc-800">Titel<span className="ml-0.5 text-rose-600" aria-hidden="true">*</span></label>
                                         <input
                                             id="tasks-detail-titel"
-                                            className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                            maxLength={255}
+                                            aria-invalid={detailErrors.titel ? true : undefined}
+                                            className={cx(inputClasses, 'mt-1')}
                                             value={selectedTask.titel ?? ''}
                                             onChange={(e) => setSelectedTask((t) => ({ ...t, titel: e.target.value }))}
                                             required
                                         />
-                                        {detailErrors.titel ? <div className="mt-1 text-xs text-rose-600" role="alert">{detailErrors.titel?.[0]}</div> : null}
+                                        {detailErrors.titel ? <div className="mt-1 text-xs font-medium text-rose-700" role="alert">{detailErrors.titel?.[0]}</div> : null}
                                     </div>
                                     <div>
-                                        <label htmlFor="tasks-detail-omschrijving" className="block text-xs font-semibold text-zinc-500">Omschrijving</label>
+                                        <label htmlFor="tasks-detail-omschrijving" className="block text-sm font-medium text-zinc-800">Omschrijving</label>
                                         <textarea
                                             id="tasks-detail-omschrijving"
-                                            className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                            className={cx(inputClasses, 'mt-1')}
                                             rows={4}
                                             value={selectedTask.omschrijving ?? ''}
                                             onChange={(e) => setSelectedTask((t) => ({ ...t, omschrijving: e.target.value }))}
@@ -1808,10 +2029,10 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
 
                                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                         <div>
-                                            <label htmlFor="tasks-detail-project" className="block text-xs font-semibold text-zinc-500">Project</label>
+                                            <label htmlFor="tasks-detail-project" className="block text-sm font-medium text-zinc-800">Project</label>
                                             <select
                                                 id="tasks-detail-project"
-                                                className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                                className={cx(inputClasses, 'mt-1')}
                                                 value={selectedTask.task_project_id ?? ''}
                                                 onChange={(e) =>
                                                     setSelectedTask((t) => ({ ...t, task_project_id: e.target.value ? Number(e.target.value) : null }))
@@ -1826,10 +2047,10 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                             </select>
                                         </div>
                                         <div>
-                                            <label htmlFor="tasks-detail-status" className="block text-xs font-semibold text-zinc-500">Status</label>
+                                            <label htmlFor="tasks-detail-status" className="block text-sm font-medium text-zinc-800">Status</label>
                                             <select
                                                 id="tasks-detail-status"
-                                                className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                                className={cx(inputClasses, 'mt-1')}
                                                 value={selectedTask.status ?? 'open'}
                                                 onChange={(e) => setSelectedTask((t) => ({ ...t, status: e.target.value }))}
                                             >
@@ -1841,10 +2062,10 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                             </select>
                                         </div>
                                         <div>
-                                            <label htmlFor="tasks-detail-prioriteit" className="block text-xs font-semibold text-zinc-500">Prioriteit</label>
+                                            <label htmlFor="tasks-detail-prioriteit" className="block text-sm font-medium text-zinc-800">Prioriteit</label>
                                             <select
                                                 id="tasks-detail-prioriteit"
-                                                className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                                className={cx(inputClasses, 'mt-1')}
                                                 value={selectedTask.prioriteit ?? 'normaal'}
                                                 onChange={(e) => setSelectedTask((t) => ({ ...t, prioriteit: e.target.value }))}
                                             >
@@ -1862,7 +2083,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                             <input
                                                 id="tasks-detail-deadline"
                                                 type="datetime-local"
-                                                className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                                className={cx(inputClasses, 'mt-1')}
                                                 value={toLocalInputValue(selectedTask.deadline)}
                                                 aria-invalid={isOverdue(selectedTask) || undefined}
                                                 onChange={(e) =>
@@ -1874,7 +2095,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                             />
                                         </div>
                                         <div className="md:col-span-2">
-                                            <label htmlFor="tasks-detail-klant" className="block text-xs font-semibold text-zinc-500">Klant</label>
+                                            <label htmlFor="tasks-detail-klant" className="block text-sm font-medium text-zinc-800">Klant</label>
                                             <CustomerPicker
                                                 id="tasks-detail-klant"
                                                 value={selectedTask.customer ?? null}
@@ -1882,17 +2103,17 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                             />
                                         </div>
                                         <div className="md:col-span-2">
-                                            <label htmlFor="tasks-detail-labels" className="block text-xs font-semibold text-zinc-500">Labels</label>
+                                            <label htmlFor="tasks-detail-labels" className="block text-sm font-medium text-zinc-800">Labels</label>
                                             <input
                                                 id="tasks-detail-labels"
-                                                className="mt-1 w-full rounded-md border-zinc-300 text-sm"
+                                                className={cx(inputClasses, 'mt-1')}
                                                 placeholder="bijv. lead, demo, urgent"
                                                 value={selectedTask.labels ?? ''}
                                                 onChange={(e) => setSelectedTask((t) => ({ ...t, labels: e.target.value }))}
                                             />
                                         </div>
                                         <div className="md:col-span-2">
-                                            <label htmlFor="tasks-detail-toegewezen-aan" className="block text-xs font-semibold text-zinc-500">Toegewezen aan</label>
+                                            <label htmlFor="tasks-detail-toegewezen-aan" className="block text-sm font-medium text-zinc-800">Toegewezen aan</label>
                                             <MultiSelectChips
                                                 id="tasks-detail-toegewezen-aan"
                                                 options={users}
@@ -1910,22 +2131,24 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                     </div>
 
                                     <ErrorList errors={detailErrors} exclude={['titel']} />
-                                    <div className="flex items-center justify-end gap-2">
-                                        <Button tone="secondary" type="button" onClick={closeTask}>
+                                    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                                        <Button variant="secondary" type="button" onClick={closeTask}>
                                             Sluiten
                                         </Button>
-                                        <Button type="submit" disabled={detailSaving}>
+                                        <Button type="submit" loading={detailSaving}>
                                             {detailSaving ? 'Opslaan...' : 'Opslaan'}
                                         </Button>
                                     </div>
                                 </form>
 
-                                <div className="mt-10 border-t border-zinc-200 pt-6">
-                                    <div className="text-sm font-bold text-zinc-900">Reacties</div>
+                                <section className="mt-8 border-t border-zinc-200 pt-6" aria-labelledby="task-detail-reacties">
+                                    <h3 id="task-detail-reacties" className="text-sm font-semibold text-zinc-900">
+                                        Reacties{selectedTask.comments?.length ? ` (${selectedTask.comments.length})` : ''}
+                                    </h3>
                                     <ul className="mt-4 space-y-3">
                                         {selectedTask.comments?.length ? (
                                             selectedTask.comments.map((c) => (
-                                                <li key={c.id} className="rounded-xl border border-zinc-200 bg-white p-4">
+                                                <li key={c.id} className="rounded-lg border border-zinc-200 bg-zinc-50/60 p-3">
                                                     <div className="text-xs font-semibold text-zinc-500">
                                                         {c.author?.name ?? 'Onbekend'} · {c.created_at ? formatDateTime(c.created_at) : '-'}
                                                     </div>
@@ -1938,7 +2161,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                     </ul>
                                     <form className="mt-4 space-y-2" onSubmit={addComment}>
                                         <textarea
-                                            className="w-full rounded-md border-zinc-300 text-sm"
+                                            className={inputClasses}
                                             rows={3}
                                             aria-label="Reactie"
                                             maxLength={5000}
@@ -1947,19 +2170,19 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                             placeholder="Schrijf een reactie en tag met @naam"
                                         />
                                         <div className="flex justify-end">
-                                            <Button type="submit" disabled={commentSaving || !commentBody.trim()}>
+                                            <Button type="submit" variant="secondary" loading={commentSaving} disabled={!commentBody.trim()}>
                                                 {commentSaving ? 'Plaatsen...' : 'Plaatsen'}
                                             </Button>
                                         </div>
                                     </form>
-                                </div>
+                                </section>
 
-                                <div className="mt-10 border-t border-zinc-200 pt-6">
+                                <section className="mt-8 border-t border-zinc-200 pt-6" aria-labelledby="task-detail-bijlagen">
                                     <div className="flex items-center justify-between gap-3">
-                                        <div className="text-sm font-bold text-zinc-900">Bijlagen</div>
+                                        <h3 id="task-detail-bijlagen" className="text-sm font-semibold text-zinc-900">Bijlagen</h3>
                                         <label
                                             className={cx(
-                                                'inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-zinc-700 ring-1 ring-zinc-200 focus-within:ring-2 focus-within:ring-zinc-400 hover:bg-zinc-50',
+                                                'inline-flex h-8 items-center gap-2 rounded-lg bg-white px-3 text-sm font-semibold text-zinc-800 shadow-sm ring-1 ring-inset ring-zinc-300 focus-within:ring-2 focus-within:ring-indigo-600 hover:bg-zinc-50',
                                                 attachmentUploading ? 'cursor-wait opacity-60' : 'cursor-pointer',
                                             )}
                                         >
@@ -1975,6 +2198,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                                     uploadAttachments(files);
                                                 }}
                                             />
+                                            {attachmentUploading ? <Spinner className="h-4 w-4" /> : null}
                                             {attachmentUploading ? 'Uploaden...' : 'Bestand uploaden'}
                                         </label>
                                     </div>
@@ -1983,7 +2207,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                     {selectedTask.attachments?.length ? (
                                         <ul className="mt-4 space-y-2">
                                             {selectedTask.attachments.map((file) => (
-                                                <li key={file.id} className="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3">
+                                                <li key={file.id} className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white px-3 py-2">
                                                     <div className="min-w-0">
                                                         <div className="truncate text-sm font-semibold text-zinc-900">{file.original_name}</div>
                                                         <div className="mt-1 text-xs text-zinc-500">
@@ -2004,7 +2228,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                     ) : (
                                         <div className="mt-4 text-sm text-zinc-500">Nog geen bijlagen.</div>
                                     )}
-                                </div>
+                                </section>
                             </div>
                         )}
                     </div>

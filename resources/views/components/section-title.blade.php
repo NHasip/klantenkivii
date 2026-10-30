@@ -1,13 +1,17 @@
-<div class="md:col-span-1 flex justify-between">
-    <div class="px-4 sm:px-0">
-        <h3 class="text-lg font-medium text-gray-900">{{ $title }}</h3>
+<div class="flex min-w-0 items-start justify-between gap-3">
+    <div class="min-w-0">
+        <h2 class="text-base font-semibold text-zinc-900">{{ $title }}</h2>
 
-        <p class="mt-1 text-sm text-gray-600">
-            {{ $description }}
-        </p>
+        @if (isset($description) && trim((string) $description) !== '')
+            <p class="mt-0.5 text-sm text-zinc-500">
+                {{ $description }}
+            </p>
+        @endif
     </div>
 
-    <div class="px-4 sm:px-0">
-        {{ $aside ?? '' }}
-    </div>
+    @if (isset($aside) && trim((string) $aside) !== '')
+        <div class="shrink-0">
+            {{ $aside }}
+        </div>
+    @endif
 </div>

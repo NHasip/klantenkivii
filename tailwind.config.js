@@ -1,4 +1,3 @@
-import defaultTheme from 'tailwindcss/defaultTheme';
 import forms from '@tailwindcss/forms';
 import typography from '@tailwindcss/typography';
 
@@ -44,8 +43,21 @@ export default {
                     900: '#383e11',
                 },
             },
+            // Systeemlettertype: geen externe fonts laden, overal dezelfde rustige stack.
             fontFamily: {
-                sans: ['Figtree', ...defaultTheme.fontFamily.sans],
+                sans: [
+                    'ui-sans-serif',
+                    'system-ui',
+                    '-apple-system',
+                    '"Segoe UI"',
+                    'Roboto',
+                    '"Helvetica Neue"',
+                    'Arial',
+                    '"Noto Sans"',
+                    'sans-serif',
+                    '"Apple Color Emoji"',
+                    '"Segoe UI Emoji"',
+                ],
             },
         },
     },

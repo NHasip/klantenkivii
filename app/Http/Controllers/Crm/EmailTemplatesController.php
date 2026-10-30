@@ -308,8 +308,12 @@ class EmailTemplatesController
     private function htmlToText(string $html): string
     {
         $text = preg_replace('/<br\s*\/?>/i', "\n", $html) ?? $html;
-        $text = preg_replace('/<\/p>\s*<p>/i', "\n\n", $text) ?? $text;
+        // Blokelementen scheiden, anders plakt bijv. een kop direct aan de volgende alinea.
+        $text = preg_replace('/<li(\s[^>]*)?>/i', '- ', $text) ?? $text;
+        $text = preg_replace('/<\/(p|h[1-6]|ul|ol|blockquote|div)>/i', "\n\n", $text) ?? $text;
+        $text = preg_replace('/<\/li>/i', "\n", $text) ?? $text;
         $text = strip_tags($text);
+        $text = preg_replace("/[ \t]+\n/", "\n", $text) ?? $text;
         $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $text = preg_replace("/\n{3,}/", "\n\n", $text) ?? $text;
 

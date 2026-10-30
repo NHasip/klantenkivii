@@ -45,12 +45,14 @@ class SearchController
 
         $companies = GarageCompany::query()
             ->with('primaryPerson')
-            ->where(function ($q) use ($like, $compactLike, $ibanCompanyIds) {
+            ->where(function ($q) use ($like, $compact, $compactLike, $ibanCompanyIds) {
                 $q->where('bedrijfsnaam', 'like', $like)
                     ->orWhere('hoofd_email', 'like', $like)
                     ->orWhere('login_email', 'like', $like)
                     ->orWhere('hoofd_telefoon', 'like', $like)
-                    ->orWhereRaw("REPLACE(REPLACE(hoofd_telefoon, ' ', ''), '-', '') LIKE ?", [$compactLike])
+                    // Alleen met minstens 2 tekens na het weghalen van spaties/streepjes;
+                    // anders wordt het patroon '%%' en matcht elk telefoonnummer.
+                    ->when(mb_strlen($compact) >= 2, fn ($qq) => $qq->orWhereRaw("REPLACE(REPLACE(hoofd_telefoon, ' ', ''), '-', '') LIKE ?", [$compactLike]))
                     ->orWhere('plaats', 'like', $like)
                     ->orWhere('kvk_nummer', 'like', $like)
                     ->orWhereHas('customerPersons', function ($p) use ($like) {

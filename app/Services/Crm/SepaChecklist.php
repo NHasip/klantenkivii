@@ -5,6 +5,7 @@ namespace App\Services\Crm;
 use App\Enums\SepaMandateStatus;
 use App\Models\GarageCompany;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -25,12 +26,22 @@ class SepaChecklist
             $columns[] = 'incasso_kenmerk_machtiging';
         }
 
+        // Maandbedrag incl. btw per klant in een enkele query, met dezelfde regels als de MRR
+        // (voorkomt een N+1 via het active_mrr_incl attribuut en houdt de getallen gelijk).
+        $inclByCompany = RevenueCalculator::activeModulesQuery(RevenueCalculator::activeStatuses())
+            ->groupBy('garage_company_modules.garage_company_id')
+            ->selectRaw('garage_company_modules.garage_company_id as company_id')
+            ->selectRaw('SUM('.RevenueCalculator::exclExpression()->getValue(DB::connection()->getQueryGrammar()).') as excl_sum')
+            ->selectRaw('SUM('.RevenueCalculator::btwExpression()->getValue(DB::connection()->getQueryGrammar()).') as btw_sum')
+            ->get()
+            ->mapWithKeys(fn ($row) => [(int) $row->company_id => round((float) $row->excl_sum + (float) $row->btw_sum, 2)]);
+
         return GarageCompany::query()
             ->whereIn('status', RevenueCalculator::activeStatuses())
             ->with(['mandates' => fn ($q) => $q->orderByDesc('created_at')])
             ->orderBy('bedrijfsnaam')
             ->get($columns)
-            ->map(function (GarageCompany $company) use ($hasIncassoKenmerkColumn) {
+            ->map(function (GarageCompany $company) use ($hasIncassoKenmerkColumn, $inclByCompany) {
                 $activeMandate = $company->mandates->firstWhere('status', SepaMandateStatus::Actief);
                 $missing = [];
 
@@ -51,7 +62,7 @@ class SepaChecklist
                     $missing[] = 'Kenmerk machtiging ontbreekt';
                 }
 
-                if (round((float) $company->active_mrr_incl, 2) <= 0) {
+                if ((float) ($inclByCompany[$company->id] ?? 0) <= 0) {
                     $missing[] = 'Maandbedrag incl. btw is 0';
                 }
 

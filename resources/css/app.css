@@ -2,8 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+    html {
+        -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+        @apply font-sans antialiased;
+    }
+
+    /* Sticky kopbalk mag gefocuste elementen of ankers niet afdekken (WCAG 2.4.11). */
+    html {
+        scroll-padding-top: 5rem;
+    }
+}
+
 [x-cloak] {
-    display: none;
+    display: none !important;
 }
 
 .tiptap {
@@ -26,12 +41,24 @@
 }
 
 .tiptap a {
-    color: #2563eb;
+    color: theme('colors.indigo.700');
     text-decoration: underline;
+    text-underline-offset: 2px;
 }
 
 /* Zichtbare toetsenbordfocus als vangnet; :where() houdt de specificiteit op 0 zodat utility-klassen voorgaan. */
 :where(a, button, summary, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
     outline: 2px solid theme('colors.indigo.600');
     outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
 }
