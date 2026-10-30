@@ -8,6 +8,7 @@ use App\Enums\GarageCompanyStatus;
 use App\Enums\ReminderChannel;
 use App\Enums\ReminderStatus;
 use App\Enums\SepaMandateStatus;
+use App\Enums\TaskStatus;
 use App\Mail\TemplateMail;
 use App\Models\Activity;
 use App\Models\CustomerPerson;
@@ -20,6 +21,7 @@ use App\Models\OutboundEmail;
 use App\Models\Reminder;
 use App\Models\SepaMandate;
 use App\Models\SmtpSetting;
+use App\Models\Task;
 use App\Models\User;
 use App\Services\Crm\RevenueCalculator;
 use App\Services\EmailTemplateRenderer;
@@ -73,6 +75,8 @@ class GarageCompaniesController
             'sort' => (string) $request->query('sort', 'bijgewerkt'),
             'dir' => strtolower((string) $request->query('dir', '')),
             'perPage' => (int) $request->query('perPage', 15),
+            // Weergave van de lijst (tabel of kaarten); alleen UI, onthouden via de URL.
+            'weergave' => $request->query('weergave') === 'kaarten' ? 'kaarten' : 'lijst',
         ];
 
         // Ongeldige waarden negeren en terugvallen op de standaard, zodat de UI en de query overeenkomen.
@@ -188,6 +192,8 @@ class GarageCompaniesController
 
         // Volgende actie per bedrijf: twee queries voor de hele pagina in plaats van een per rij.
         $nextActions = $this->nextActionsForCompanies($companies->getCollection()->pluck('id')->all(), $hasTaskLink);
+        // Actieve modules per bedrijf (namen voor de chips in de lijst): een query voor de hele pagina.
+        $activeModules = $this->activeModuleNamesForCompanies($companies->getCollection()->pluck('id')->all());
 
         // Zelfde berekening als dashboard en rapportages: alleen klanten met status Actief.
         // Demo-klanten worden apart als pijplijn meegegeven.
@@ -209,6 +215,8 @@ class GarageCompaniesController
             'plaats' => $company->plaats,
             'demo_eind_op' => $isDemo($company) ? $company->effectiveDemoEnd()?->toDateString() : null,
             'demo_eind_berekend' => $isDemo($company) && $company->demoEndIsComputed(),
+            'demo_start_op' => $isDemo($company) ? ($company->proefperiode_start ?? $company->demo_aangevraagd_op)?->toDateString() : null,
+            'modules' => $activeModules[$company->id] ?? [],
             'volgende_actie' => $nextActions[$company->id] ?? null,
             'updated_at' => $company->updated_at?->toIso8601String(),
             'deleted_at' => $company->deleted_at?->toIso8601String(),
@@ -706,6 +714,36 @@ class GarageCompaniesController
     /**
      * @return list<int>
      */
+    /**
+     * Namen van de actieve modules per bedrijf (zelfde actief-definitie als de omzetberekening),
+     * gesorteerd op prijs zodat de belangrijkste modules eerst staan. Een query voor alle ids.
+     *
+     * @param  array<int, int>  $companyIds
+     * @return array<int, array<int, string>>
+     */
+    private function activeModuleNamesForCompanies(array $companyIds): array
+    {
+        if ($companyIds === []) {
+            return [];
+        }
+
+        $rows = RevenueCalculator::constrainActiveModules(
+            DB::table('garage_company_modules')
+                ->join('modules', 'modules.id', '=', 'garage_company_modules.module_id')
+                ->whereIn('garage_company_modules.garage_company_id', $companyIds)
+        )
+            ->orderByDesc('garage_company_modules.prijs_maand_excl')
+            ->orderBy('modules.naam')
+            ->get(['garage_company_modules.garage_company_id', 'modules.naam']);
+
+        $result = [];
+        foreach ($rows as $row) {
+            $result[(int) $row->garage_company_id][] = (string) $row->naam;
+        }
+
+        return $result;
+    }
+
     private function idsFromRequest(Request $request): array
     {
         $raw = $request->input('ids', []);
@@ -1036,6 +1074,28 @@ class GarageCompaniesController
                 'creator' => $activity->creator?->name,
             ]);
 
+        // Open taken uit de module /taken die aan deze klant gekoppeld zijn (alleen lezen, voor "Gerelateerd").
+        $crmTasks = collect();
+        if (Schema::hasTable('tasks') && Task::supportsCustomer()) {
+            $crmTasks = Task::query()
+                ->where('garage_company_id', $garageCompany->id)
+                ->whereNull('afgerond_op')
+                ->where('status', '<>', TaskStatus::Afgerond->value)
+                ->with(['project', 'assignees'])
+                ->orderByRaw('case when deadline is null then 1 else 0 end, deadline asc')
+                ->limit(8)
+                ->get()
+                ->map(fn (Task $task) => [
+                    'id' => $task->id,
+                    'titel' => $task->titel,
+                    'status' => $task->status?->value,
+                    'prioriteit' => $task->prioriteit?->value,
+                    'deadline' => optional($task->deadline)->toIso8601String(),
+                    'project' => $task->project?->naam,
+                    'assignees' => $task->assignees->pluck('name')->values(),
+                ]);
+        }
+
         // Welkomstmail al verstuurd volgens de tijdlijn (ook als die buiten de huidige pagina valt).
         $welcomeSentActivityAt = optional(
             Activity::query()
@@ -1146,6 +1206,7 @@ class GarageCompaniesController
             'appointments' => $afspraken,
             'recentNotes' => $recentNotes,
             'welcomeSentActivityAt' => $welcomeSentActivityAt,
+            'crmTasks' => $crmTasks,
             'reminderChannels' => collect(ReminderChannel::cases())->map(fn ($c) => $c->value)->values(),
             'hasActiveMandate' => $activeMandate !== null,
             'statusErrors' => $this->statusErrors($garageCompany),
@@ -1174,6 +1235,7 @@ class GarageCompaniesController
                 'refresh_welcome_email' => route('crm.garage_companies.welcome.refresh', ['garageCompany' => $garageCompany->id]),
                 'update_welcome_email' => route('crm.garage_companies.welcome.update', ['garageCompany' => $garageCompany->id]),
                 'send_welcome_email' => route('crm.garage_companies.welcome.send', ['garageCompany' => $garageCompany->id]),
+                'tasks_index' => route('crm.tasks.index'),
             ],
         ]);
     }

@@ -502,6 +502,59 @@ class TasksController
     }
 
     /**
+     * Extra klantcontext voor het taakdetail (mini-kaart): status, MRR en het aantal open
+     * klantafspraken. Alleen-lezen en per taak hooguit een paar kleine queries.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function customerDetail(Task $task): ?array
+    {
+        if (! Task::supportsCustomer() || ! $task->garage_company_id) {
+            return null;
+        }
+
+        $company = GarageCompany::query()
+            ->withoutGlobalScope('not_deleted')
+            ->find($task->garage_company_id, ['id', 'bedrijfsnaam', 'plaats', 'status']);
+        if (! $company) {
+            return null;
+        }
+
+        $status = null;
+        $statusLabel = null;
+        try {
+            $status = $company->status?->value;
+            $statusLabel = $company->status?->label();
+        } catch (Throwable) {
+            // Onbekende statuswaarde: mini-kaart toont dan geen status.
+        }
+
+        $mrr = null;
+        try {
+            $mrr = round((float) $company->active_mrr_excl, 2);
+        } catch (Throwable) {
+            $mrr = null;
+        }
+
+        $openAppointments = Activity::query()
+            ->where('garage_company_id', $company->id)
+            ->whereIn('type', [ActivityType::Taak->value, ActivityType::Afspraak->value])
+            ->whereNull('done_at')
+            ->count();
+
+        $url = route('crm.garage_companies.show', ['garageCompany' => $company->id]);
+
+        return [
+            ...$this->customerPayload($company),
+            'status' => $status,
+            'status_label' => $statusLabel,
+            'mrr' => $mrr,
+            'open_appointments' => $openAppointments,
+            'appointments_url' => $url.'?tab=taken_afspraken',
+        ];
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     private function customerOption(mixed $id): ?array
@@ -668,6 +721,7 @@ class TasksController
     {
         return [
             ...$this->taskSummary($task),
+            'customer_info' => $this->customerDetail($task),
             'comments' => $task->comments
                 ->sortBy('created_at')
                 ->map(fn (TaskComment $comment) => [

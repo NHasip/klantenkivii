@@ -40,6 +40,7 @@ class Bell extends Component
             ->whereNull('popup_dismissed_at')
             ->where('remind_at', '<=', now())
             ->whereIn('channel', [ReminderChannel::Popup, ReminderChannel::Beide])
+            ->with('garageCompany:id,bedrijfsnaam')
             ->orderBy('remind_at')
             ->limit(8)
             ->get();
@@ -56,14 +57,14 @@ class Bell extends Component
     /**
      * Extra signalen naast reminders. Kort gecachet (60s per gebruiker) omdat de bel elke 30s pollt.
      *
-     * @return list<array{key: string, title: string, count: int, link: ?string, linkLabel: ?string, items: list<array{label: string, meta: ?string, url: string, overdue: bool}>}>
+     * @return list<array{key: string, title: string, count: int, link: ?string, linkLabel: ?string, items: list<array{label: string, meta: ?string, url: string, overdue: bool, at?: ?string, avatar?: ?string, sub?: ?string}>}>
      */
     private function signals(): array
     {
         $userId = (int) auth()->id();
 
         try {
-            return Cache::remember('crm-bell-signals:'.$userId, 60, fn () => $this->buildSignals($userId));
+            return Cache::remember('crm-bell-signals:v2:'.$userId, 60, fn () => $this->buildSignals($userId));
         } catch (Throwable $e) {
             report($e);
 
@@ -101,6 +102,9 @@ class Bell extends Component
                         'meta' => 'Deadline '.$task->deadline?->format('d-m-Y H:i'),
                         'url' => route('crm.tasks.index', ['taak' => $task->id]),
                         'overdue' => true,
+                        'at' => $task->deadline?->toIso8601String(),
+                        'avatar' => null,
+                        'sub' => null,
                     ])->all(),
             ];
         }
@@ -130,6 +134,9 @@ class Bell extends Component
                         ], fn ($part) => filled($part))) ?: null,
                         'url' => route('crm.garage_companies.show', ['garageCompany' => $activity->garage_company_id, 'tab' => 'taken_afspraken']),
                         'overdue' => $activity->due_at?->lt($now) ?? false,
+                        'at' => $activity->due_at?->toIso8601String(),
+                        'avatar' => $activity->garageCompany?->bedrijfsnaam,
+                        'sub' => $activity->garageCompany?->bedrijfsnaam,
                     ])->all(),
             ];
         }
@@ -159,6 +166,9 @@ class Bell extends Component
                             'overdue' => $end->lt($now),
                             // De meta zegt al "Verlopen op", geen extra "Te laat"-label nodig.
                             'overdueLabel' => false,
+                            'at' => null,
+                            'avatar' => $company->bedrijfsnaam,
+                            'sub' => null,
                         ];
                     })->values()->all(),
             ];

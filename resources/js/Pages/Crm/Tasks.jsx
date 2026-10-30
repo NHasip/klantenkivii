@@ -7,7 +7,8 @@ import { CSS } from '@dnd-kit/utilities';
 import { useDialog } from '../../components/useDialog';
 import { MultiSelectChips } from '../../components/MultiSelectChips';
 import { useConfirm } from '../../components/ConfirmProvider';
-import { Badge, Button, EmptyState, FilePicker, PageHeader, Spinner, cx, inputClasses, tableClasses } from '../../components/ui';
+import { Avatar, Badge, Button, EmptyState, FilePicker, IconTile, PageHeader, Skeleton, Spinner, StatusDot, buttonClasses, cx, inputClasses, tableClasses } from '../../components/ui';
+import { Icon } from '../../components/icons';
 
 function dedupeById(list) {
     const seen = new Set();
@@ -75,36 +76,39 @@ function ErrorList({ errors, exclude = [] }) {
     );
 }
 
+// Prioriteit: kleur voor de rand van de kaart en de stip, altijd met zichtbaar label.
+const PRIORITY_META = {
+    kritiek: { label: 'Kritiek', tone: 'danger', edge: 'bg-rose-500', text: 'text-rose-700' },
+    hoog: { label: 'Hoog', tone: 'warning', edge: 'bg-amber-400', text: 'text-amber-800' },
+    normaal: { label: 'Normaal', tone: 'brand', edge: 'bg-indigo-300', text: 'text-zinc-600' },
+    laag: { label: 'Laag', tone: 'neutral', edge: 'bg-zinc-200', text: 'text-zinc-500' },
+};
+
 function priorityMeta(value) {
-    switch (value) {
-        case 'kritiek':
-            return { label: 'Kritiek', className: 'bg-rose-600 text-white' };
-        case 'hoog':
-            return { label: 'Hoog', className: 'bg-amber-100 text-amber-900 ring-1 ring-inset ring-amber-300' };
-        case 'laag':
-            return { label: 'Laag', className: 'bg-zinc-100 text-zinc-700 ring-1 ring-inset ring-zinc-200' };
-        default:
-            return { label: 'Normaal', className: 'bg-indigo-50 text-indigo-800 ring-1 ring-inset ring-indigo-200' };
-    }
+    return PRIORITY_META[value] ?? PRIORITY_META.normaal;
 }
 
 function statusTone(value) {
     return { open: 'neutral', in_behandeling: 'info', wacht_op_klant: 'warning', afgerond: 'success' }[value] ?? 'neutral';
 }
 
-function countLabel(n, one, many) {
-    return `${n} ${n === 1 ? one : many}`;
+// Klantstatus (GarageCompanyStatus) naar badge-kleur.
+function customerStatusTone(value) {
+    return (
+        {
+            actief: 'success',
+            proefperiode: 'info',
+            demo_gepland: 'info',
+            demo_aangevraagd: 'brand',
+            lead: 'brand',
+            opgezegd: 'warning',
+            verloren: 'neutral',
+        }[value] ?? 'neutral'
+    );
 }
 
-function initials(name) {
-    return String(name || '')
-        .trim()
-        .split(' ')
-        .filter(Boolean)
-        .map((part) => part.slice(0, 1))
-        .join('')
-        .slice(0, 2)
-        .toUpperCase();
+function countLabel(n, one, many) {
+    return `${n} ${n === 1 ? one : many}`;
 }
 
 function parseId(value) {
@@ -126,8 +130,143 @@ function isOverdue(task) {
     return !Number.isNaN(date.getTime()) && date.getTime() < Date.now();
 }
 
+// Korte, menselijke deadline: "Vandaag 17:00", "Morgen 09:00", "12 okt 14:00".
+function formatDeadline(isoString) {
+    if (!isoString) return null;
+    const date = new Date(isoString);
+    if (Number.isNaN(date.getTime())) return String(isoString);
+    const now = new Date();
+    const day = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const diff = Math.round((day(date) - day(now)) / 86400000);
+    const time = new Intl.DateTimeFormat('nl-NL', { hour: '2-digit', minute: '2-digit' }).format(date);
+    if (diff === 0) return `Vandaag ${time}`;
+    if (diff === 1) return `Morgen ${time}`;
+    if (diff === -1) return `Gisteren ${time}`;
+    const datePart = new Intl.DateTimeFormat('nl-NL', {
+        day: 'numeric',
+        month: 'short',
+        ...(date.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}),
+    })
+        .format(date)
+        .replace('.', '');
+    return `${datePart} ${time}`;
+}
+
+function formatMoney(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return null;
+    return new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR', maximumFractionDigits: n % 1 === 0 ? 0 : 2 }).format(n);
+}
+
+function safeColor(value) {
+    return typeof value === 'string' && /^#[0-9a-f]{3,8}$/i.test(value.trim()) ? value.trim() : null;
+}
+
 function OverdueBadge() {
-    return <span className="inline-flex shrink-0 items-center rounded-full bg-rose-600 px-2 py-0.5 text-[11px] font-semibold text-white">Te laat</span>;
+    return (
+        <Badge tone="danger" icon="clock">
+            Te laat
+        </Badge>
+    );
+}
+
+function PriorityTag({ value, className = '' }) {
+    const meta = priorityMeta(value);
+    return (
+        <span className={cx('inline-flex shrink-0 items-center gap-1.5 text-xs font-medium', meta.text, className)}>
+            <StatusDot tone={meta.tone} />
+            <span className="sr-only">Prioriteit: </span>
+            {meta.label}
+        </span>
+    );
+}
+
+function ProjectDot({ kleur, className = '' }) {
+    const color = safeColor(kleur);
+    return <span aria-hidden="true" className={cx('inline-block h-2.5 w-2.5 shrink-0 rounded-[3px]', !color && 'bg-zinc-300', className)} style={color ? { backgroundColor: color } : undefined} />;
+}
+
+function DeadlineMeta({ deadline, overdue = false, emptyLabel = 'Geen deadline', className = '' }) {
+    if (!deadline) {
+        return (
+            <span className={cx('inline-flex items-center gap-1 whitespace-nowrap text-zinc-400', className)}>
+                <Icon name="clock" className="h-3.5 w-3.5" />
+                {emptyLabel}
+            </span>
+        );
+    }
+    return (
+        <span
+            className={cx(
+                'inline-flex items-center gap-1 whitespace-nowrap',
+                overdue ? 'rounded-md bg-rose-50 px-1.5 py-0.5 font-semibold text-rose-700 ring-1 ring-inset ring-rose-200' : 'text-zinc-600',
+                className,
+            )}
+            title={formatDateTime(deadline)}
+        >
+            <Icon name={overdue ? 'alert-circle' : 'clock'} className="h-3.5 w-3.5" />
+            {overdue ? <span>Te laat</span> : <span className="sr-only">Deadline: </span>}
+            <span className={overdue ? 'font-medium text-rose-600' : undefined}>{formatDeadline(deadline)}</span>
+        </span>
+    );
+}
+
+function CountMeta({ icon, count, one, many }) {
+    if (!count) return null;
+    return (
+        <span className="inline-flex items-center gap-1 tabular-nums text-zinc-500" title={countLabel(count, one, many)}>
+            <Icon name={icon} className="h-3.5 w-3.5" />
+            {count}
+            <span className="sr-only"> {count === 1 ? one : many}</span>
+        </span>
+    );
+}
+
+function AvatarStack({ people = [], max = 3, size = 'xs' }) {
+    const list = Array.isArray(people) ? people : [];
+    if (list.length === 0) {
+        return (
+            <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-dashed border-zinc-300 text-zinc-400" title="Niet toegewezen">
+                <Icon name="user" className="h-3 w-3" />
+                <span className="sr-only">Niet toegewezen</span>
+            </span>
+        );
+    }
+    const shown = list.slice(0, max);
+    const rest = list.length - shown.length;
+    return (
+        <span className="flex shrink-0 items-center -space-x-1">
+            <span className="sr-only">Toegewezen aan {list.map((p) => p.name).join(', ')}</span>
+            {shown.map((p) => (
+                <span key={p.id} className="rounded-full ring-2 ring-white" title={p.name}>
+                    <Avatar name={p.name} size={size} />
+                </span>
+            ))}
+            {rest > 0 ? (
+                <span className="inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-zinc-100 px-1 text-[10px] font-semibold text-zinc-600 ring-2 ring-white" aria-hidden="true">
+                    +{rest}
+                </span>
+            ) : null}
+        </span>
+    );
+}
+
+function CustomerChip({ customer, stopDrag = false, className = '' }) {
+    if (!customer) return null;
+    return (
+        <a
+            href={customer.url}
+            title={`Klant openen: ${customer.naam}`}
+            onPointerDown={stopDrag ? (e) => e.stopPropagation() : undefined}
+            className={cx(
+                'inline-flex max-w-full items-center gap-1.5 rounded-full bg-white py-0.5 pl-0.5 pr-2.5 text-xs font-medium text-zinc-700 ring-1 ring-inset ring-zinc-200 transition-colors hover:bg-indigo-50 hover:text-indigo-900 hover:ring-indigo-200 focus-ring',
+                className,
+            )}
+        >
+            <Avatar name={customer.naam} size="xs" />
+            <span className="truncate">{customer.naam}</span>
+        </a>
+    );
 }
 
 const EMPTY_TASK_FORM = {
@@ -174,6 +313,8 @@ function readUrlState() {
         group: group === 'project' || group === 'status' ? group : null,
         appointments: params.get('afspraken') === '1',
         taskId: parseId(params.get('taak') ?? '') || null,
+        // /taken?nieuw=1&klant=ID opent direct "Nieuwe taak" met die klant ingevuld (link vanaf de klantpagina).
+        newTask: params.get('nieuw') === '1',
     };
 }
 
@@ -235,9 +376,10 @@ function CustomerPicker({ id, value, onChange, placeholder = 'Zoek een klant...'
 
     if (value) {
         return (
-            <div className="mt-1 flex items-center justify-between gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm">
-                <a href={value.url} className="truncate font-semibold text-indigo-700 hover:underline">
-                    {value.naam}
+            <div className="mt-1 flex min-h-[2.375rem] items-center justify-between gap-2 rounded-xl border border-zinc-300 bg-white py-1 pl-1.5 pr-3 text-sm shadow-sm">
+                <a href={value.url} className="inline-flex min-w-0 items-center gap-2 rounded-full font-semibold text-zinc-900 hover:text-indigo-700 focus-ring">
+                    <Avatar name={value.naam} size="xs" />
+                    <span className="truncate">{value.naam}</span>
                 </a>
                 <button
                     type="button"
@@ -254,6 +396,7 @@ function CustomerPicker({ id, value, onChange, placeholder = 'Zoek een klant...'
     const listId = `${id}-opties`;
     return (
         <div className="relative mt-1">
+            <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
             <input
                 id={id}
                 role="combobox"
@@ -262,7 +405,7 @@ function CustomerPicker({ id, value, onChange, placeholder = 'Zoek een klant...'
                 aria-autocomplete="list"
                 aria-activedescendant={active >= 0 ? `${listId}-${active}` : undefined}
                 autoComplete="off"
-                className={inputClasses}
+                className={cx(inputClasses, 'pl-9')}
                 placeholder={placeholder}
                 value={query}
                 onFocus={() => setOpen(true)}
@@ -291,23 +434,24 @@ function CustomerPicker({ id, value, onChange, placeholder = 'Zoek een klant...'
                 }}
             />
             {open ? (
-                <ul id={listId} role="listbox" className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-zinc-200 bg-white py-1 text-sm shadow-lg">
-                    {loading && results.length === 0 ? <li className="px-3 py-2 text-zinc-500">Zoeken...</li> : null}
-                    {!loading && results.length === 0 ? <li className="px-3 py-2 text-zinc-500">Geen klanten gevonden.</li> : null}
+                <ul id={listId} role="listbox" className="menu-panel absolute z-30 mt-1 max-h-60 w-full overflow-y-auto text-sm">
+                    {loading && results.length === 0 ? <li className="px-2.5 py-2 text-zinc-500">Zoeken...</li> : null}
+                    {!loading && results.length === 0 ? <li className="px-2.5 py-2 text-zinc-500">Geen klanten gevonden.</li> : null}
                     {results.map((customer, idx) => (
                         <li
                             key={customer.id}
                             id={`${listId}-${idx}`}
                             role="option"
                             aria-selected={idx === active}
-                            className={cx('cursor-pointer px-3 py-2', idx === active ? 'bg-indigo-50 text-indigo-900' : 'hover:bg-zinc-50')}
+                            className={cx('flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2', idx === active ? 'bg-indigo-50 text-indigo-900' : 'hover:bg-zinc-50')}
                             onMouseDown={(e) => {
                                 e.preventDefault();
                                 choose(customer);
                             }}
                         >
-                            <span className="font-semibold">{customer.naam}</span>
-                            {customer.plaats ? <span className="ml-2 text-xs text-zinc-500">{customer.plaats}</span> : null}
+                            <Avatar name={customer.naam} size="xs" />
+                            <span className="min-w-0 truncate font-semibold">{customer.naam}</span>
+                            {customer.plaats ? <span className="ml-auto shrink-0 text-xs text-zinc-500">{customer.plaats}</span> : null}
                         </li>
                     ))}
                 </ul>
@@ -316,13 +460,49 @@ function CustomerPicker({ id, value, onChange, placeholder = 'Zoek een klant...'
     );
 }
 
-function Pill({ children, className = '' }) {
+// Inhoud van een taakkaart (bord, mobiele lijst). De titelknop strekt zich over de hele kaart uit,
+// zodat de kaart overal klikbaar is; de klantlink ligt erboven (z-10) en blijft apart bereikbaar.
+function TaskCardContent({ task, onOpen, stopDrag = false }) {
+    const meta = priorityMeta(task.prioriteit);
+    const overdue = isOverdue(task);
     return (
-        <span className={cx('inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-700', className)}>
-            {children}
-        </span>
+        <>
+            <span aria-hidden="true" className={cx('absolute inset-y-0 left-0 w-1', overdue ? 'bg-rose-500' : meta.edge)} />
+            <button
+                type="button"
+                className="block w-full text-left after:absolute after:inset-0 after:rounded-xl focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-indigo-600"
+                onClick={() => onOpen(task.id)}
+                title={task.titel}
+            >
+                <span className={cx('line-clamp-2 text-sm font-semibold leading-5', task.status === 'afgerond' ? 'text-zinc-500 line-through decoration-zinc-300' : 'text-zinc-900')}>{task.titel}</span>
+            </button>
+            <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                <PriorityTag value={task.prioriteit} />
+                {task.project?.naam ? (
+                    <span className="inline-flex min-w-0 items-center gap-1.5 text-zinc-500">
+                        <ProjectDot kleur={task.project.kleur} className="h-2 w-2" />
+                        <span className="truncate">{task.project.naam}</span>
+                    </span>
+                ) : null}
+            </div>
+            {task.customer ? (
+                <div className="relative z-10 mt-2.5 flex min-w-0">
+                    <CustomerChip customer={task.customer} stopDrag={stopDrag} />
+                </div>
+            ) : null}
+            <div className="mt-3 flex items-center justify-between gap-2 border-t border-zinc-100 pt-2.5">
+                <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                    <DeadlineMeta deadline={task.deadline} overdue={overdue} />
+                    <CountMeta icon="message-square" count={task.counts?.comments} one="reactie" many="reacties" />
+                    <CountMeta icon="file-text" count={task.counts?.attachments} one="bijlage" many="bijlagen" />
+                </div>
+                <AvatarStack people={task.assignees} />
+            </div>
+        </>
     );
 }
+
+const CARD_BASE = 'relative overflow-hidden rounded-xl border bg-white py-3 pl-4 pr-3 shadow-card transition-[box-shadow,border-color] duration-150 hover:shadow-card-hover';
 
 function SortableTaskCard({ task, onOpen }) {
     const id = `task-${task.id}`;
@@ -334,63 +514,24 @@ function SortableTaskCard({ task, onOpen }) {
             ref={setNodeRef}
             style={style}
             className={cx(
-                'cursor-grab touch-manipulation rounded-lg border bg-white p-3 shadow-sm transition-shadow hover:border-zinc-300 hover:shadow active:cursor-grabbing',
-                isOverdue(task) ? 'border-rose-200 border-l-4 border-l-rose-500' : 'border-zinc-200',
-                isDragging ? 'opacity-50' : 'opacity-100',
+                CARD_BASE,
+                'cursor-grab touch-manipulation active:cursor-grabbing',
+                isOverdue(task) ? 'border-rose-200' : 'border-hairline hover:border-zinc-300',
+                isDragging ? 'opacity-40' : 'opacity-100',
             )}
             aria-roledescription={attributes['aria-roledescription']}
             {...listeners}
         >
             {/* Alleen de knop is focusbaar; de kaart zelf is geen extra tab-stop. */}
-            <button type="button" className="w-full rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2" onClick={() => onOpen(task.id)} title={task.titel}>
-                <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                        <div className="line-clamp-2 text-sm font-semibold text-zinc-900">{task.titel}</div>
-                        {task.project?.naam ? <div className="mt-1 truncate text-xs text-zinc-500">{task.project.naam}</div> : null}
-                    </div>
-                    <span className={cx('shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold', priorityMeta(task.prioriteit).className)}>
-                        {priorityMeta(task.prioriteit).label}
-                    </span>
-                </div>
-                <div className="mt-3 flex items-center justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                        {isOverdue(task) ? <OverdueBadge /> : null}
-                        {task.deadline ? (
-                            <Pill className={isOverdue(task) ? 'bg-rose-50 text-rose-700' : ''}>{formatDateTime(task.deadline)}</Pill>
-                        ) : (
-                            <Pill className="text-zinc-400">Geen deadline</Pill>
-                        )}
-                        {task.counts?.comments ? <Pill>{countLabel(task.counts.comments, 'reactie', 'reacties')}</Pill> : null}
-                        {task.counts?.attachments ? <Pill>{countLabel(task.counts.attachments, 'bijlage', 'bijlagen')}</Pill> : null}
-                    </div>
-                    <div className="flex items-center gap-1">
-                        {task.assignees?.slice(0, 2).map((a) => (
-                            <span
-                                key={a.id}
-                                className="grid h-7 w-7 place-items-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-800 ring-2 ring-white"
-                                title={a.name}
-                                aria-label={a.name}
-                            >
-                                {initials(a.name) || '--'}
-                            </span>
-                        ))}
-                        {task.assignees?.length > 2 ? (
-                            <span className="grid h-7 w-7 place-items-center rounded-full bg-zinc-100 text-xs font-bold text-zinc-700" title="Meer">
-                                +{task.assignees.length - 2}
-                            </span>
-                        ) : null}
-                    </div>
-                </div>
-            </button>
-            {task.customer ? (
-                <a
-                    href={task.customer.url}
-                    className="mt-2 block truncate rounded text-xs font-semibold text-indigo-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
-                    onPointerDown={(e) => e.stopPropagation()}
-                >
-                    Klant: {task.customer.naam}
-                </a>
-            ) : null}
+            <TaskCardContent task={task} onOpen={onOpen} stopDrag />
+        </div>
+    );
+}
+
+function StaticTaskCard({ task, onOpen }) {
+    return (
+        <div className={cx(CARD_BASE, isOverdue(task) ? 'border-rose-200' : 'border-hairline')}>
+            <TaskCardContent task={task} onOpen={onOpen} />
         </div>
     );
 }
@@ -403,8 +544,8 @@ function DroppableBody({ id, children }) {
         <div
             ref={setNodeRef}
             className={cx(
-                'min-h-[6rem] flex-1 space-y-2 overflow-y-auto p-3 transition-colors lg:max-h-[calc(100vh-22rem)]',
-                isOver && 'bg-indigo-50/70 ring-2 ring-inset ring-indigo-300',
+                'mx-1.5 min-h-[6rem] flex-1 space-y-2 overflow-y-auto rounded-xl p-1.5 transition-colors lg:max-h-[calc(100vh-22rem)]',
+                isOver && 'bg-indigo-50 ring-2 ring-inset ring-indigo-300',
             )}
         >
             {children}
@@ -412,41 +553,211 @@ function DroppableBody({ id, children }) {
     );
 }
 
-function Column({ title, subtitle, count, children, footer, droppableId = null, fit = false }) {
+function Column({ title, subtitle, count, lead, alert, children, footer, droppableId = null, fit = false }) {
     return (
-        <div className={cx('flex h-full w-[min(300px,85vw)] flex-col rounded-xl border border-zinc-200 bg-zinc-50', fit && 'xl:w-auto')}>
-            <div className="flex items-start justify-between gap-3 border-b border-zinc-200 px-3 py-3">
-                <div className="min-w-0">
-                    <h2 className="truncate text-sm font-semibold text-zinc-900" title={title}>{title}</h2>
-                    {subtitle ? <div className="mt-0.5 truncate text-xs text-zinc-500">{subtitle}</div> : null}
+        <div className={cx('flex h-full w-[min(300px,85vw)] flex-col rounded-2xl bg-zinc-200/40 ring-1 ring-inset ring-zinc-200/70', fit && 'xl:w-auto')}>
+            <div className="flex items-center gap-2.5 px-3 pb-2 pt-3">
+                {lead}
+                <div className="min-w-0 flex-1">
+                    <h2 className="truncate text-sm font-semibold text-zinc-900" title={title}>
+                        {title}
+                    </h2>
+                    {subtitle || alert ? (
+                        <div className="mt-0.5 flex min-w-0 items-center gap-2 text-xs">
+                            {alert ? <span className="shrink-0 font-semibold text-rose-700">{alert}</span> : null}
+                            {subtitle ? <span className="truncate text-zinc-500">{subtitle}</span> : null}
+                        </div>
+                    ) : null}
                 </div>
-                <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-semibold tabular-nums text-zinc-700 ring-1 ring-inset ring-zinc-200" aria-label={countLabel(count, 'taak', 'taken')}>
+                <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-semibold tabular-nums text-zinc-700 shadow-card ring-1 ring-inset ring-black/5" aria-label={countLabel(count, 'taak', 'taken')}>
                     {count}
                 </span>
             </div>
-            {droppableId ? (
-                <DroppableBody id={droppableId}>{children}</DroppableBody>
-            ) : (
-                <div className="flex-1 space-y-2 overflow-y-auto p-3">{children}</div>
-            )}
-            {footer ? <div className="border-t border-zinc-200 p-3">{footer}</div> : null}
+            {droppableId ? <DroppableBody id={droppableId}>{children}</DroppableBody> : <div className="flex-1 space-y-2 overflow-y-auto p-3">{children}</div>}
+            {footer ? <div className="p-3 pt-2">{footer}</div> : null}
         </div>
     );
 }
 
+function columnLead(col, group, projects) {
+    if (group === 'status') return <StatusDot tone={statusTone(col.status)} className="ml-1" />;
+    if (group === 'project') {
+        if (!col.projectId) return <IconTile icon="inbox" tone="neutral" size="sm" className="h-7 w-7" />;
+        return (
+            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white shadow-card ring-1 ring-inset ring-black/5" aria-hidden="true">
+                <ProjectDot kleur={projects.find((p) => p.id === col.projectId)?.kleur} />
+            </span>
+        );
+    }
+    if (!col.assigneeId) return <IconTile icon="user" tone="neutral" size="sm" />;
+    return <Avatar name={col.title} size="sm" />;
+}
+
 function TaskOverlay({ task }) {
     if (!task) return null;
+    const meta = priorityMeta(task.prioriteit);
     return (
-        <div className="w-[min(300px,80vw)] rotate-1 cursor-grabbing rounded-lg border border-indigo-200 bg-white p-3 shadow-xl">
+        <div className="relative w-[min(300px,80vw)] rotate-1 cursor-grabbing overflow-hidden rounded-xl border border-indigo-200 bg-white py-3 pl-4 pr-3 shadow-pop">
+            <span aria-hidden="true" className={cx('absolute inset-y-0 left-0 w-1', meta.edge)} />
             <div className="truncate text-sm font-semibold text-zinc-900">{task.titel}</div>
-            <div className="mt-2 flex items-center justify-between">
-                <span className={cx('rounded-full px-2 py-0.5 text-[11px] font-semibold', priorityMeta(task.prioriteit).className)}>
-                    {priorityMeta(task.prioriteit).label}
-                </span>
-                {task.deadline ? <Pill>{formatDateTime(task.deadline)}</Pill> : <Pill className="text-zinc-400">Geen deadline</Pill>}
+            <div className="mt-2 flex items-center justify-between gap-2 text-xs">
+                <PriorityTag value={task.prioriteit} />
+                <DeadlineMeta deadline={task.deadline} overdue={isOverdue(task)} />
             </div>
         </div>
     );
+}
+
+function BoardSkeleton({ columns = 4 }) {
+    return (
+        <div className="flex gap-4 overflow-hidden" aria-hidden="true">
+            {Array.from({ length: columns }, (_, i) => (
+                <div key={i} className="w-[min(300px,85vw)] shrink-0 rounded-2xl bg-zinc-200/40 p-3 xl:w-auto xl:flex-1">
+                    <Skeleton className="h-4 w-24" />
+                    <div className="mt-4 space-y-2">
+                        {Array.from({ length: 3 - (i % 2) }, (_, j) => (
+                            <div key={j} className="rounded-xl bg-white p-3 shadow-card">
+                                <Skeleton lines={2} />
+                                <div className="mt-4 flex items-center justify-between">
+                                    <Skeleton className="h-3 w-20" />
+                                    <Skeleton className="h-6 w-6 rounded-full" />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function ListSkeleton() {
+    return (
+        <div className="card divide-y divide-zinc-100" aria-hidden="true">
+            {Array.from({ length: 5 }, (_, i) => (
+                <div key={i} className="flex items-center gap-4 px-4 py-3.5">
+                    <Skeleton className="h-4 flex-1" />
+                    <Skeleton className="hidden h-6 w-28 rounded-full sm:block" />
+                    <Skeleton className="hidden h-4 w-20 md:block" />
+                    <Skeleton className="h-6 w-6 rounded-full" />
+                </div>
+            ))}
+        </div>
+    );
+}
+
+// Bestandstype voor het icoon en de kleur van een bijlage.
+function fileKind(name = '', mime = '') {
+    const ext = String(name).split('.').pop()?.toLowerCase() ?? '';
+    if (ext === 'pdf' || mime === 'application/pdf') return { label: 'PDF', tone: 'danger' };
+    if (['jpg', 'jpeg', 'png', 'webp'].includes(ext) || String(mime).startsWith('image/')) return { label: 'Afbeelding', tone: 'info' };
+    if (['xls', 'xlsx', 'csv'].includes(ext)) return { label: ext === 'csv' ? 'CSV' : 'Excel', tone: 'success' };
+    if (['doc', 'docx'].includes(ext)) return { label: 'Word', tone: 'brand' };
+    return { label: ext ? ext.toUpperCase() : 'Bestand', tone: 'neutral' };
+}
+
+function ModalHeader({ id, icon, title, description, onClose }) {
+    return (
+        <div className="flex items-start justify-between gap-4">
+            <div className="flex min-w-0 items-start gap-3">
+                <IconTile icon={icon} tone="brand" />
+                <div className="min-w-0">
+                    <h2 id={id} className="text-lg font-semibold text-zinc-900">
+                        {title}
+                    </h2>
+                    {description ? <p className="mt-0.5 text-sm text-zinc-500">{description}</p> : null}
+                </div>
+            </div>
+            <Button variant="ghost" size="sm" iconOnly icon="x" type="button" onClick={onClose} aria-label="Venster sluiten" />
+        </div>
+    );
+}
+
+function DrawerSection({ id, icon, title, count, actions, children, className = '' }) {
+    return (
+        <section className={cx('border-t border-zinc-100 pt-6', className)} aria-labelledby={id}>
+            <div className="mb-4 flex items-center justify-between gap-3">
+                <h3 id={id} className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-900">
+                    <Icon name={icon} className="h-4 w-4 text-zinc-400" />
+                    {title}
+                    {count ? <span className="rounded-full bg-zinc-100 px-1.5 text-2xs font-semibold tabular-nums text-zinc-600">{count}</span> : null}
+                </h3>
+                {actions}
+            </div>
+            {children}
+        </section>
+    );
+}
+
+// Mini-kaart van de gekoppelde klant in het taakdetail. `info` (status, MRR, open klantafspraken)
+// komt uit het detail-endpoint; zonder info (net gewijzigde klant) tonen we alleen naam en plaats.
+function CustomerMiniCard({ customer, info }) {
+    if (!customer) return null;
+    const data = info ?? customer;
+    const mrr = info?.mrr > 0 ? formatMoney(info.mrr) : null;
+    const open = Number(info?.open_appointments ?? 0);
+    return (
+        <div className="overflow-hidden rounded-2xl border border-hairline bg-gradient-to-b from-zinc-50 to-white">
+            <div className="flex items-center gap-3 p-3.5">
+                <Avatar name={data.naam} size="md" />
+                <div className="min-w-0 flex-1">
+                    <div className="text-xs font-medium text-zinc-500">Klant</div>
+                    <a href={data.url} className="block truncate font-semibold text-zinc-900 hover:text-indigo-700 focus-ring rounded">
+                        {data.naam}
+                    </a>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
+                        {info?.status_label ? (
+                            <Badge tone={customerStatusTone(info.status)} dot>
+                                {info.status_label}
+                            </Badge>
+                        ) : null}
+                        {mrr ? (
+                            <span className="inline-flex items-center gap-1 tabular-nums">
+                                <Icon name="euro" className="h-3.5 w-3.5 text-zinc-400" />
+                                {mrr} per maand
+                            </span>
+                        ) : data.plaats ? (
+                            <span className="inline-flex items-center gap-1">
+                                <Icon name="map-pin" className="h-3.5 w-3.5 text-zinc-400" />
+                                {data.plaats}
+                            </span>
+                        ) : null}
+                    </div>
+                </div>
+                <a href={data.url} className={buttonClasses({ variant: 'secondary', size: 'sm', iconOnly: true })} aria-label={`Klantpagina van ${data.naam} openen`} title="Klantpagina openen">
+                    <Icon name="arrow-up-right" className="h-4 w-4" />
+                </a>
+            </div>
+            {info ? (
+                <a
+                    href={info.appointments_url}
+                    className="flex items-center justify-between gap-3 border-t border-zinc-100 px-3.5 py-2.5 text-sm text-zinc-700 transition-colors hover:bg-zinc-50 focus:outline-none focus-visible:bg-indigo-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-600"
+                >
+                    <span className="inline-flex items-center gap-2">
+                        <Icon name="calendar" className="h-4 w-4 text-zinc-400" />
+                        {open > 0 ? (
+                            <span>
+                                <span className="font-semibold text-zinc-900">{open}</span> open {open === 1 ? 'klantafspraak' : 'klantafspraken'}
+                            </span>
+                        ) : (
+                            'Geen open klantafspraken'
+                        )}
+                    </span>
+                    <Icon name="chevron-right" className="h-4 w-4 text-zinc-400" />
+                </a>
+            ) : null}
+        </div>
+    );
+}
+
+function relativeTime(isoString) {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    if (Number.isNaN(date.getTime())) return '';
+    const minutes = Math.round((Date.now() - date.getTime()) / 60000);
+    if (minutes < 1) return 'Zojuist';
+    if (minutes < 60) return `${minutes} min geleden`;
+    return formatDeadline(isoString);
 }
 
 function normalizeName(name) {
@@ -544,7 +855,8 @@ function findContainerId(itemsByColumn, id) {
 }
 
 export default function Tasks({ initial, filters, customerFilter, urls }) {
-    const currentUserId = Number(usePage().props?.auth?.user?.id) || null;
+    const authUser = usePage().props?.auth?.user ?? null;
+    const currentUserId = Number(authUser?.id) || null;
     const confirm = useConfirm();
     const detailBaselineRef = useRef('');
     const confirmingRef = useRef(false);
@@ -819,6 +1131,12 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
         });
         setShowTaskModal(true);
     }, [currentUserId, users, filterCustomer]);
+
+    useEffect(() => {
+        // Eenmalig bij laden: ?nieuw=1 opent het formulier (klant komt uit ?klant=, via customerFilter).
+        if (urlInit.newTask && !urlInit.taskId) openNewTaskModal();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const saveTaskDetails = useCallback(
         async (event) => {
@@ -1262,21 +1580,33 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
 
     const emptyTasksState = hasActiveFilters ? (
         <EmptyState
+            illustration="search"
             title="Geen taken gevonden"
-            description="Er zijn geen taken die passen bij de huidige filters."
+            description="Geen enkele taak past bij deze filters. Wis de filters of zoek op iets anders."
             action={
-                <Button variant="secondary" onClick={resetFilters}>
+                <Button variant="secondary" icon="x" onClick={resetFilters}>
                     Filters wissen
                 </Button>
             }
         />
     ) : (
         <EmptyState
-            title={loading ? 'Taken laden...' : 'Nog geen taken'}
-            description={loading ? null : 'Maak je eerste taak aan om het werk te verdelen.'}
-            action={loading ? null : <Button onClick={openNewTaskModal}>Nieuwe taak</Button>}
+            illustration="tasks"
+            title="Nog geen taken"
+            description="Maak een taak aan en verdeel het werk over je team. Koppel een klant om alles bij elkaar te houden."
+            action={
+                <Button icon="plus" onClick={openNewTaskModal}>
+                    Nieuwe taak
+                </Button>
+            }
         />
     );
+
+    // Detailformulier: niet opgeslagen wijzigingen zichtbaar maken.
+    const detailDirty = Boolean(selectedTask) && detailSnapshot(selectedTask) !== detailBaselineRef.current;
+    const currentUserName = authUser?.name ?? '';
+    const customerInfo = selectedTask?.customer_info && selectedTask.customer_info.id === selectedTask?.customer?.id ? selectedTask.customer_info : null;
+    const boardInitialLoading = loading && tasks.length === 0;
 
     const closeProjectModal = useCallback(() => setShowProjectModal(false), []);
     const closeTaskModal = useCallback(() => setShowTaskModal(false), []);
@@ -1293,10 +1623,12 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                     description="Plan, verdeel en volg taken per status, project of collega."
                     actions={
                         <>
-                            <Button variant="secondary" onClick={() => setShowProjectModal(true)}>
+                            <Button variant="secondary" icon="layers" onClick={() => setShowProjectModal(true)}>
                                 Nieuw project
                             </Button>
-                            <Button onClick={openNewTaskModal}>Nieuwe taak</Button>
+                            <Button icon="plus" onClick={openNewTaskModal}>
+                                Nieuwe taak
+                            </Button>
                         </>
                     }
                 />
@@ -1306,40 +1638,36 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                         role={notice.tone === 'error' ? 'alert' : 'status'}
                         aria-live={notice.tone === 'error' ? 'assertive' : 'polite'}
                         className={cx(
-                            'fixed bottom-4 left-4 right-4 z-[60] rounded-xl border p-4 text-sm shadow-lg sm:left-auto sm:w-96',
-                            notice.tone === 'error' ? 'border-rose-200 bg-rose-50 text-rose-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900',
+                            'fixed bottom-4 left-4 right-4 z-[60] rounded-2xl border bg-white p-4 text-sm shadow-pop sm:left-auto sm:w-96',
+                            notice.tone === 'error' ? 'border-rose-200' : 'border-emerald-200',
                         )}
                     >
-                        <div className="flex items-start justify-between gap-3">
-                            <div>{notice.text}</div>
-                            <button
-                                type="button"
-                                className="shrink-0 rounded text-xs font-semibold underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
-                                onClick={() => setNotice(null)}
-                            >
-                                Sluiten
-                            </button>
+                        <div className="flex items-start gap-3">
+                            <IconTile icon={notice.tone === 'error' ? 'alert-circle' : 'check-circle'} tone={notice.tone === 'error' ? 'danger' : 'success'} size="sm" />
+                            <div className="min-w-0 flex-1 pt-1.5 text-zinc-800">{notice.text}</div>
+                            <Button variant="ghost" size="xs" iconOnly icon="x" aria-label="Melding sluiten" onClick={() => setNotice(null)} />
                         </div>
                     </div>
                 ) : null}
 
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                    <div className="inline-flex rounded-lg bg-zinc-100 p-1" role="group" aria-label="Weergave">
+                    <div className="inline-flex rounded-xl bg-zinc-200/50 p-1 ring-1 ring-inset ring-zinc-200/70" role="group" aria-label="Weergave">
                         {[
-                            ['board', 'Bord'],
-                            ['list', 'Lijst'],
-                            ['team', 'Team'],
-                        ].map(([key, label]) => (
+                            ['board', 'Bord', 'grid'],
+                            ['list', 'Lijst', 'list'],
+                            ['team', 'Team', 'users'],
+                        ].map(([key, label, icon]) => (
                             <button
                                 key={key}
                                 type="button"
                                 aria-pressed={view === key}
                                 className={cx(
-                                    'h-8 rounded-md px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600',
-                                    view === key ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-600 hover:text-zinc-900',
+                                    'inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600',
+                                    view === key ? 'bg-white text-zinc-900 shadow-card ring-1 ring-black/5' : 'text-zinc-600 hover:text-zinc-900',
                                 )}
                                 onClick={() => setView(key)}
                             >
+                                <Icon name={icon} className={cx('h-4 w-4', view === key ? 'text-indigo-600' : 'text-zinc-400')} />
                                 {label}
                             </button>
                         ))}
@@ -1348,12 +1676,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                         {view === 'board' ? (
                             <label htmlFor="tasks-filter-groepeer" className="inline-flex items-center gap-2 whitespace-nowrap text-sm text-zinc-600">
                                 Groepeer op
-                                <select
-                                    id="tasks-filter-groepeer"
-                                    className={cx(inputClasses, 'w-auto py-1.5')}
-                                    value={groupBoardBy}
-                                    onChange={(e) => setGroupBoardBy(e.target.value)}
-                                >
+                                <select id="tasks-filter-groepeer" className={cx(inputClasses, 'w-auto py-1.5')} value={groupBoardBy} onChange={(e) => setGroupBoardBy(e.target.value)}>
                                     <option value="status">Status</option>
                                     <option value="project">Project</option>
                                 </select>
@@ -1362,12 +1685,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                         {view === 'list' ? (
                             <label htmlFor="tasks-filter-sorteren" className="inline-flex items-center gap-2 whitespace-nowrap text-sm text-zinc-600">
                                 Sorteren op
-                                <select
-                                    id="tasks-filter-sorteren"
-                                    className={cx(inputClasses, 'w-auto py-1.5')}
-                                    value={sortMode}
-                                    onChange={(e) => setSortMode(e.target.value)}
-                                >
+                                <select id="tasks-filter-sorteren" className={cx(inputClasses, 'w-auto py-1.5')} value={sortMode} onChange={(e) => setSortMode(e.target.value)}>
                                     <option value="deadline">Deadline</option>
                                     <option value="prioriteit">Prioriteit</option>
                                     <option value="nieuwste">Nieuwste</option>
@@ -1378,14 +1696,9 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                 </div>
 
                 <div className="md:hidden">
-                    <Button
-                        variant="secondary"
-                        className="w-full justify-between"
-                        onClick={() => setFiltersOpen((open) => !open)}
-                        aria-expanded={filtersOpen}
-                        aria-controls="tasks-filters"
-                    >
+                    <Button variant="secondary" className="w-full justify-between" onClick={() => setFiltersOpen((open) => !open)} aria-expanded={filtersOpen} aria-controls="tasks-filters">
                         <span className="inline-flex items-center gap-2">
+                            <Icon name="filter" className="h-4 w-4 text-zinc-500" />
                             Zoeken en filters
                             {activeFilterCount > 0 && (
                                 <span className="rounded-full bg-indigo-600 px-2 text-xs text-white">
@@ -1394,29 +1707,38 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                 </span>
                             )}
                         </span>
-                        <span aria-hidden="true" className="text-xs">{filtersOpen ? '▲' : '▼'}</span>
+                        <Icon name={filtersOpen ? 'chevron-up' : 'chevron-down'} className="h-4 w-4 text-zinc-500" />
                     </Button>
                 </div>
 
-                <div id="tasks-filters" role="search" className={cx('rounded-xl border border-zinc-200 bg-white p-4 shadow-sm md:block', filtersOpen ? 'block' : 'hidden')}>
+                <div id="tasks-filters" role="search" className={cx('card mt-3 p-4 md:mt-0 md:block', filtersOpen ? 'block' : 'hidden')}>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
                         <div className="sm:col-span-2">
-                            <label htmlFor="tasks-filter-zoeken" className={FILTER_LABEL}>Zoeken</label>
-                            <input
-                                id="tasks-filter-zoeken"
-                                type="search"
-                                className={cx(inputClasses, 'mt-1')}
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                placeholder="Titel, omschrijving, label of klant"
-                            />
+                            <label htmlFor="tasks-filter-zoeken" className={FILTER_LABEL}>
+                                Zoeken
+                            </label>
+                            <div className="relative mt-1">
+                                <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                                <input
+                                    id="tasks-filter-zoeken"
+                                    type="search"
+                                    className={cx(inputClasses, 'pl-9')}
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    placeholder="Titel, omschrijving, label of klant"
+                                />
+                            </div>
                         </div>
                         <div>
-                            <label htmlFor="tasks-filter-klant" className={FILTER_LABEL}>Klant</label>
+                            <label htmlFor="tasks-filter-klant" className={FILTER_LABEL}>
+                                Klant
+                            </label>
                             <CustomerPicker id="tasks-filter-klant" value={filterCustomer} onChange={setFilterCustomer} placeholder="Alle klanten" clearLabel="Wissen" />
                         </div>
                         <div>
-                            <label htmlFor="tasks-filter-toegewezen-aan" className={FILTER_LABEL}>Toegewezen aan</label>
+                            <label htmlFor="tasks-filter-toegewezen-aan" className={FILTER_LABEL}>
+                                Toegewezen aan
+                            </label>
                             <select id="tasks-filter-toegewezen-aan" className={cx(inputClasses, 'mt-1')} value={filterAssignee} onChange={(e) => setFilterAssignee(e.target.value)}>
                                 <option value="">Iedereen</option>
                                 {currentUserId && users.some((u) => Number(u.id) === currentUserId) ? <option value={String(currentUserId)}>Mijn taken</option> : null}
@@ -1428,7 +1750,9 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                             </select>
                         </div>
                         <div>
-                            <label htmlFor="tasks-filter-status" className={FILTER_LABEL}>Status</label>
+                            <label htmlFor="tasks-filter-status" className={FILTER_LABEL}>
+                                Status
+                            </label>
                             <select id="tasks-filter-status" className={cx(inputClasses, 'mt-1')} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
                                 <option value="">Alle statussen</option>
                                 {statusOptions.map((s) => (
@@ -1439,7 +1763,9 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                             </select>
                         </div>
                         <div>
-                            <label htmlFor="tasks-filter-prioriteit" className={FILTER_LABEL}>Prioriteit</label>
+                            <label htmlFor="tasks-filter-prioriteit" className={FILTER_LABEL}>
+                                Prioriteit
+                            </label>
                             <select id="tasks-filter-prioriteit" className={cx(inputClasses, 'mt-1')} value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)}>
                                 <option value="">Alle prioriteiten</option>
                                 {priorityOptions.map((p) => (
@@ -1450,7 +1776,9 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                             </select>
                         </div>
                         <div className="sm:col-span-2 lg:col-span-2">
-                            <label htmlFor="tasks-filter-project" className={FILTER_LABEL}>Project</label>
+                            <label htmlFor="tasks-filter-project" className={FILTER_LABEL}>
+                                Project
+                            </label>
                             <select id="tasks-filter-project" className={cx(inputClasses, 'mt-1')} value={filterProject} onChange={(e) => setFilterProject(e.target.value)}>
                                 <option value="">Alle projecten</option>
                                 {projects.map((p) => (
@@ -1462,265 +1790,300 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                         </div>
                     </div>
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 pt-3">
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-zinc-600">
+                        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-zinc-600">
                             <span className="inline-flex items-center gap-2 tabular-nums" aria-live="polite">
-                                {loading ? <Spinner className="h-4 w-4 text-indigo-600" /> : null}
+                                {loading ? <Spinner className="h-4 w-4 text-indigo-600" /> : <Icon name="check-square" className="h-4 w-4 text-zinc-400" />}
                                 {loading ? 'Laden...' : countLabel(tasks.length, 'taak', 'taken')}
                             </span>
                             <label className="inline-flex items-center gap-2 font-medium text-zinc-700">
-                                <input
-                                    type="checkbox"
-                                    className="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-600"
-                                    checked={showAppointments}
-                                    onChange={(e) => setShowAppointments(e.target.checked)}
-                                />
+                                <input type="checkbox" className="checkbox" checked={showAppointments} onChange={(e) => setShowAppointments(e.target.checked)} />
                                 Toon klantafspraken
                             </label>
                         </div>
                         <div className="flex items-center gap-2">
                             {hasActiveFilters ? (
-                                <Button variant="ghost" size="sm" onClick={resetFilters}>
+                                <Button variant="ghost" size="sm" icon="x" onClick={resetFilters}>
                                     Filters wissen
                                 </Button>
                             ) : null}
-                            <Button variant="secondary" size="sm" onClick={() => fetchTasks()} disabled={loading}>
+                            <Button variant="secondary" size="sm" icon="refresh" onClick={() => fetchTasks()} disabled={loading}>
                                 Vernieuwen
                             </Button>
                         </div>
                     </div>
                 </div>
 
-                {showAppointments ? (
-                    <section className={cx(tableClasses.wrapper, 'mt-6')} aria-labelledby="tasks-klantafspraken-title">
-                        <div className="flex items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3">
-                            <div>
-                                <h2 id="tasks-klantafspraken-title" className="text-base font-semibold text-zinc-900">Klantafspraken</h2>
-                                <p className="mt-0.5 text-sm text-zinc-500">Open taken en afspraken vanaf de klantpagina's.</p>
+                {filterCustomer ? (
+                    <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-indigo-200 bg-indigo-50/60 p-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex min-w-0 items-center gap-3">
+                            <Avatar name={filterCustomer.naam} size="md" />
+                            <div className="min-w-0">
+                                <div className="text-xs font-medium text-zinc-600">Taken van klant</div>
+                                <a href={filterCustomer.url} className="block truncate font-semibold text-zinc-900 hover:text-indigo-700 focus-ring rounded">
+                                    {filterCustomer.naam}
+                                </a>
                             </div>
-                            <Badge>{appointments.length}</Badge>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Button variant="ghost" size="sm" icon="x" onClick={() => setFilterCustomer(null)}>
+                                Alle klanten
+                            </Button>
+                            <Button size="sm" icon="plus" onClick={openNewTaskModal}>
+                                Nieuwe taak voor {filterCustomer.naam}
+                            </Button>
+                        </div>
+                    </div>
+                ) : null}
+
+                {showAppointments ? (
+                    <section className="card mt-6 overflow-hidden" aria-labelledby="tasks-klantafspraken-title">
+                        <div className="flex items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3 sm:px-5">
+                            <div className="flex min-w-0 items-center gap-3">
+                                <IconTile icon="calendar" tone="info" size="sm" />
+                                <div className="min-w-0">
+                                    <h2 id="tasks-klantafspraken-title" className="section-heading">
+                                        Klantafspraken
+                                    </h2>
+                                    <p className="text-sm text-zinc-500">Open taken en afspraken vanaf de klantpagina's.</p>
+                                </div>
+                            </div>
+                            <Badge tone="info">{appointments.length}</Badge>
                         </div>
                         {appointments.length === 0 ? (
-                            <div className="p-4">
-                                <EmptyState
-                                    title={loading ? 'Klantafspraken laden...' : 'Geen open klantafspraken'}
-                                    description={loading ? null : 'Alles is afgehandeld voor de huidige filters.'}
-                                />
-                            </div>
+                            loading ? (
+                                <div className="space-y-3 p-4" aria-hidden="true">
+                                    <Skeleton className="h-10 w-full" />
+                                    <Skeleton className="h-10 w-full" />
+                                </div>
+                            ) : (
+                                <EmptyState bare compact icon="check-circle" title="Geen open klantafspraken" description="Alles is afgehandeld voor de huidige filters." />
+                            )
                         ) : (
-                            <table className={tableClasses.table}>
-                                <thead className={tableClasses.thead}>
-                                    <tr>
-                                        <th scope="col" className={tableClasses.th}>Type</th>
-                                        <th scope="col" className={tableClasses.th}>Titel</th>
-                                        <th scope="col" className={tableClasses.th}>Klant</th>
-                                        <th scope="col" className={tableClasses.th}>Datum</th>
-                                        <th scope="col" className={cx(tableClasses.th, 'text-right')}>
-                                            <span className="sr-only">Actie</span>
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className={tableClasses.tbody}>
-                                    {appointments.map((a) => (
-                                        <tr key={a.id} className={tableClasses.tr}>
-                                            <td className={tableClasses.td}>
-                                                <Badge tone={a.type === 'afspraak' ? 'info' : 'neutral'}>{a.type === 'afspraak' ? 'Afspraak' : 'Taak'}</Badge>
-                                            </td>
-                                            <td className={tableClasses.td}>
-                                                <div className="font-medium text-zinc-900">{a.titel || 'Zonder titel'}</div>
-                                                {a.inhoud ? <div className="mt-0.5 line-clamp-2 text-xs text-zinc-500">{a.inhoud}</div> : null}
-                                            </td>
-                                            <td className={tableClasses.td}>
-                                                {a.customer ? (
-                                                    <a href={`${a.customer.url}?tab=taken_afspraken`} className="font-medium text-indigo-700 hover:underline">
-                                                        {a.customer.naam}
-                                                    </a>
-                                                ) : (
-                                                    <span className="text-zinc-400">-</span>
-                                                )}
-                                            </td>
-                                            <td className={cx(tableClasses.td, 'whitespace-nowrap')}>
+                            <ul className="divide-y divide-zinc-100 text-sm">
+                                {appointments.map((a) => (
+                                    <li key={a.id} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:gap-4 sm:px-5">
+                                        <div className="flex min-w-0 flex-1 items-start gap-3">
+                                            <IconTile icon={a.type === 'afspraak' ? 'calendar' : 'check-square'} tone={a.type === 'afspraak' ? 'info' : 'neutral'} size="sm" />
+                                            <div className="min-w-0 flex-1">
                                                 <div className="flex flex-wrap items-center gap-2">
-                                                    <span className={a.overdue ? 'font-semibold text-rose-700' : 'text-zinc-600'}>{a.due_at ? formatDateTime(a.due_at) : '-'}</span>
-                                                    {a.overdue ? <OverdueBadge /> : null}
+                                                    <span className="font-medium text-zinc-900">{a.titel || 'Zonder titel'}</span>
+                                                    <span className="text-xs text-zinc-500">{a.type === 'afspraak' ? 'Afspraak' : 'Taak'}</span>
                                                 </div>
-                                            </td>
-                                            <td className={cx(tableClasses.td, 'text-right')}>
-                                                <Button
-                                                    variant="secondary"
-                                                    size="xs"
-                                                    loading={Boolean(appointmentBusy[a.id])}
-                                                    aria-label={`${a.titel || 'Klantafspraak'} afronden`}
-                                                    onClick={() => completeAppointment(a)}
-                                                >
-                                                    Afronden
-                                                </Button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                                {a.inhoud ? <div className="mt-0.5 line-clamp-2 text-xs text-zinc-500">{a.inhoud}</div> : null}
+                                                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
+                                                    {a.customer ? <CustomerChip customer={{ ...a.customer, url: `${a.customer.url}?tab=taken_afspraken` }} /> : null}
+                                                    <DeadlineMeta deadline={a.due_at} overdue={Boolean(a.overdue)} emptyLabel="Geen datum" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            icon="check"
+                                            className="self-start sm:self-center"
+                                            loading={Boolean(appointmentBusy[a.id])}
+                                            aria-label={`${a.titel || 'Klantafspraak'} afronden`}
+                                            onClick={() => completeAppointment(a)}
+                                        >
+                                            Afronden
+                                        </Button>
+                                    </li>
+                                ))}
+                            </ul>
                         )}
                     </section>
                 ) : null}
 
                 {view === 'list' ? (
-                    listRows.length === 0 ? (
+                    boardInitialLoading ? (
+                        <div className="mt-6" aria-busy="true">
+                            <span className="sr-only" role="status">
+                                Taken laden...
+                            </span>
+                            <ListSkeleton />
+                        </div>
+                    ) : listRows.length === 0 ? (
                         <div className="mt-6">{emptyTasksState}</div>
                     ) : (
-                        <div className={cx(tableClasses.wrapper, 'mt-6', loading && 'opacity-60')} aria-busy={loading || undefined}>
-                            <table className={tableClasses.table}>
-                                <thead className={tableClasses.thead}>
-                                    <tr>
-                                        <th scope="col" className={tableClasses.th}>Taak</th>
-                                        <th scope="col" className={tableClasses.th}>Klant</th>
-                                        <th scope="col" className={tableClasses.th}>Project</th>
-                                        <th scope="col" className={tableClasses.th}>Status</th>
-                                        <th scope="col" className={tableClasses.th}>Prioriteit</th>
-                                        <th scope="col" className={tableClasses.th}>Deadline</th>
-                                        <th scope="col" className={tableClasses.th}>Toegewezen aan</th>
-                                        <th scope="col" className={tableClasses.th}>Info</th>
-                                    </tr>
-                                </thead>
-                                <tbody className={tableClasses.tbody}>
-                                    {listRows.map((task) => (
-                                        <tr key={task.id} className={cx(tableClasses.tr, isOverdue(task) && 'bg-rose-50/40')}>
-                                            <td className={tableClasses.td}>
-                                                <button
-                                                    type="button"
-                                                    className="max-w-xs truncate rounded text-left font-semibold text-zinc-900 hover:text-indigo-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
-                                                    title={task.titel}
-                                                    onClick={() => openTask(task.id)}
-                                                >
-                                                    {task.titel}
-                                                </button>
-                                            </td>
-                                            <td className={tableClasses.td}>
-                                                {task.customer ? (
-                                                    <a href={task.customer.url} className="font-medium text-indigo-700 hover:underline">
-                                                        {task.customer.naam}
-                                                    </a>
-                                                ) : (
-                                                    <span className="text-zinc-400">-</span>
-                                                )}
-                                            </td>
-                                            <td className={tableClasses.td}>{task.project?.naam ?? <span className="text-zinc-400">-</span>}</td>
-                                            <td className={tableClasses.td}>
-                                                <Badge tone={statusTone(task.status)}>{statusLabel(task.status)}</Badge>
-                                            </td>
-                                            <td className={tableClasses.td}>
-                                                <span className={cx('inline-flex rounded-full px-2 py-0.5 text-xs font-semibold', priorityMeta(task.prioriteit).className)}>
-                                                    {priorityMeta(task.prioriteit).label}
-                                                </span>
-                                            </td>
-                                            <td className={cx(tableClasses.td, 'whitespace-nowrap')}>
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                    <span className={isOverdue(task) ? 'font-semibold text-rose-700' : 'text-zinc-600'}>
-                                                        {task.deadline ? formatDateTime(task.deadline) : '-'}
-                                                    </span>
-                                                    {isOverdue(task) ? <OverdueBadge /> : null}
-                                                </div>
-                                            </td>
-                                            <td className={tableClasses.td}>
-                                                <div className="flex flex-wrap gap-1.5">
-                                                    {task.assignees?.length ? task.assignees.map((a) => <Pill key={a.id}>{a.name}</Pill>) : <span className="text-zinc-400">-</span>}
-                                                </div>
-                                            </td>
-                                            <td className={tableClasses.td}>
-                                                <div className="flex items-center gap-1.5">
-                                                    {task.counts?.comments ? <Pill>{countLabel(task.counts.comments, 'reactie', 'reacties')}</Pill> : null}
-                                                    {task.counts?.attachments ? <Pill>{countLabel(task.counts.attachments, 'bijlage', 'bijlagen')}</Pill> : null}
-                                                </div>
-                                            </td>
+                        <div className={cx('mt-6 transition-opacity', loading && 'opacity-60')} aria-busy={loading || undefined}>
+                            <ul className="space-y-2 md:hidden" aria-label="Taken">
+                                {listRows.map((task) => (
+                                    <li key={task.id}>
+                                        <StaticTaskCard task={task} onOpen={openTask} />
+                                    </li>
+                                ))}
+                            </ul>
+                            <div className={cx(tableClasses.wrapper, 'hidden md:block')}>
+                                <table className={tableClasses.table}>
+                                    <thead className={tableClasses.thead}>
+                                        <tr>
+                                            <th scope="col" className={tableClasses.th}>
+                                                Taak
+                                            </th>
+                                            <th scope="col" className={tableClasses.th}>
+                                                Klant
+                                            </th>
+                                            <th scope="col" className={tableClasses.th}>
+                                                Status
+                                            </th>
+                                            <th scope="col" className={tableClasses.th}>
+                                                Deadline
+                                            </th>
+                                            <th scope="col" className={tableClasses.th}>
+                                                Team
+                                            </th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className={tableClasses.tbody}>
+                                        {listRows.map((task) => {
+                                            const overdue = isOverdue(task);
+                                            const meta = priorityMeta(task.prioriteit);
+                                            return (
+                                                <tr key={task.id} className={cx(tableClasses.tr, 'group/row', overdue && 'bg-rose-50/40')}>
+                                                    <td className={cx(tableClasses.td, 'relative')}>
+                                                        <span aria-hidden="true" className={cx('absolute inset-y-2 left-0 w-1 rounded-r-full', overdue ? 'bg-rose-500' : meta.edge)} />
+                                                        <button
+                                                            type="button"
+                                                            className={cx(
+                                                                'block max-w-xs truncate rounded text-left font-semibold hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600',
+                                                                task.status === 'afgerond' ? 'text-zinc-500 line-through decoration-zinc-300' : 'text-zinc-900',
+                                                            )}
+                                                            title={task.titel}
+                                                            onClick={() => openTask(task.id)}
+                                                        >
+                                                            {task.titel}
+                                                        </button>
+                                                        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                                                            <PriorityTag value={task.prioriteit} />
+                                                            {task.project?.naam ? (
+                                                                <span className="inline-flex min-w-0 items-center gap-1.5 text-zinc-500">
+                                                                    <ProjectDot kleur={task.project.kleur} className="h-2 w-2" />
+                                                                    <span className="max-w-[12rem] truncate">{task.project.naam}</span>
+                                                                </span>
+                                                            ) : null}
+                                                            <CountMeta icon="message-square" count={task.counts?.comments} one="reactie" many="reacties" />
+                                                            <CountMeta icon="file-text" count={task.counts?.attachments} one="bijlage" many="bijlagen" />
+                                                        </div>
+                                                    </td>
+                                                    <td className={tableClasses.td}>{task.customer ? <CustomerChip customer={task.customer} /> : <span className="text-zinc-400">Geen klant</span>}</td>
+                                                    <td className={tableClasses.td}>
+                                                        <Badge tone={statusTone(task.status)} dot>
+                                                            {statusLabel(task.status)}
+                                                        </Badge>
+                                                    </td>
+                                                    <td className={cx(tableClasses.td, 'whitespace-nowrap text-xs')}>
+                                                        <DeadlineMeta deadline={task.deadline} overdue={overdue} />
+                                                    </td>
+                                                    <td className={tableClasses.td}>
+                                                        <div className="flex items-center gap-2">
+                                                            <AvatarStack people={task.assignees} />
+                                                            {task.assignees?.length === 1 ? <span className="max-w-[9rem] truncate text-xs text-zinc-600">{task.assignees[0].name}</span> : null}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     )
+                ) : boardInitialLoading ? (
+                    <div className="mt-6" aria-busy="true">
+                        <span className="sr-only" role="status">
+                            Taken laden...
+                        </span>
+                        <BoardSkeleton columns={Math.min(Math.max(columns.length, 3), 4)} />
+                    </div>
                 ) : (
                     <div className={cx('mt-6', loading && 'opacity-70 transition-opacity')} aria-busy={loading || undefined}>
-                        {tasks.length === 0 && hasActiveFilters && !loading ? <div className="mb-4">{emptyTasksState}</div> : null}
-                        <p className="mb-2 text-xs text-zinc-500">
-                            Sleep kaarten om de volgorde of {view === 'team' ? 'de toegewezen persoon' : group === 'project' ? 'het project' : 'de status'} te wijzigen. Open een kaart om dit met het toetsenbord te doen.
-                            {!boardScroll.end || !boardScroll.start ? ' Scroll horizontaal voor meer kolommen.' : ''}
+                        {tasks.length === 0 && !loading ? <div className="mb-4">{emptyTasksState}</div> : null}
+                        <p className="mb-3 flex items-start gap-1.5 text-xs text-zinc-500">
+                            <Icon name="info" className="mt-px h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                            <span>
+                                Sleep kaarten om de volgorde of {view === 'team' ? 'de toegewezen persoon' : group === 'project' ? 'het project' : 'de status'} te wijzigen. Open een kaart om dit met het toetsenbord te doen.
+                                {!boardScroll.end || !boardScroll.start ? ' Scroll horizontaal voor meer kolommen.' : ''}
+                            </span>
                         </p>
                         <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
                             <div className="relative">
-                            <div
-                                ref={boardScrollRef}
-                                onScroll={updateBoardScroll}
-                                className={cx(
-                                    '-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain px-4 pb-4 sm:mx-0 sm:snap-none sm:px-0',
-                                    boardFits && 'xl:grid xl:overflow-x-visible',
-                                    boardFits && BOARD_GRID_COLS[columns.length],
-                                )}
-                                role="list"
-                                aria-label="Kolommen"
-                            >
-                                {columns.map((col) => {
-                                    const taskIds = itemsByColumn[col.id] ?? [];
-                                    const quickValue = quickAdd[col.id] ?? '';
-                                    const quickBusy = Boolean(quickAddSaving[col.id]);
-                                    return (
-                                        <div key={col.id} className="shrink-0 snap-start" role="listitem">
-                                            <Column
-                                                fit={boardFits}
-                                                droppableId={col.id}
-                                                title={col.title}
-                                                subtitle={col.subtitle}
-                                                count={taskIds.length}
-                                                footer={
-                                                    <form
-                                                        className="flex items-center gap-2"
-                                                        onSubmit={(e) => {
-                                                            e.preventDefault();
-                                                            quickCreateTask({ column: col, title: quickValue });
-                                                        }}
-                                                    >
-                                                        <input
-                                                            className={inputClasses}
-                                                            placeholder="Snel een taak toevoegen"
-                                                            aria-label={`Taak toevoegen aan ${col.title}`}
-                                                            readOnly={quickBusy}
-                                                            maxLength={255}
-                                                            value={quickValue}
-                                                            onChange={(e) => setQuickAdd((prev) => ({ ...prev, [col.id]: e.target.value }))}
-                                                        />
-                                                        <Button
-                                                            type="submit"
-                                                            variant="secondary"
-                                                            className="w-9 shrink-0 px-0"
-                                                            aria-label={`Taak toevoegen aan ${col.title}`}
-                                                            loading={quickBusy}
-                                                            disabled={!quickValue.trim()}
+                                <div
+                                    ref={boardScrollRef}
+                                    onScroll={updateBoardScroll}
+                                    className={cx(
+                                        '-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto overscroll-x-contain px-4 pb-4 sm:mx-0 sm:snap-none sm:scroll-px-0 sm:px-0',
+                                        boardFits && 'xl:grid xl:overflow-x-visible',
+                                        boardFits && BOARD_GRID_COLS[columns.length],
+                                    )}
+                                    role="list"
+                                    aria-label="Kolommen"
+                                >
+                                    {columns.map((col) => {
+                                        const taskIds = itemsByColumn[col.id] ?? [];
+                                        const quickValue = quickAdd[col.id] ?? '';
+                                        const quickBusy = Boolean(quickAddSaving[col.id]);
+                                        const overdueCount = taskIds.filter((key) => isOverdue(taskById[parseId(key)])).length;
+                                        return (
+                                            <div key={col.id} className="shrink-0 snap-start" role="listitem">
+                                                <Column
+                                                    fit={boardFits}
+                                                    droppableId={col.id}
+                                                    title={col.title}
+                                                    subtitle={col.subtitle}
+                                                    alert={overdueCount > 0 ? `${overdueCount} te laat` : null}
+                                                    lead={columnLead(col, group, projects)}
+                                                    count={taskIds.length}
+                                                    footer={
+                                                        <form
+                                                            className="flex items-center gap-2"
+                                                            onSubmit={(e) => {
+                                                                e.preventDefault();
+                                                                quickCreateTask({ column: col, title: quickValue });
+                                                            }}
                                                         >
-                                                            {quickBusy ? null : <span aria-hidden="true">+</span>}
-                                                        </Button>
-                                                    </form>
-                                                }
-                                            >
-                                                <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
-                                                    {taskIds.length === 0 ? (
-                                                        <div className="rounded-lg border border-dashed border-zinc-300 px-4 py-6 text-center text-sm text-zinc-500">Sleep een taak hierheen</div>
-                                                    ) : null}
-                                                    {taskIds.map((taskKey) => {
-                                                        const tid = parseId(taskKey);
-                                                        const task = tid ? taskById[tid] : null;
-                                                        if (!task) return null;
-                                                        return <SortableTaskCard key={taskKey} task={task} onOpen={openTask} />;
-                                                    })}
-                                                </SortableContext>
-                                            </Column>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                            {!boardScroll.start ? (
-                                <div aria-hidden="true" className={cx('pointer-events-none absolute inset-y-0 left-0 bottom-4 w-8 bg-gradient-to-r from-white to-transparent', boardFits && 'xl:hidden')} />
-                            ) : null}
-                            {!boardScroll.end ? (
-                                <div aria-hidden="true" className={cx('pointer-events-none absolute inset-y-0 right-0 bottom-4 w-10 bg-gradient-to-l from-white to-transparent', boardFits && 'xl:hidden')} />
-                            ) : null}
+                                                            <input
+                                                                className={cx(inputClasses, 'h-9 bg-white/80 py-1.5 shadow-none')}
+                                                                placeholder="Snel een taak toevoegen"
+                                                                aria-label={`Taak toevoegen aan ${col.title}`}
+                                                                readOnly={quickBusy}
+                                                                maxLength={255}
+                                                                value={quickValue}
+                                                                onChange={(e) => setQuickAdd((prev) => ({ ...prev, [col.id]: e.target.value }))}
+                                                            />
+                                                            <Button
+                                                                type="submit"
+                                                                variant="secondary"
+                                                                iconOnly
+                                                                icon="plus"
+                                                                className="shrink-0"
+                                                                aria-label={`Taak toevoegen aan ${col.title}`}
+                                                                loading={quickBusy}
+                                                                disabled={!quickValue.trim()}
+                                                            />
+                                                        </form>
+                                                    }
+                                                >
+                                                    <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
+                                                        {taskIds.length === 0 ? (
+                                                            <div className="flex flex-col items-center gap-1 rounded-xl border border-dashed border-zinc-300 px-4 py-6 text-center text-xs text-zinc-500">
+                                                                <Icon name="inbox" className="h-5 w-5 text-zinc-400" />
+                                                                Sleep een taak hierheen
+                                                            </div>
+                                                        ) : null}
+                                                        {taskIds.map((taskKey) => {
+                                                            const tid = parseId(taskKey);
+                                                            const task = tid ? taskById[tid] : null;
+                                                            if (!task) return null;
+                                                            return <SortableTaskCard key={taskKey} task={task} onOpen={openTask} />;
+                                                        })}
+                                                    </SortableContext>
+                                                </Column>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                {!boardScroll.start ? <div aria-hidden="true" className={cx('pointer-events-none absolute inset-y-0 bottom-4 left-0 w-8 bg-gradient-to-r from-[#f5f6f1] to-transparent', boardFits && 'xl:hidden')} /> : null}
+                                {!boardScroll.end ? <div aria-hidden="true" className={cx('pointer-events-none absolute inset-y-0 bottom-4 right-0 w-10 bg-gradient-to-l from-[#f5f6f1] to-transparent', boardFits && 'xl:hidden')} /> : null}
                             </div>
                             <DragOverlay>{activeDragTask ? <TaskOverlay task={activeDragTask} /> : null}</DragOverlay>
                         </DndContext>
@@ -1730,73 +2093,58 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
 
             {showProjectModal ? (
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4"
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4 backdrop-blur-[2px]"
                     onMouseDown={(e) => {
                         if (e.target === e.currentTarget) closeProjectModal();
                     }}
                 >
-                    <div
-                        ref={projectDialogRef}
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="project-modal-title"
-                        tabIndex={-1}
-                        className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-6"
-                    >
-                        <div className="flex items-start justify-between gap-4">
-                            <div>
-                                <h2 id="project-modal-title" className="text-lg font-semibold text-zinc-900">Nieuw project</h2>
-                                <div className="mt-1 text-sm text-zinc-500">Maak een nieuwe projectkolom voor je bord.</div>
-                            </div>
-                            <Button variant="ghost" size="sm" type="button" onClick={closeProjectModal} aria-label="Venster sluiten">
-                                Sluiten
-                            </Button>
-                        </div>
+                    <div ref={projectDialogRef} role="dialog" aria-modal="true" aria-labelledby="project-modal-title" tabIndex={-1} className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-5 shadow-pop sm:p-6">
+                        <ModalHeader id="project-modal-title" icon="layers" title="Nieuw project" description="Een project wordt een eigen kolom op je bord." onClose={closeProjectModal} />
                         <form className="mt-6 space-y-4" onSubmit={createProject}>
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div className="md:col-span-2">
-                                    <label htmlFor="tasks-project-naam" className="block text-sm font-medium text-zinc-800">Naam<span className="ml-0.5 text-rose-600" aria-hidden="true">*</span></label>
+                                    <label htmlFor="tasks-project-naam" className="label">
+                                        Naam
+                                        <span className="ml-0.5 text-rose-600" aria-hidden="true">
+                                            *
+                                        </span>
+                                    </label>
                                     <input
                                         id="tasks-project-naam"
                                         data-autofocus
                                         required
                                         maxLength={255}
                                         aria-invalid={projectErrors.naam ? true : undefined}
-                                        className={cx(inputClasses, 'mt-1')}
+                                        className={cx(inputClasses, 'mt-1.5')}
                                         value={projectForm.naam}
                                         onChange={(e) => setProjectForm((p) => ({ ...p, naam: e.target.value }))}
                                     />
-                                    {projectErrors.naam ? <div className="mt-1 text-xs font-medium text-rose-700" role="alert">{projectErrors.naam?.[0]}</div> : null}
+                                    {projectErrors.naam ? (
+                                        <div className="field-error" role="alert">
+                                            {projectErrors.naam?.[0]}
+                                        </div>
+                                    ) : null}
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label htmlFor="tasks-project-omschrijving" className="block text-sm font-medium text-zinc-800">Omschrijving</label>
-                                    <textarea
-                                        id="tasks-project-omschrijving"
-                                        className={cx(inputClasses, 'mt-1')}
-                                        rows={3}
-                                        value={projectForm.omschrijving}
-                                        onChange={(e) => setProjectForm((p) => ({ ...p, omschrijving: e.target.value }))}
-                                    />
+                                    <label htmlFor="tasks-project-omschrijving" className="label">
+                                        Omschrijving
+                                    </label>
+                                    <textarea id="tasks-project-omschrijving" className={cx(inputClasses, 'mt-1.5')} rows={3} value={projectForm.omschrijving} onChange={(e) => setProjectForm((p) => ({ ...p, omschrijving: e.target.value }))} />
                                 </div>
                                 <div>
-                                    <label htmlFor="tasks-project-deadline" className="block text-sm font-medium text-zinc-800">Deadline</label>
-                                    <input
-                                        id="tasks-project-deadline"
-                                        type="datetime-local"
-                                        className={cx(inputClasses, 'mt-1')}
-                                        value={projectForm.deadline}
-                                        onChange={(e) => setProjectForm((p) => ({ ...p, deadline: e.target.value }))}
-                                    />
+                                    <label htmlFor="tasks-project-deadline" className="label">
+                                        Deadline
+                                    </label>
+                                    <input id="tasks-project-deadline" type="datetime-local" className={cx(inputClasses, 'mt-1.5')} value={projectForm.deadline} onChange={(e) => setProjectForm((p) => ({ ...p, deadline: e.target.value }))} />
                                 </div>
                                 <div>
-                                    <label htmlFor="tasks-project-kleur-optioneel" className="block text-sm font-medium text-zinc-800">Kleur (optioneel)</label>
-                                    <input
-                                        id="tasks-project-kleur-optioneel"
-                                        className={cx(inputClasses, 'mt-1')}
-                                        placeholder="#aabbcc"
-                                        value={projectForm.kleur}
-                                        onChange={(e) => setProjectForm((p) => ({ ...p, kleur: e.target.value }))}
-                                    />
+                                    <label htmlFor="tasks-project-kleur-optioneel" className="label">
+                                        Kleur (optioneel)
+                                    </label>
+                                    <div className="relative mt-1.5">
+                                        <ProjectDot kleur={projectForm.kleur} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
+                                        <input id="tasks-project-kleur-optioneel" className={cx(inputClasses, 'pl-8')} placeholder="#aabbcc" value={projectForm.kleur} onChange={(e) => setProjectForm((p) => ({ ...p, kleur: e.target.value }))} />
+                                    </div>
                                 </div>
                             </div>
                             <ErrorList errors={projectErrors} exclude={['naam']} />
@@ -1804,7 +2152,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                 <Button variant="secondary" type="button" onClick={closeProjectModal}>
                                     Annuleren
                                 </Button>
-                                <Button type="submit" loading={projectSaving}>
+                                <Button type="submit" icon="plus" loading={projectSaving}>
                                     {projectSaving ? 'Opslaan...' : 'Project toevoegen'}
                                 </Button>
                             </div>
@@ -1814,62 +2162,61 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
             ) : null}
             {showTaskModal ? (
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4"
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4 backdrop-blur-[2px]"
                     onMouseDown={(e) => {
                         if (e.target === e.currentTarget) closeTaskModal();
                     }}
                 >
-                    <div
-                        ref={taskDialogRef}
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="task-modal-title"
-                        tabIndex={-1}
-                        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-6"
-                    >
-                        <div className="flex items-start justify-between gap-4">
-                            <div>
-                                <h2 id="task-modal-title" className="text-lg font-semibold text-zinc-900">Nieuwe taak</h2>
-                                <div className="mt-1 text-sm text-zinc-500">Maak snel een taak aan en koppel deze aan een project.</div>
-                            </div>
-                            <Button variant="ghost" size="sm" type="button" onClick={closeTaskModal} aria-label="Venster sluiten">
-                                Sluiten
-                            </Button>
-                        </div>
+                    <div ref={taskDialogRef} role="dialog" aria-modal="true" aria-labelledby="task-modal-title" tabIndex={-1} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-pop sm:p-6">
+                        <ModalHeader
+                            id="task-modal-title"
+                            icon="check-square"
+                            title="Nieuwe taak"
+                            description={taskForm.customer ? `Voor ${taskForm.customer.naam}. Wijs collega's toe en zet een deadline.` : 'Maak een taak aan, wijs collega\'s toe en koppel eventueel een klant.'}
+                            onClose={closeTaskModal}
+                        />
                         <form className="mt-6 space-y-4" onSubmit={createTask}>
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div className="md:col-span-2">
-                                    <label htmlFor="tasks-task-titel" className="block text-sm font-medium text-zinc-800">Titel<span className="ml-0.5 text-rose-600" aria-hidden="true">*</span></label>
+                                    <label htmlFor="tasks-task-titel" className="label">
+                                        Titel
+                                        <span className="ml-0.5 text-rose-600" aria-hidden="true">
+                                            *
+                                        </span>
+                                    </label>
                                     <input
                                         id="tasks-task-titel"
                                         data-autofocus
                                         required
                                         maxLength={255}
                                         aria-invalid={taskErrors.titel ? true : undefined}
-                                        className={cx(inputClasses, 'mt-1')}
+                                        className={cx(inputClasses, 'mt-1.5')}
                                         value={taskForm.titel}
                                         onChange={(e) => setTaskForm((t) => ({ ...t, titel: e.target.value }))}
                                     />
-                                    {taskErrors.titel ? <div className="mt-1 text-xs font-medium text-rose-700" role="alert">{taskErrors.titel?.[0]}</div> : null}
+                                    {taskErrors.titel ? (
+                                        <div className="field-error" role="alert">
+                                            {taskErrors.titel?.[0]}
+                                        </div>
+                                    ) : null}
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label htmlFor="tasks-task-omschrijving" className="block text-sm font-medium text-zinc-800">Omschrijving</label>
-                                    <textarea
-                                        id="tasks-task-omschrijving"
-                                        className={cx(inputClasses, 'mt-1')}
-                                        rows={3}
-                                        value={taskForm.omschrijving}
-                                        onChange={(e) => setTaskForm((t) => ({ ...t, omschrijving: e.target.value }))}
-                                    />
+                                    <label htmlFor="tasks-task-omschrijving" className="label">
+                                        Omschrijving
+                                    </label>
+                                    <textarea id="tasks-task-omschrijving" className={cx(inputClasses, 'mt-1.5')} rows={3} value={taskForm.omschrijving} onChange={(e) => setTaskForm((t) => ({ ...t, omschrijving: e.target.value }))} />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label htmlFor="tasks-task-klant" className="label">
+                                        Klant
+                                    </label>
+                                    <CustomerPicker id="tasks-task-klant" value={taskForm.customer} onChange={(customer) => setTaskForm((t) => ({ ...t, customer }))} />
                                 </div>
                                 <div>
-                                    <label htmlFor="tasks-task-project" className="block text-sm font-medium text-zinc-800">Project</label>
-                                    <select
-                                        id="tasks-task-project"
-                                        className={cx(inputClasses, 'mt-1')}
-                                        value={taskForm.task_project_id}
-                                        onChange={(e) => setTaskForm((t) => ({ ...t, task_project_id: e.target.value }))}
-                                    >
+                                    <label htmlFor="tasks-task-project" className="label">
+                                        Project
+                                    </label>
+                                    <select id="tasks-task-project" className={cx(inputClasses, 'mt-1.5')} value={taskForm.task_project_id} onChange={(e) => setTaskForm((t) => ({ ...t, task_project_id: e.target.value }))}>
                                         <option value="">Geen</option>
                                         {projects.map((p) => (
                                             <option key={p.id} value={p.id}>
@@ -1879,13 +2226,10 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                     </select>
                                 </div>
                                 <div>
-                                    <label htmlFor="tasks-task-status" className="block text-sm font-medium text-zinc-800">Status</label>
-                                    <select
-                                        id="tasks-task-status"
-                                        className={cx(inputClasses, 'mt-1')}
-                                        value={taskForm.status}
-                                        onChange={(e) => setTaskForm((t) => ({ ...t, status: e.target.value }))}
-                                    >
+                                    <label htmlFor="tasks-task-status" className="label">
+                                        Status
+                                    </label>
+                                    <select id="tasks-task-status" className={cx(inputClasses, 'mt-1.5')} value={taskForm.status} onChange={(e) => setTaskForm((t) => ({ ...t, status: e.target.value }))}>
                                         {statusOptions.map((s) => (
                                             <option key={s} value={s}>
                                                 {statusLabel(s)}
@@ -1894,13 +2238,10 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                     </select>
                                 </div>
                                 <div>
-                                    <label htmlFor="tasks-task-prioriteit" className="block text-sm font-medium text-zinc-800">Prioriteit</label>
-                                    <select
-                                        id="tasks-task-prioriteit"
-                                        className={cx(inputClasses, 'mt-1')}
-                                        value={taskForm.prioriteit}
-                                        onChange={(e) => setTaskForm((t) => ({ ...t, prioriteit: e.target.value }))}
-                                    >
+                                    <label htmlFor="tasks-task-prioriteit" className="label">
+                                        Prioriteit
+                                    </label>
+                                    <select id="tasks-task-prioriteit" className={cx(inputClasses, 'mt-1.5')} value={taskForm.prioriteit} onChange={(e) => setTaskForm((t) => ({ ...t, prioriteit: e.target.value }))}>
                                         {priorityOptions.map((p) => (
                                             <option key={p} value={p}>
                                                 {priorityMeta(p).label}
@@ -1909,15 +2250,11 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                     </select>
                                 </div>
                                 <div>
-                                    <label htmlFor="tasks-task-deadline" className="block text-sm font-medium text-zinc-800">Deadline</label>
-                                    <input
-                                        id="tasks-task-deadline"
-                                        type="datetime-local"
-                                        className={cx(inputClasses, 'mt-1')}
-                                        value={taskForm.deadline}
-                                        onChange={(e) => setTaskForm((t) => ({ ...t, deadline: e.target.value }))}
-                                    />
-                                    <div className="mt-1 flex flex-wrap gap-1" role="group" aria-label="Snelle deadline">
+                                    <label htmlFor="tasks-task-deadline" className="label">
+                                        Deadline
+                                    </label>
+                                    <input id="tasks-task-deadline" type="datetime-local" className={cx(inputClasses, 'mt-1.5')} value={taskForm.deadline} onChange={(e) => setTaskForm((t) => ({ ...t, deadline: e.target.value }))} />
+                                    <div className="mt-1.5 flex flex-wrap gap-1" role="group" aria-label="Snelle deadline">
                                         {[
                                             ['vandaag', 'Vandaag'],
                                             ['morgen', 'Morgen'],
@@ -1926,7 +2263,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                             <button
                                                 key={kind}
                                                 type="button"
-                                                className="rounded-md bg-zinc-100 px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
+                                                className="rounded-lg bg-zinc-100 px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
                                                 onClick={() => setTaskForm((t) => ({ ...t, deadline: shortcutDate(kind) }))}
                                             >
                                                 {label}
@@ -1934,35 +2271,25 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                         ))}
                                     </div>
                                 </div>
-                                <div>
-                                    <label htmlFor="tasks-task-klant" className="block text-sm font-medium text-zinc-800">Klant</label>
-                                    <CustomerPicker id="tasks-task-klant" value={taskForm.customer} onChange={(customer) => setTaskForm((t) => ({ ...t, customer }))} />
+                                <div className="md:col-span-2">
+                                    <label htmlFor="tasks-task-labels" className="label">
+                                        Labels
+                                    </label>
+                                    <input id="tasks-task-labels" className={cx(inputClasses, 'mt-1.5')} placeholder="bijv. lead, demo, urgent" value={taskForm.labels} onChange={(e) => setTaskForm((t) => ({ ...t, labels: e.target.value }))} />
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label htmlFor="tasks-task-labels" className="block text-sm font-medium text-zinc-800">Labels</label>
-                                    <input
-                                        id="tasks-task-labels"
-                                        className={cx(inputClasses, 'mt-1')}
-                                        placeholder="bijv. lead, demo, urgent"
-                                        value={taskForm.labels}
-                                        onChange={(e) => setTaskForm((t) => ({ ...t, labels: e.target.value }))}
-                                    />
+                                    <label htmlFor="tasks-task-toegewezen-aan" className="label">
+                                        Toegewezen aan
+                                    </label>
+                                    <MultiSelectChips id="tasks-task-toegewezen-aan" options={users} value={taskForm.assignees} placeholder="Zoek een collega..." onChange={(ids) => setTaskForm((t) => ({ ...t, assignees: ids }))} />
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label htmlFor="tasks-task-toegewezen-aan" className="block text-sm font-medium text-zinc-800">Toegewezen aan</label>
-                                    <MultiSelectChips
-                                        id="tasks-task-toegewezen-aan"
-                                        options={users}
-                                        value={taskForm.assignees}
-                                        placeholder="Zoek een collega..."
-                                        onChange={(ids) => setTaskForm((t) => ({ ...t, assignees: ids }))}
-                                    />
-                                </div>
-                                <div className="md:col-span-2">
-                                    <label htmlFor="tasks-task-bijlagen" className="block text-sm font-medium text-zinc-800">Bijlagen</label>
+                                    <label htmlFor="tasks-task-bijlagen" className="label">
+                                        Bijlagen
+                                    </label>
                                     <FilePicker
                                         id="tasks-task-bijlagen"
-                                        className="mt-1"
+                                        className="mt-1.5"
                                         files={taskFiles}
                                         multiple
                                         accept={ATTACHMENT_ACCEPT}
@@ -1973,25 +2300,20 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                             setTaskFiles((prev) => [...prev, ...picked]);
                                         }}
                                     />
-                                    <div className="mt-1 text-xs text-zinc-500">{ATTACHMENT_HINT}</div>
+                                    <div className="field-hint">{ATTACHMENT_HINT}</div>
                                     {taskFiles.length > 0 ? (
-                                        <ul className="mt-2 divide-y divide-zinc-100 rounded-lg border border-zinc-200" aria-label="Gekozen bestanden">
-                                            {taskFiles.map((file, idx) => (
-                                                <li key={`${file.name}-${idx}`} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                                                    <span className="min-w-0 truncate text-zinc-800">
-                                                        {file.name}
-                                                        {formatFileSize(file.size) ? <span className="ml-2 text-xs text-zinc-500">{formatFileSize(file.size)}</span> : null}
-                                                    </span>
-                                                    <Button
-                                                        variant="danger-ghost"
-                                                        size="xs"
-                                                        aria-label={`${file.name} verwijderen`}
-                                                        onClick={() => setTaskFiles((prev) => prev.filter((_, i) => i !== idx))}
-                                                    >
-                                                        Verwijderen
-                                                    </Button>
-                                                </li>
-                                            ))}
+                                        <ul className="mt-2 flex flex-wrap gap-2" aria-label="Gekozen bestanden">
+                                            {taskFiles.map((file, idx) => {
+                                                const kind = fileKind(file.name, file.type);
+                                                return (
+                                                    <li key={`${file.name}-${idx}`} className="flex max-w-full items-center gap-2 rounded-xl border border-hairline bg-zinc-50/60 py-1.5 pl-1.5 pr-1 text-sm">
+                                                        <IconTile icon="file-text" tone={kind.tone} size="sm" className="h-7 w-7" />
+                                                        <span className="min-w-0 truncate text-zinc-800">{file.name}</span>
+                                                        {formatFileSize(file.size) ? <span className="shrink-0 text-xs text-zinc-500">{formatFileSize(file.size)}</span> : null}
+                                                        <Button variant="ghost" size="xs" iconOnly icon="x" aria-label={`${file.name} verwijderen`} onClick={() => setTaskFiles((prev) => prev.filter((_, i) => i !== idx))} />
+                                                    </li>
+                                                );
+                                            })}
                                         </ul>
                                     ) : null}
                                 </div>
@@ -2001,7 +2323,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                 <Button variant="secondary" type="button" onClick={closeTaskModal}>
                                     Annuleren
                                 </Button>
-                                <Button type="submit" loading={taskSaving}>
+                                <Button type="submit" icon="plus" loading={taskSaving}>
                                     {taskSaving ? 'Opslaan...' : 'Taak toevoegen'}
                                 </Button>
                             </div>
@@ -2011,94 +2333,143 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
             ) : null}
             {selectedTaskId ? (
                 <div
-                    className="fixed inset-0 z-50 flex justify-end bg-zinc-900/40"
+                    className="fixed inset-0 z-50 flex justify-end bg-zinc-900/40 backdrop-blur-[2px]"
                     onMouseDown={(e) => {
                         if (e.target === e.currentTarget) closeTask();
                     }}
                 >
-                    <div
-                        ref={detailDialogRef}
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="task-detail-title"
-                        tabIndex={-1}
-                        className="h-full w-full max-w-xl overflow-y-auto overscroll-contain bg-white shadow-2xl"
-                    >
-                        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-zinc-200 bg-white px-4 py-4 sm:px-6">
-                            <div className="min-w-0">
-                                <h2 id="task-detail-title" className="truncate text-lg font-semibold text-zinc-900">
-                                    {selectedTask?.titel?.trim() || 'Taak'}
-                                </h2>
-                                <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-zinc-500">
-                                    {selectedTask ? <Badge tone={statusTone(selectedTask.status)}>{statusLabel(selectedTask.status)}</Badge> : null}
-                                    {isOverdue(selectedTask) ? <OverdueBadge /> : null}
-                                    <span className="truncate">{selectedTask?.project?.naam ?? (selectedTask ? 'Geen project' : '')}</span>
+                    <div ref={detailDialogRef} role="dialog" aria-modal="true" aria-labelledby="task-detail-title" tabIndex={-1} className="h-full w-full max-w-xl overflow-y-auto overscroll-contain bg-white shadow-pop sm:rounded-l-2xl">
+                        <div className="sticky top-0 z-20 border-b border-zinc-100 bg-white/95 px-4 py-4 backdrop-blur sm:px-6">
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <div className="flex min-h-[1.375rem] flex-wrap items-center gap-2">
+                                        {selectedTask ? (
+                                            <>
+                                                <Badge tone={statusTone(selectedTask.status)} dot>
+                                                    {statusLabel(selectedTask.status)}
+                                                </Badge>
+                                                <PriorityTag value={selectedTask.prioriteit} />
+                                                {isOverdue(selectedTask) ? <OverdueBadge /> : null}
+                                            </>
+                                        ) : (
+                                            <Skeleton className="h-5 w-32 rounded-full" />
+                                        )}
+                                    </div>
+                                    <h2 id="task-detail-title" className="mt-2 line-clamp-2 text-lg font-semibold leading-6 text-zinc-900">
+                                        {selectedTask?.titel?.trim() || 'Taak'}
+                                    </h2>
+                                    {selectedTask ? (
+                                        <p className="mt-1 inline-flex min-w-0 items-center gap-1.5 text-sm text-zinc-500">
+                                            <ProjectDot kleur={selectedTask.project?.kleur} className="h-2 w-2" />
+                                            <span className="truncate">{selectedTask.project?.naam ?? 'Geen project'}</span>
+                                        </p>
+                                    ) : null}
                                 </div>
-                            </div>
-                            <div className="flex shrink-0 items-center gap-2">
-                                {selectedTask && selectedTask.status !== 'afgerond' ? (
-                                    <Button variant="secondary" size="sm" onClick={completeSelectedTask} disabled={detailSaving}>
-                                        Afronden
-                                    </Button>
-                                ) : null}
-                                <Button variant="ghost" size="sm" onClick={closeTask} aria-label="Taakdetails sluiten">
-                                    Sluiten
-                                </Button>
+                                <div className="flex shrink-0 items-center gap-1.5">
+                                    {selectedTask && selectedTask.status !== 'afgerond' ? (
+                                        <Button variant="secondary" size="sm" icon="check" onClick={completeSelectedTask} disabled={detailSaving}>
+                                            Afronden
+                                        </Button>
+                                    ) : null}
+                                    <Button variant="ghost" size="sm" iconOnly icon="x" onClick={closeTask} aria-label="Taakdetails sluiten" />
+                                </div>
                             </div>
                         </div>
                         {detailLoading ? (
-                            <div className="flex items-center gap-2 p-6 text-sm text-zinc-600" role="status">
-                                <Spinner className="h-4 w-4 text-indigo-600" /> Taak laden...
+                            <div className="space-y-6 px-4 py-6 sm:px-6" aria-busy="true">
+                                <span className="sr-only" role="status">
+                                    Taak laden...
+                                </span>
+                                <Skeleton className="h-20 w-full rounded-2xl" />
+                                <Skeleton lines={3} />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <Skeleton className="h-10" />
+                                    <Skeleton className="h-10" />
+                                    <Skeleton className="h-10" />
+                                    <Skeleton className="h-10" />
+                                </div>
                             </div>
                         ) : !selectedTask ? (
                             <div className="p-6">
                                 <EmptyState
+                                    icon="alert-circle"
                                     title="Taak niet gevonden"
                                     description="Deze taak bestaat niet (meer) of kon niet worden geladen."
                                     action={
-                                        <Button variant="secondary" onClick={() => loadTask(selectedTaskId)}>
+                                        <Button variant="secondary" icon="refresh" onClick={() => loadTask(selectedTaskId)}>
                                             Opnieuw proberen
                                         </Button>
                                     }
                                 />
                             </div>
                         ) : (
-                            <div className="px-4 py-6 sm:px-6">
-                                <form className="space-y-6" onSubmit={saveTaskDetails}>
+                            <div className="space-y-6 px-4 py-6 sm:px-6">
+                                {selectedTask.customer ? <CustomerMiniCard customer={selectedTask.customer} info={customerInfo} /> : null}
+
+                                <form className="space-y-5" onSubmit={saveTaskDetails}>
                                     <div>
-                                        <label htmlFor="tasks-detail-titel" className="block text-sm font-medium text-zinc-800">Titel<span className="ml-0.5 text-rose-600" aria-hidden="true">*</span></label>
+                                        <label htmlFor="tasks-detail-titel" className="label">
+                                            Titel
+                                            <span className="ml-0.5 text-rose-600" aria-hidden="true">
+                                                *
+                                            </span>
+                                        </label>
                                         <input
                                             id="tasks-detail-titel"
                                             maxLength={255}
                                             aria-invalid={detailErrors.titel ? true : undefined}
-                                            className={cx(inputClasses, 'mt-1')}
+                                            className={cx(inputClasses, 'mt-1.5')}
                                             value={selectedTask.titel ?? ''}
                                             onChange={(e) => setSelectedTask((t) => ({ ...t, titel: e.target.value }))}
                                             required
                                         />
-                                        {detailErrors.titel ? <div className="mt-1 text-xs font-medium text-rose-700" role="alert">{detailErrors.titel?.[0]}</div> : null}
+                                        {detailErrors.titel ? (
+                                            <div className="field-error" role="alert">
+                                                {detailErrors.titel?.[0]}
+                                            </div>
+                                        ) : null}
                                     </div>
                                     <div>
-                                        <label htmlFor="tasks-detail-omschrijving" className="block text-sm font-medium text-zinc-800">Omschrijving</label>
-                                        <textarea
-                                            id="tasks-detail-omschrijving"
-                                            className={cx(inputClasses, 'mt-1')}
-                                            rows={4}
-                                            value={selectedTask.omschrijving ?? ''}
-                                            onChange={(e) => setSelectedTask((t) => ({ ...t, omschrijving: e.target.value }))}
-                                        />
+                                        <label htmlFor="tasks-detail-omschrijving" className="label">
+                                            Omschrijving
+                                        </label>
+                                        <textarea id="tasks-detail-omschrijving" className={cx(inputClasses, 'mt-1.5')} rows={4} value={selectedTask.omschrijving ?? ''} onChange={(e) => setSelectedTask((t) => ({ ...t, omschrijving: e.target.value }))} />
                                     </div>
 
-                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                         <div>
-                                            <label htmlFor="tasks-detail-project" className="block text-sm font-medium text-zinc-800">Project</label>
+                                            <label htmlFor="tasks-detail-status" className="label">
+                                                Status
+                                            </label>
+                                            <select id="tasks-detail-status" className={cx(inputClasses, 'mt-1.5')} value={selectedTask.status ?? 'open'} onChange={(e) => setSelectedTask((t) => ({ ...t, status: e.target.value }))}>
+                                                {statusOptions.map((s) => (
+                                                    <option key={s} value={s}>
+                                                        {statusLabel(s)}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label htmlFor="tasks-detail-prioriteit" className="label">
+                                                Prioriteit
+                                            </label>
+                                            <select id="tasks-detail-prioriteit" className={cx(inputClasses, 'mt-1.5')} value={selectedTask.prioriteit ?? 'normaal'} onChange={(e) => setSelectedTask((t) => ({ ...t, prioriteit: e.target.value }))}>
+                                                {priorityOptions.map((p) => (
+                                                    <option key={p} value={p}>
+                                                        {priorityMeta(p).label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label htmlFor="tasks-detail-project" className="label">
+                                                Project
+                                            </label>
                                             <select
                                                 id="tasks-detail-project"
-                                                className={cx(inputClasses, 'mt-1')}
+                                                className={cx(inputClasses, 'mt-1.5')}
                                                 value={selectedTask.task_project_id ?? ''}
-                                                onChange={(e) =>
-                                                    setSelectedTask((t) => ({ ...t, task_project_id: e.target.value ? Number(e.target.value) : null }))
-                                                }
+                                                onChange={(e) => setSelectedTask((t) => ({ ...t, task_project_id: e.target.value ? Number(e.target.value) : null }))}
                                             >
                                                 <option value="">Geen</option>
                                                 {projects.map((p) => (
@@ -2109,73 +2480,28 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                             </select>
                                         </div>
                                         <div>
-                                            <label htmlFor="tasks-detail-status" className="block text-sm font-medium text-zinc-800">Status</label>
-                                            <select
-                                                id="tasks-detail-status"
-                                                className={cx(inputClasses, 'mt-1')}
-                                                value={selectedTask.status ?? 'open'}
-                                                onChange={(e) => setSelectedTask((t) => ({ ...t, status: e.target.value }))}
-                                            >
-                                                {statusOptions.map((s) => (
-                                                    <option key={s} value={s}>
-                                                        {statusLabel(s)}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label htmlFor="tasks-detail-prioriteit" className="block text-sm font-medium text-zinc-800">Prioriteit</label>
-                                            <select
-                                                id="tasks-detail-prioriteit"
-                                                className={cx(inputClasses, 'mt-1')}
-                                                value={selectedTask.prioriteit ?? 'normaal'}
-                                                onChange={(e) => setSelectedTask((t) => ({ ...t, prioriteit: e.target.value }))}
-                                            >
-                                                {priorityOptions.map((p) => (
-                                                    <option key={p} value={p}>
-                                                        {priorityMeta(p).label}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label htmlFor="tasks-detail-deadline" className="flex items-center gap-2 text-xs font-semibold text-zinc-500">
+                                            <label htmlFor="tasks-detail-deadline" className="label flex items-center gap-2">
                                                 Deadline {isOverdue(selectedTask) ? <OverdueBadge /> : null}
                                             </label>
                                             <input
                                                 id="tasks-detail-deadline"
                                                 type="datetime-local"
-                                                className={cx(inputClasses, 'mt-1')}
+                                                className={cx(inputClasses, 'mt-1.5')}
                                                 value={toLocalInputValue(selectedTask.deadline)}
                                                 aria-invalid={isOverdue(selectedTask) || undefined}
-                                                onChange={(e) =>
-                                                    setSelectedTask((t) => ({
-                                                        ...t,
-                                                        deadline: e.target.value || null,
-                                                    }))
-                                                }
+                                                onChange={(e) => setSelectedTask((t) => ({ ...t, deadline: e.target.value || null }))}
                                             />
                                         </div>
-                                        <div className="md:col-span-2">
-                                            <label htmlFor="tasks-detail-klant" className="block text-sm font-medium text-zinc-800">Klant</label>
-                                            <CustomerPicker
-                                                id="tasks-detail-klant"
-                                                value={selectedTask.customer ?? null}
-                                                onChange={(customer) => setSelectedTask((t) => ({ ...t, customer, garage_company_id: customer?.id ?? null }))}
-                                            />
+                                        <div className="sm:col-span-2">
+                                            <label htmlFor="tasks-detail-klant" className="label">
+                                                Klant
+                                            </label>
+                                            <CustomerPicker id="tasks-detail-klant" value={selectedTask.customer ?? null} onChange={(customer) => setSelectedTask((t) => ({ ...t, customer, garage_company_id: customer?.id ?? null }))} />
                                         </div>
-                                        <div className="md:col-span-2">
-                                            <label htmlFor="tasks-detail-labels" className="block text-sm font-medium text-zinc-800">Labels</label>
-                                            <input
-                                                id="tasks-detail-labels"
-                                                className={cx(inputClasses, 'mt-1')}
-                                                placeholder="bijv. lead, demo, urgent"
-                                                value={selectedTask.labels ?? ''}
-                                                onChange={(e) => setSelectedTask((t) => ({ ...t, labels: e.target.value }))}
-                                            />
-                                        </div>
-                                        <div className="md:col-span-2">
-                                            <label htmlFor="tasks-detail-toegewezen-aan" className="block text-sm font-medium text-zinc-800">Toegewezen aan</label>
+                                        <div className="sm:col-span-2">
+                                            <label htmlFor="tasks-detail-toegewezen-aan" className="label">
+                                                Toegewezen aan
+                                            </label>
                                             <MultiSelectChips
                                                 id="tasks-detail-toegewezen-aan"
                                                 options={users}
@@ -2190,64 +2516,91 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                                 }}
                                             />
                                         </div>
+                                        <div className="sm:col-span-2">
+                                            <label htmlFor="tasks-detail-labels" className="label">
+                                                Labels
+                                            </label>
+                                            <input id="tasks-detail-labels" className={cx(inputClasses, 'mt-1.5')} placeholder="bijv. lead, demo, urgent" value={selectedTask.labels ?? ''} onChange={(e) => setSelectedTask((t) => ({ ...t, labels: e.target.value }))} />
+                                        </div>
                                     </div>
 
                                     <ErrorList errors={detailErrors} exclude={['titel']} />
-                                    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                                        <Button variant="secondary" type="button" onClick={closeTask}>
-                                            Sluiten
-                                        </Button>
-                                        <Button type="submit" loading={detailSaving}>
-                                            {detailSaving ? 'Opslaan...' : 'Opslaan'}
-                                        </Button>
+                                    <div className={cx('flex flex-col-reverse gap-3 rounded-2xl p-3 transition-colors sm:flex-row sm:items-center sm:justify-between', detailDirty ? 'bg-amber-50 ring-1 ring-inset ring-amber-200' : 'bg-zinc-50')}>
+                                        <span className={cx('inline-flex items-center gap-2 text-sm', detailDirty ? 'font-medium text-amber-900' : 'text-zinc-500')} aria-live="polite">
+                                            <Icon name={detailDirty ? 'alert-circle' : 'check-circle'} className={cx('h-4 w-4', detailDirty ? 'text-amber-600' : 'text-emerald-600')} />
+                                            {detailDirty ? 'Niet opgeslagen wijzigingen' : 'Alles is opgeslagen'}
+                                        </span>
+                                        <div className="flex flex-col-reverse gap-2 sm:flex-row">
+                                            <Button variant="secondary" type="button" onClick={closeTask}>
+                                                Sluiten
+                                            </Button>
+                                            <Button type="submit" icon="check" loading={detailSaving} disabled={!detailDirty && !detailSaving}>
+                                                {detailSaving ? 'Opslaan...' : 'Opslaan'}
+                                            </Button>
+                                        </div>
                                     </div>
                                 </form>
 
-                                <section className="mt-8 border-t border-zinc-200 pt-6" aria-labelledby="task-detail-reacties">
-                                    <h3 id="task-detail-reacties" className="text-sm font-semibold text-zinc-900">
-                                        Reacties{selectedTask.comments?.length ? ` (${selectedTask.comments.length})` : ''}
-                                    </h3>
-                                    <ul className="mt-4 space-y-3">
-                                        {selectedTask.comments?.length ? (
-                                            selectedTask.comments.map((c) => (
-                                                <li key={c.id} className="rounded-lg border border-zinc-200 bg-zinc-50/60 p-3">
-                                                    <div className="text-xs font-semibold text-zinc-500">
-                                                        {c.author?.name ?? 'Onbekend'} · {c.created_at ? formatDateTime(c.created_at) : '-'}
-                                                    </div>
-                                                    <div className="mt-2 whitespace-pre-wrap text-sm text-zinc-700">{c.body}</div>
-                                                </li>
-                                            ))
-                                        ) : (
-                                            <li className="text-sm text-zinc-500">Nog geen reacties.</li>
-                                        )}
-                                    </ul>
-                                    <form className="mt-4 space-y-2" onSubmit={addComment}>
-                                        <textarea
-                                            className={inputClasses}
-                                            rows={3}
-                                            aria-label="Reactie"
-                                            maxLength={5000}
-                                            value={commentBody}
-                                            onChange={(e) => setCommentBody(e.target.value)}
-                                            placeholder="Schrijf een reactie en tag met @naam"
-                                        />
-                                        <div className="flex justify-end">
-                                            <Button type="submit" variant="secondary" loading={commentSaving} disabled={!commentBody.trim()}>
-                                                {commentSaving ? 'Plaatsen...' : 'Plaatsen'}
-                                            </Button>
+                                <DrawerSection id="task-detail-reacties" icon="message-square" title="Reacties" count={selectedTask.comments?.length}>
+                                    {selectedTask.comments?.length ? (
+                                        <ul className="space-y-4">
+                                            {selectedTask.comments.map((c) => {
+                                                const mine = currentUserId && Number(c.author?.id) === currentUserId;
+                                                const name = c.author?.name ?? 'Onbekend';
+                                                return (
+                                                    <li key={c.id} className={cx('flex items-start gap-2.5', mine && 'flex-row-reverse')}>
+                                                        <Avatar name={name} size="sm" />
+                                                        <div className={cx('flex min-w-0 max-w-[85%] flex-col', mine ? 'items-end' : 'items-start')}>
+                                                            <div className="flex items-baseline gap-2 text-xs">
+                                                                <span className="font-semibold text-zinc-800">{mine ? 'Jij' : name}</span>
+                                                                <time dateTime={c.created_at ?? undefined} title={formatDateTime(c.created_at) ?? undefined} className="text-zinc-400">
+                                                                    {relativeTime(c.created_at)}
+                                                                </time>
+                                                            </div>
+                                                            <div className={cx('mt-1 whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2.5 text-sm leading-6', mine ? 'rounded-tr-md bg-indigo-100/70 text-zinc-900' : 'rounded-tl-md bg-zinc-100 text-zinc-800')}>{c.body}</div>
+                                                        </div>
+                                                    </li>
+                                                );
+                                            })}
+                                        </ul>
+                                    ) : (
+                                        <p className="rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-500">Nog geen reacties. Stel een vraag of geef een update; tag een collega met @naam.</p>
+                                    )}
+                                    <form className="mt-4 flex items-start gap-2.5" onSubmit={addComment}>
+                                        <Avatar name={currentUserName || 'Jij'} size="sm" className="mt-1" />
+                                        <div className="min-w-0 flex-1 rounded-2xl border border-zinc-300 bg-white shadow-sm transition-colors focus-within:border-indigo-600 focus-within:ring-1 focus-within:ring-indigo-600">
+                                            <textarea
+                                                className="block w-full resize-none rounded-t-2xl border-0 bg-transparent px-3.5 pt-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:ring-0"
+                                                rows={2}
+                                                aria-label="Reactie"
+                                                maxLength={5000}
+                                                value={commentBody}
+                                                onChange={(e) => setCommentBody(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                                                        e.preventDefault();
+                                                        e.currentTarget.form?.requestSubmit();
+                                                    }
+                                                }}
+                                                placeholder="Schrijf een reactie en tag met @naam"
+                                            />
+                                            <div className="flex items-center justify-between gap-2 px-2 pb-2">
+                                                <span className="pl-1.5 text-2xs text-zinc-400">Ctrl + Enter om te plaatsen</span>
+                                                <Button type="submit" size="sm" loading={commentSaving} disabled={!commentBody.trim()}>
+                                                    {commentSaving ? 'Plaatsen...' : 'Plaatsen'}
+                                                </Button>
+                                            </div>
                                         </div>
                                     </form>
-                                </section>
+                                </DrawerSection>
 
-                                <section className="mt-8 border-t border-zinc-200 pt-6" aria-labelledby="task-detail-bijlagen">
-                                    <div className="flex items-center justify-between gap-3">
-                                        <h3 id="task-detail-bijlagen" className="text-sm font-semibold text-zinc-900">Bijlagen</h3>
-                                        <label
-                                            className={cx(
-                                                'inline-flex h-8 items-center gap-2 rounded-lg bg-white px-3 text-sm font-semibold text-zinc-800 shadow-sm ring-1 ring-inset ring-zinc-300 focus-within:ring-2 focus-within:ring-indigo-600 hover:bg-zinc-50',
-                                                attachmentUploading ? 'cursor-wait opacity-60' : 'cursor-pointer',
-                                            )}
-                                        >
+                                <DrawerSection
+                                    id="task-detail-bijlagen"
+                                    icon="file-text"
+                                    title="Bijlagen"
+                                    count={selectedTask.attachments?.length}
+                                    actions={
+                                        <label className={cx(buttonClasses({ variant: 'secondary', size: 'sm' }), 'focus-within:ring-2 focus-within:ring-indigo-600 focus-within:ring-offset-2', attachmentUploading ? 'cursor-wait opacity-60' : 'cursor-pointer')}>
                                             <input
                                                 type="file"
                                                 className="sr-only"
@@ -2260,37 +2613,39 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                                     uploadAttachments(files);
                                                 }}
                                             />
-                                            {attachmentUploading ? <Spinner className="h-4 w-4" /> : null}
+                                            {attachmentUploading ? <Spinner className="h-4 w-4" /> : <Icon name="upload" className="h-4 w-4 text-zinc-500" />}
                                             {attachmentUploading ? 'Uploaden...' : 'Bestand uploaden'}
                                         </label>
-                                    </div>
-                                    <div className="mt-1 text-xs text-zinc-500">{ATTACHMENT_HINT}</div>
-
+                                    }
+                                >
                                     {selectedTask.attachments?.length ? (
-                                        <ul className="mt-4 space-y-2">
-                                            {selectedTask.attachments.map((file) => (
-                                                <li key={file.id} className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white px-3 py-2">
-                                                    <div className="min-w-0">
-                                                        <div className="truncate text-sm font-semibold text-zinc-900">{file.original_name}</div>
-                                                        <div className="mt-1 text-xs text-zinc-500">
-                                                            {[formatFileSize(file.size), file.mime].filter(Boolean).join(' · ') || 'Bestand'}
-                                                        </div>
-                                                    </div>
-                                                    <a
-                                                        className="shrink-0 text-sm font-semibold text-indigo-700 hover:text-indigo-900"
-                                                        href={file.url}
-                                                        download
-                                                        aria-label={`${file.original_name} downloaden`}
-                                                    >
-                                                        Downloaden
-                                                    </a>
-                                                </li>
-                                            ))}
+                                        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                            {selectedTask.attachments.map((file) => {
+                                                const kind = fileKind(file.original_name, file.mime);
+                                                return (
+                                                    <li key={file.id} className="min-w-0">
+                                                        <a
+                                                            href={file.url}
+                                                            download
+                                                            aria-label={`${file.original_name} downloaden`}
+                                                            className="group flex min-w-0 items-center gap-3 rounded-xl border border-hairline bg-white p-2.5 transition-[box-shadow,border-color] hover:border-zinc-300 hover:shadow-card-hover focus-ring"
+                                                        >
+                                                            <IconTile icon="file-text" tone={kind.tone} size="sm" />
+                                                            <span className="min-w-0 flex-1">
+                                                                <span className="block truncate text-sm font-medium text-zinc-900">{file.original_name}</span>
+                                                                <span className="block text-xs text-zinc-500">{[kind.label, formatFileSize(file.size)].filter(Boolean).join(', ')}</span>
+                                                            </span>
+                                                            <Icon name="download" className="h-4 w-4 shrink-0 text-zinc-400 group-hover:text-indigo-700" />
+                                                        </a>
+                                                    </li>
+                                                );
+                                            })}
                                         </ul>
                                     ) : (
-                                        <div className="mt-4 text-sm text-zinc-500">Nog geen bijlagen.</div>
+                                        <p className="rounded-xl border border-dashed border-zinc-300 px-4 py-5 text-center text-sm text-zinc-500">Nog geen bijlagen. Upload offertes, foto's of andere documenten bij deze taak.</p>
                                     )}
-                                </section>
+                                    <p className="field-hint">{ATTACHMENT_HINT}</p>
+                                </DrawerSection>
                             </div>
                         )}
                     </div>

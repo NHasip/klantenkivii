@@ -1,63 +1,97 @@
+@php
+    // Icoon en kleur per soort melding (sleutels komen uit Bell::buildSignals()).
+    $bellTypes = [
+        'taken' => ['icon' => 'check-square', 'tile' => 'bg-rose-50 text-rose-700'],
+        'afspraken' => ['icon' => 'calendar', 'tile' => 'bg-amber-50 text-amber-700'],
+        'demos' => ['icon' => 'clock', 'tile' => 'bg-sky-50 text-sky-700'],
+        'mandaten' => ['icon' => 'credit-card', 'tile' => 'bg-violet-50 text-violet-700'],
+    ];
+    $bellRelative = function ($value) {
+        try {
+            return $value ? \Illuminate\Support\Carbon::parse($value)->locale('nl') : null;
+        } catch (\Throwable) {
+            return null;
+        }
+    };
+    $bellGroupHead = 'flex items-center justify-between gap-3 px-4 pb-1 pt-3';
+    $bellGroupTitle = 'text-xs font-semibold text-zinc-500';
+    $bellCount = 'inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-zinc-100 px-1.5 text-2xs font-semibold tabular-nums text-zinc-700';
+    $bellLink = 'focus-ring inline-flex items-center gap-1 rounded text-xs font-semibold text-indigo-700 hover:text-indigo-900';
+@endphp
 <div class="relative" wire:poll.30s
      x-data="{ open: false }"
      @kivii-menu-open.window="if ($event.detail !== 'bell') open = false"
      @keydown.escape.window="if (open) { open = false; $refs.bellButton.focus() }"
      @click.outside="open = false">
     <button type="button" x-ref="bellButton"
-            class="relative inline-flex h-9 w-9 items-center justify-center rounded-lg text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1"
+            class="btn btn-ghost btn-icon relative text-zinc-600"
             :class="open && 'bg-zinc-100 text-zinc-900'"
             @click="open = !open; if (open) { $dispatch('kivii-menu-open', 'bell'); $wire.$refresh() }"
             :aria-expanded="open.toString()" aria-controls="reminders-panel"
             aria-label="Meldingen{{ $count > 0 ? ' ('.$count.' open)' : ', geen open meldingen' }}">
-        <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 2a6 6 0 00-6 6v2.586l-.707.707A1 1 0 004 13h12a1 1 0 00.707-1.707L16 10.586V8a6 6 0 00-6-6z"/><path d="M10 18a3 3 0 01-2.995-2.824L7 15h6a3 3 0 01-3 3z"/></svg>
+        <x-icon name="bell" class="h-5 w-5" />
         @if($count > 0)
-            <span aria-hidden="true" class="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-600 px-1.5 text-[11px] font-semibold tabular-nums text-white ring-2 ring-white">{{ $count > 99 ? '99+' : $count }}</span>
+            <span aria-hidden="true" class="absolute -right-0.5 -top-0.5 inline-flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-semibold tabular-nums leading-none text-white ring-2 ring-white">{{ $count > 99 ? '99+' : $count }}</span>
         @endif
     </button>
 
-    <div id="reminders-panel" x-cloak x-show="open" x-transition.opacity.duration.100ms role="region" aria-label="Meldingen"
-         class="fixed inset-x-2 top-16 z-40 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-96">
+    <div id="reminders-panel" x-cloak x-show="open"
+         x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+         role="region" aria-label="Meldingen"
+         class="fixed inset-x-2 top-16 z-40 flex max-h-[80vh] flex-col overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-pop motion-reduce:transition-none sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-[25rem]">
         <div class="flex items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3">
             <div class="flex items-center gap-2">
                 <h2 class="text-sm font-semibold text-zinc-900">Meldingen</h2>
                 @if($count > 0)
-                    <span class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-zinc-100 px-1.5 text-xs font-semibold tabular-nums text-zinc-700">{{ $count }}</span>
+                    <span class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-50 px-1.5 text-xs font-semibold tabular-nums text-rose-700 ring-1 ring-inset ring-rose-200">{{ $count }}<span class="sr-only">&nbsp;open</span></span>
                 @endif
             </div>
-            <button type="button" class="-mr-1 inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600" @click="open = false; $refs.bellButton.focus()" aria-label="Meldingen sluiten">
-                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>
+            <button type="button" class="btn btn-ghost btn-icon btn-sm -mr-1 text-zinc-500" @click="open = false; $refs.bellButton.focus()" aria-label="Meldingen sluiten">
+                <x-icon name="x" class="h-4 w-4" />
             </button>
         </div>
 
-        <div class="max-h-[70vh] overflow-y-auto">
+        <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-2">
             @if($reminders->isNotEmpty())
-                <section class="border-b border-zinc-100 px-4 py-3" aria-labelledby="bell-reminders-title">
-                    <div class="flex items-center justify-between gap-3">
-                        <h3 id="bell-reminders-title" class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Herinneringen</h3>
-                        <span class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-indigo-50 px-1.5 text-xs font-semibold tabular-nums text-indigo-800">{{ $reminders->count() }}</span>
+                <section aria-labelledby="bell-reminders-title">
+                    <div class="{{ $bellGroupHead }}">
+                        <h3 id="bell-reminders-title" class="{{ $bellGroupTitle }}">Herinneringen</h3>
+                        <span class="{{ $bellCount }} bg-indigo-50 text-indigo-800">{{ $reminders->count() }}</span>
                     </div>
-                    <ul class="mt-2 space-y-2">
+                    <ul class="px-2">
                         @foreach($reminders as $reminder)
-                            <li wire:key="bell-reminder-{{ $reminder->id }}" class="rounded-lg border border-zinc-200 p-3">
-                                <div class="flex items-start justify-between gap-3">
-                                    <div class="min-w-0">
-                                        <div class="truncate text-sm font-semibold text-zinc-900">{{ $reminder->titel }}</div>
-                                        @if($reminder->message)
-                                            <div class="mt-0.5 text-xs text-zinc-600">{{ \Illuminate\Support\Str::limit($reminder->message, 140) }}</div>
-                                        @endif
-                                        <div class="mt-1 text-xs tabular-nums text-zinc-500">{{ $reminder->remind_at?->format('d-m-Y H:i') }}</div>
-                                    </div>
-                                    <button type="button"
-                                            class="inline-flex h-8 shrink-0 items-center rounded-lg bg-white px-2.5 text-xs font-semibold text-zinc-800 shadow-sm ring-1 ring-inset ring-zinc-300 hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:opacity-50"
-                                            wire:click="dismiss({{ $reminder->id }})" wire:loading.attr="disabled" wire:target="dismiss({{ $reminder->id }})">
-                                        Afhandelen
-                                    </button>
-                                </div>
-                                @if($reminder->garage_company_id)
-                                    <a class="mt-2 inline-block rounded text-xs font-semibold text-indigo-700 hover:text-indigo-900 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600" href="{{ route('crm.garage_companies.show', $reminder->garage_company_id) }}">
-                                        Naar klant &rarr;
-                                    </a>
+                            @php $remindAt = $reminder->remind_at; @endphp
+                            <li wire:key="bell-reminder-{{ $reminder->id }}" class="flex items-start gap-3 rounded-xl px-2 py-2.5 hover:bg-zinc-50">
+                                @if($reminder->garageCompany)
+                                    <x-avatar :name="$reminder->garageCompany->bedrijfsnaam" size="sm" class="mt-0.5" />
+                                @else
+                                    <span class="icon-tile mt-0.5 h-8 w-8 rounded-lg bg-indigo-100/80 text-indigo-700" aria-hidden="true"><x-icon name="bell" class="h-4 w-4" /></span>
                                 @endif
+                                <div class="min-w-0 flex-1">
+                                    <div class="truncate text-sm font-semibold text-zinc-900">{{ $reminder->titel }}</div>
+                                    @if($reminder->message)
+                                        <div class="mt-0.5 line-clamp-2 text-xs leading-5 text-zinc-600">{{ \Illuminate\Support\Str::limit($reminder->message, 140) }}</div>
+                                    @endif
+                                    <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
+                                        @if($remindAt)
+                                            <time datetime="{{ $remindAt->toIso8601String() }}" title="{{ $remindAt->format('d-m-Y H:i') }}">{{ $remindAt->copy()->locale('nl')->diffForHumans() }}</time>
+                                        @endif
+                                        @if($reminder->garage_company_id)
+                                            <a class="{{ $bellLink }}" href="{{ route('crm.garage_companies.show', $reminder->garage_company_id) }}">
+                                                {{ $reminder->garageCompany?->bedrijfsnaam ?: 'Naar klant' }}
+                                                <x-icon name="arrow-up-right" class="h-3 w-3" />
+                                            </a>
+                                        @endif
+                                    </div>
+                                </div>
+                                <button type="button"
+                                        class="btn btn-secondary btn-xs shrink-0"
+                                        wire:click="dismiss({{ $reminder->id }})" wire:loading.attr="disabled" wire:target="dismiss({{ $reminder->id }})"
+                                        aria-label="{{ $reminder->titel }} afhandelen">
+                                    <x-icon name="check" class="h-3.5 w-3.5" />
+                                    Afhandelen
+                                </button>
                             </li>
                         @endforeach
                     </ul>
@@ -65,40 +99,80 @@
             @endif
 
             @foreach($signals as $signal)
-                <section class="border-b border-zinc-100 px-4 py-3 last:border-b-0" aria-labelledby="bell-signal-{{ $signal['key'] }}">
-                    <div class="flex items-center justify-between gap-3">
-                        <h3 id="bell-signal-{{ $signal['key'] }}" class="text-xs font-semibold uppercase tracking-wide text-zinc-500">{{ $signal['title'] }}</h3>
-                        <span class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-zinc-100 px-1.5 text-xs font-semibold tabular-nums text-zinc-700">{{ $signal['count'] }}</span>
+                @php $bellType = $bellTypes[$signal['key']] ?? ['icon' => 'info', 'tile' => 'bg-zinc-100 text-zinc-600']; @endphp
+                <section @class(['border-t border-zinc-100' => $reminders->isNotEmpty() || ! $loop->first]) aria-labelledby="bell-signal-{{ $signal['key'] }}">
+                    <div class="{{ $bellGroupHead }}">
+                        <h3 id="bell-signal-{{ $signal['key'] }}" class="{{ $bellGroupTitle }}">{{ $signal['title'] }}</h3>
+                        <span class="{{ $bellCount }}">{{ $signal['count'] }}</span>
                     </div>
                     @if(! empty($signal['items']))
-                        <ul class="-mx-2 mt-1.5">
+                        <ul class="px-2">
                             @foreach($signal['items'] as $item)
+                                @php
+                                    $itemAt = $bellRelative($item['at'] ?? null);
+                                    $itemSub = $item['sub'] ?? null;
+                                    $itemOverdueLabel = $item['overdue'] && ($item['overdueLabel'] ?? true);
+                                @endphp
                                 <li>
-                                    <a href="{{ $item['url'] }}" class="block rounded-lg px-2 py-1.5 text-sm hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-600">
-                                        <span class="block truncate font-medium text-zinc-900">{{ $item['label'] }}</span>
-                                        @if($item['meta'])
-                                            <span class="block truncate text-xs {{ $item['overdue'] ? 'font-medium text-rose-700' : 'text-zinc-500' }}">{{ $item['overdue'] && ($item['overdueLabel'] ?? true) ? 'Te laat · ' : '' }}{{ $item['meta'] }}</span>
+                                    <a href="{{ $item['url'] }}" class="flex items-start gap-3 rounded-xl px-2 py-2 hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-600">
+                                        @if(! empty($item['avatar']))
+                                            <x-avatar :name="$item['avatar']" size="sm" class="mt-0.5" />
+                                        @else
+                                            <span class="icon-tile mt-0.5 h-8 w-8 rounded-lg {{ $bellType['tile'] }}" aria-hidden="true"><x-icon :name="$bellType['icon']" class="h-4 w-4" /></span>
                                         @endif
+                                        <span class="min-w-0 flex-1">
+                                            <span class="block truncate text-sm font-medium text-zinc-900">{{ $item['label'] }}</span>
+                                            <span class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-zinc-500">
+                                                @if($itemOverdueLabel)
+                                                    <span class="font-semibold text-rose-700">Te laat</span>
+                                                @endif
+                                                @if($itemAt)
+                                                    @if($itemSub)<span class="truncate">{{ $itemSub }}</span>@endif
+                                                    <time datetime="{{ $itemAt->toIso8601String() }}" title="{{ $itemAt->format('d-m-Y H:i') }}" @class(['font-medium text-rose-700' => $item['overdue']])>{{ $itemAt->diffForHumans() }}</time>
+                                                @elseif($item['meta'])
+                                                    <span @class(['truncate', 'font-medium text-rose-700' => $item['overdue']])>{{ $item['meta'] }}</span>
+                                                @endif
+                                            </span>
+                                        </span>
                                     </a>
                                 </li>
                             @endforeach
                         </ul>
-                    @endif
-                    @if($signal['link'])
-                        <a href="{{ $signal['link'] }}" class="mt-1.5 inline-block rounded text-xs font-semibold text-indigo-700 hover:text-indigo-900 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
-                            {{ $signal['linkLabel'] }} &rarr;
+                    @elseif($signal['link'])
+                        <a href="{{ $signal['link'] }}" class="mx-2 flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-600">
+                            <span class="icon-tile h-8 w-8 rounded-lg {{ $bellType['tile'] }}" aria-hidden="true"><x-icon :name="$bellType['icon']" class="h-4 w-4" /></span>
+                            <span class="min-w-0 flex-1 text-sm text-zinc-700">
+                                <span class="font-semibold tabular-nums text-zinc-900">{{ $signal['count'] }}</span> {{ $signal['count'] === 1 ? 'klant vraagt' : 'klanten vragen' }} aandacht
+                            </span>
+                            <x-icon name="chevron-right" class="h-4 w-4 text-zinc-400" />
                         </a>
+                    @endif
+                    @if($signal['link'] && ! empty($signal['items']))
+                        <div class="px-4 pb-1 pt-0.5">
+                            <a href="{{ $signal['link'] }}" class="{{ $bellLink }}">
+                                {{ $signal['linkLabel'] ? $signal['linkLabel'].' bekijken' : 'Alles bekijken' }}
+                                <x-icon name="chevron-right" class="h-3.5 w-3.5" />
+                            </a>
+                        </div>
                     @endif
                 </section>
             @endforeach
 
             @if($reminders->isEmpty() && empty($signals))
                 <div class="flex flex-col items-center px-6 py-10 text-center">
-                    <svg class="h-8 w-8 text-zinc-300" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" /></svg>
-                    <p class="mt-2 text-sm font-semibold text-zinc-800">Alles bijgewerkt</p>
+                    <span class="icon-tile h-12 w-12 bg-emerald-50 text-emerald-700" aria-hidden="true"><x-icon name="check-circle" class="h-6 w-6" /></span>
+                    <p class="mt-3 text-sm font-semibold text-zinc-900">Alles bijgewerkt</p>
                     <p class="mt-0.5 text-sm text-zinc-500">Er zijn geen open meldingen.</p>
                 </div>
             @endif
+        </div>
+
+        <div class="flex items-center justify-between gap-3 border-t border-zinc-100 bg-zinc-50/70 px-4 py-2.5">
+            <a href="{{ route('crm.tasks.index') }}" class="{{ $bellLink }}">
+                <x-icon name="check-square" class="h-3.5 w-3.5" />
+                Alle taken bekijken
+            </a>
+            <span class="text-2xs text-zinc-400">Ververst elke 30 seconden</span>
         </div>
     </div>
 </div>

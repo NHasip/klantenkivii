@@ -10,50 +10,58 @@
 
     @if ($passkeysEnabled && $passkeys->isNotEmpty())
         <x-slot name="aside">
-            <span class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 ring-1 ring-inset ring-zinc-200">{{ $passkeys->count() }} ingesteld</span>
+            <x-badge tone="success" dot>{{ $passkeys->count() }} ingesteld</x-badge>
         </x-slot>
     @endif
 
     <x-slot name="content">
         @if ($passkeysEnabled)
             @if ($passkeys->isNotEmpty())
-                <ul class="divide-y divide-zinc-100 rounded-lg border border-zinc-200">
+                <ul class="divide-y divide-zinc-100 overflow-hidden rounded-xl border border-zinc-200">
                     @foreach ($passkeys as $passkey)
-                        <li class="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                            <div class="min-w-0">
+                        <li class="flex items-center gap-3 px-4 py-3">
+                            <span class="icon-tile h-9 w-9 rounded-lg bg-indigo-100/80 text-indigo-700" aria-hidden="true"><x-icon name="key" class="h-4 w-4" /></span>
+                            <div class="min-w-0 flex-1">
                                 <div class="truncate text-sm font-semibold text-zinc-900">{{ $passkey->name ?: 'Passkey' }}</div>
-                                <div class="text-xs text-zinc-500">
-                                    Toegevoegd {{ optional($passkey->created_at)->format('d-m-Y H:i') }}
+                                <div class="flex flex-wrap gap-x-3 text-xs text-zinc-500">
+                                    @if ($passkey->created_at)
+                                        <span title="{{ $passkey->created_at->format('d-m-Y H:i') }}">Toegevoegd {{ $passkey->created_at->locale('nl')->diffForHumans() }}</span>
+                                    @endif
                                     @if ($passkey->last_used_at)
-                                        · Laatst gebruikt {{ optional($passkey->last_used_at)->format('d-m-Y H:i') }}
+                                        <span title="{{ optional($passkey->last_used_at)->format('d-m-Y H:i') }}">Laatst gebruikt {{ \Illuminate\Support\Carbon::parse($passkey->last_used_at)->locale('nl')->diffForHumans() }}</span>
+                                    @else
+                                        <span>Nog niet gebruikt</span>
                                     @endif
                                 </div>
                             </div>
                             <form method="POST" action="{{ route('profile.passkeys.destroy', ['passkey' => $passkey->id]) }}" onsubmit="return confirm('Weet je zeker dat je deze passkey wilt verwijderen?')">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="inline-flex h-8 items-center rounded-lg px-2.5 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-600" aria-label="Passkey {{ $passkey->name ?: '' }} verwijderen">
-                                    Verwijderen
+                                <button type="submit" class="btn btn-danger-ghost btn-icon btn-sm" title="Verwijderen" aria-label="Passkey {{ $passkey->name ?: '' }} verwijderen">
+                                    <x-icon name="trash" class="h-4 w-4" />
                                 </button>
                             </form>
                         </li>
                     @endforeach
                 </ul>
             @else
-                <div class="rounded-lg border border-dashed border-zinc-300 bg-zinc-50/60 px-4 py-6 text-center">
+                <div class="flex flex-col items-center rounded-xl border border-dashed border-zinc-300 bg-zinc-50/60 px-4 py-7 text-center">
+                    <span class="icon-tile mb-3 h-10 w-10 bg-white text-zinc-500 ring-1 ring-inset ring-zinc-200" aria-hidden="true"><x-icon name="key" class="h-5 w-5" /></span>
                     <p class="text-sm font-semibold text-zinc-800">Nog geen passkeys</p>
-                    <p class="mt-1 text-sm text-zinc-500">Voeg er een toe om voortaan met je vingerafdruk, gezicht of pincode in te loggen.</p>
+                    <p class="mt-1 max-w-sm text-sm text-zinc-500">Voeg er een toe om voortaan met je vingerafdruk, gezicht of pincode in te loggen.</p>
                 </div>
             @endif
 
             <div class="mt-5 flex flex-wrap items-center gap-3">
                 <x-button id="passkey-register-button" type="button">
+                    <x-icon name="plus" class="h-4 w-4" />
                     Passkey toevoegen
                 </x-button>
                 <span id="passkey-register-status" class="text-sm text-zinc-600" role="status" aria-live="polite"></span>
             </div>
         @else
-            <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <div class="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <x-icon name="alert-triangle" class="mt-0.5 h-4 w-4 text-amber-600" />
                 Passkeys zijn nog niet beschikbaar. Draai eerst de nieuwste databasemigraties.
             </div>
         @endif

@@ -12,6 +12,8 @@ export default {
         './resources/js/**/*.jsx',
     ],
 
+    // Badge-tonen worden dynamisch opgebouwd (`badge-${tone}` in ui.jsx en Blade): altijd meebouwen.
+    safelist: [{ pattern: /^badge-(neutral|brand|success|warning|danger|info)$/ }],
     theme: {
         extend: {
             colors: {

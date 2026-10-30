@@ -1,7 +1,8 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { FOCUS_SCOPE } from '../../../components/StatusBadge';
-import { Button, Card, CardHeader, EmptyState, PageHeader, Stat, buttonClasses, cx, inputClasses, tableClasses } from '../../../components/ui';
+import { Icon } from '../../../components/icons';
+import StatusBadge, { FOCUS_SCOPE } from '../../../components/StatusBadge';
+import { Avatar, Button, Card, CardHeader, EmptyState, IconTile, PageHeader, buttonClasses, cx, inputClasses } from '../../../components/ui';
 
 function formatEuro(value) {
     try {
@@ -18,10 +19,7 @@ function numberValue(value) {
 
 function toLocalDateInput(date) {
     const pad = (value) => String(value).padStart(2, '0');
-    const year = date.getFullYear();
-    const month = pad(date.getMonth() + 1);
-    const day = pad(date.getDate());
-    return `${year}-${month}-${day}`;
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
 const SOURCE_LABELS = {
@@ -30,6 +28,17 @@ const SOURCE_LABELS = {
     email: 'E-mail',
     referral: 'Doorverwijzing',
     anders: 'Anders',
+};
+
+// Uitleg en icoon per status voor de keuzetegels.
+const STATUS_META = {
+    demo_aangevraagd: { icon: 'inbox', text: 'Heeft interesse, demo nog niet gestart' },
+    lead: { icon: 'inbox', text: 'Heeft interesse, demo nog niet gestart' },
+    proefperiode: { icon: 'sparkles', text: 'Demo loopt, met start- en einddatum' },
+    demo_gepland: { icon: 'sparkles', text: 'Demo loopt, met start- en einddatum' },
+    actief: { icon: 'check-circle', text: 'Betalende klant' },
+    opgezegd: { icon: 'x-circle', text: 'Heeft het abonnement opgezegd' },
+    verloren: { icon: 'archive', text: 'Is geen klant geworden' },
 };
 
 function addDaysToDateInput(value, days) {
@@ -41,38 +50,36 @@ function addDaysToDateInput(value, days) {
     return date;
 }
 
-function formatDateNl(date) {
+function formatDateNl(date, long = true) {
     if (!date) return '';
     try {
-        return new Intl.DateTimeFormat('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(date);
+        return new Intl.DateTimeFormat('nl-NL', long ? { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' } : { day: 'numeric', month: 'long', year: 'numeric' }).format(date);
     } catch {
         return toLocalDateInput(date);
     }
 }
 
-function DuplicateWarning({ matches }) {
-    if (!Array.isArray(matches) || matches.length === 0) return null;
-    return (
-        <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-            <p className="font-semibold">Mogelijk bestaat deze klant al</p>
-            <ul className="mt-2 space-y-1">
-                {matches.map((match) => (
-                    <li key={match.id}>
-                        <a href={match.url} target="_blank" rel="noopener noreferrer" className="font-semibold underline underline-offset-2 hover:text-amber-950">
-                            {match.bedrijfsnaam}
-                            <span className="sr-only"> (opent in nieuw tabblad)</span>
-                        </a>
-                        {match.plaats ? ` (${match.plaats})` : ''}
-                        {': '}
-                        {match.status_label}
-                        {match.in_prullenbak ? ', in prullenbak' : ''}
-                        {Array.isArray(match.redenen) && match.redenen.length > 0 ? `. Zelfde ${match.redenen.join(', ')}.` : ''}
-                    </li>
-                ))}
-            </ul>
-            <div className="mt-2 text-xs text-amber-800">Je kunt de klant toch opslaan als dit een andere klant is.</div>
-        </div>
-    );
+function daysFromToday(date) {
+    if (!date) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const target = new Date(date.getTime());
+    target.setHours(0, 0, 0, 0);
+    return Math.round((target - today) / 86400000);
+}
+
+// Lichte controle (mod 97) alleen als hint; de server valideert het IBAN definitief.
+function ibanLooksValid(raw) {
+    const iban = String(raw || '').replace(/\s+/g, '').toUpperCase();
+    if (iban.length < 15) return null;
+    if (!/^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(iban)) return false;
+    const rearranged = iban.slice(4) + iban.slice(0, 4);
+    let remainder = 0;
+    for (const ch of rearranged) {
+        const code = /\d/.test(ch) ? ch : String(ch.charCodeAt(0) - 55);
+        for (const digit of code) remainder = (remainder * 10 + Number(digit)) % 97;
+    }
+    return remainder === 1;
 }
 
 function generatePassword(length = 12) {
@@ -81,55 +88,129 @@ function generatePassword(length = 12) {
     const result = [];
     if (window.crypto && window.crypto.getRandomValues) {
         window.crypto.getRandomValues(values);
-        for (let i = 0; i < length; i += 1) {
-            result.push(chars[values[i] % chars.length]);
-        }
+        for (let i = 0; i < length; i += 1) result.push(chars[values[i] % chars.length]);
     } else {
-        for (let i = 0; i < length; i += 1) {
-            result.push(chars[Math.floor(Math.random() * chars.length)]);
-        }
+        for (let i = 0; i < length; i += 1) result.push(chars[Math.floor(Math.random() * chars.length)]);
     }
     return result.join('');
 }
 
-// Formulierveld met label, verplicht-markering, hint en foutmelding gekoppeld aan het invoerveld.
-function TextField({ name, label, value, onChange, error, required = false, hint, className = '', type = 'text', inputProps = {} }) {
-    const id = `gc-${name}`;
-    const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
+/* ------------------------------------------------------------------ Bouwstenen */
+
+function DuplicateWarning({ matches }) {
+    if (!Array.isArray(matches) || matches.length === 0) return null;
     return (
-        <div className={cx('min-w-0', className)}>
-            <label htmlFor={id} className="mb-1 block text-sm font-medium text-zinc-800">
-                {label}
-                {required ? <span className="ml-0.5 text-rose-600" aria-hidden="true">*</span> : null}
-                {required ? <span className="sr-only"> (verplicht)</span> : null}
-            </label>
-            <input
-                id={id}
-                name={name}
-                type={type}
-                className={cx(inputClasses, error && 'border-rose-400 focus:border-rose-600 focus:ring-rose-600')}
-                value={value ?? ''}
-                onChange={(e) => onChange(e.target.value)}
-                aria-invalid={error ? 'true' : undefined}
-                aria-describedby={describedBy}
-                {...inputProps}
-            />
-            {hint && !error ? <p id={`${id}-hint`} className="mt-1 text-xs text-zinc-500">{hint}</p> : null}
-            {error ? <p id={`${id}-error`} className="mt-1 text-xs font-medium text-rose-700">{error}</p> : null}
+        <div role="status" className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 sm:p-5">
+            <div className="flex items-start gap-3">
+                <IconTile icon="alert-triangle" tone="warning" size="sm" className="bg-amber-100" />
+                <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-amber-950">{matches.length === 1 ? 'Deze klant bestaat mogelijk al' : `Er bestaan mogelijk al ${matches.length} vergelijkbare klanten`}</p>
+                    <p className="mt-0.5 text-sm text-amber-900">Controleer het even voordat je opslaat. Is het een andere klant, dan kun je gewoon doorgaan.</p>
+                    <ul className="mt-3 space-y-2">
+                        {matches.map((match) => (
+                            <li key={match.id}>
+                                <a
+                                    href={match.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="group flex items-center gap-3 rounded-xl bg-white p-2.5 pr-3 shadow-card ring-1 ring-amber-200/70 transition-colors hover:ring-amber-300 focus-ring"
+                                >
+                                    <Avatar name={match.bedrijfsnaam} size="sm" />
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block truncate text-sm font-semibold text-zinc-900 group-hover:underline">{match.bedrijfsnaam}</span>
+                                        <span className="block truncate text-xs text-zinc-500">
+                                            {[match.plaats, match.status_label, match.in_prullenbak ? 'in prullenbak' : null].filter(Boolean).join(', ')}
+                                            {Array.isArray(match.redenen) && match.redenen.length > 0 ? `. Zelfde ${match.redenen.join(', ')}` : ''}
+                                        </span>
+                                    </span>
+                                    <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-amber-900">
+                                        Bekijken
+                                        <Icon name="external-link" className="h-3.5 w-3.5" />
+                                        <span className="sr-only"> (opent in nieuw tabblad)</span>
+                                    </span>
+                                </a>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            </div>
         </div>
     );
 }
 
-function Section({ title, description, children, aside }) {
+// Formulierveld met label, verplicht-markering, hint en foutmelding gekoppeld aan het invoerveld.
+function TextField({ name, label, value, onChange, error, required = false, hint, warning, className = '', type = 'text', icon, inputProps = {} }) {
+    const id = `gc-${name}`;
+    const describedBy = error ? `${id}-error` : warning ? `${id}-warning` : hint ? `${id}-hint` : undefined;
     return (
-        <Card>
-            <CardHeader title={title} description={description} actions={aside} />
+        <div className={cx('min-w-0', className)}>
+            <label htmlFor={id} className="label mb-1.5">
+                {label}
+                {required ? <span className="ml-0.5 text-rose-600" aria-hidden="true">*</span> : null}
+                {required ? <span className="sr-only"> (verplicht)</span> : null}
+            </label>
+            <div className="relative">
+                {icon ? <Icon name={icon} className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" /> : null}
+                <input
+                    id={id}
+                    name={name}
+                    type={type}
+                    className={cx(inputClasses, icon && 'pl-9', error && 'border-rose-400 focus:border-rose-600 focus:ring-rose-600')}
+                    value={value ?? ''}
+                    onChange={(e) => onChange(e.target.value)}
+                    aria-invalid={error ? 'true' : undefined}
+                    aria-describedby={describedBy}
+                    {...inputProps}
+                />
+            </div>
+            {error ? (
+                <p id={`${id}-error`} className="field-error">{error}</p>
+            ) : warning ? (
+                <p id={`${id}-warning`} className="mt-1.5 flex items-center gap-1 text-xs font-medium text-amber-800">
+                    <Icon name="alert-circle" className="h-3.5 w-3.5 shrink-0" />
+                    {warning}
+                </p>
+            ) : hint ? (
+                <p id={`${id}-hint`} className="field-hint">{hint}</p>
+            ) : null}
+        </div>
+    );
+}
+
+const STEP_STATE_BADGE = {
+    done: { text: 'Compleet', className: 'bg-emerald-50 text-emerald-800 ring-emerald-200', icon: 'check' },
+    todo: { text: 'Nog invullen', className: 'bg-zinc-100 text-zinc-600 ring-zinc-200', icon: null },
+    optional: { text: 'Optioneel', className: 'bg-zinc-50 text-zinc-500 ring-zinc-200', icon: null },
+};
+
+function StepSection({ id, step, total, title, description, icon, state, children }) {
+    const badge = STEP_STATE_BADGE[state] ?? STEP_STATE_BADGE.todo;
+    return (
+        <Card id={id} aria-labelledby={`${id}-title`} className="scroll-mt-6">
+            <CardHeader
+                icon={icon}
+                title={
+                    <span id={`${id}-title`}>
+                        <span className="sr-only">Stap {step} van {total}: </span>
+                        {title}
+                    </span>
+                }
+                description={description}
+                actions={
+                    <span className={cx('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset', badge.className)}>
+                        {badge.icon ? <Icon name={badge.icon} className="h-3 w-3" strokeWidth={2.5} /> : null}
+                        {badge.text}
+                    </span>
+                }
+            />
             {children}
         </Card>
     );
 }
 
 const fieldError = (errors, name) => (errors && errors[name]) || null;
+
+/* ------------------------------------------------------------------ Pagina */
 
 export default function Create({ statusOptions: rawStatusOptions, statusLabels, sourceOptions: rawSourceOptions, moduleRows, defaults: rawDefaults, urls: rawUrls }) {
     const statusOptions = Array.isArray(rawStatusOptions) ? rawStatusOptions : [];
@@ -169,7 +250,6 @@ export default function Create({ statusOptions: rawStatusOptions, statusLabels, 
         let totaalExcl = 0;
         let btw = 0;
         let actieveModules = 0;
-
         data.moduleRows.forEach((row) => {
             if (!row.actief) return;
             const prijs = numberValue(row.prijs_maand_excl);
@@ -178,21 +258,11 @@ export default function Create({ statusOptions: rawStatusOptions, statusLabels, 
             btw += prijs * aantal * (numberValue(row.btw_percentage) / 100);
             actieveModules += 1;
         });
-
-        return {
-            totaleModules: data.moduleRows.length,
-            actieveModules,
-            totaalExcl,
-            btw,
-            totaalIncl: totaalExcl + btw,
-        };
+        return { totaleModules: data.moduleRows.length, actieveModules, totaalExcl, btw, totaalIncl: totaalExcl + btw };
     }, [data.moduleRows]);
 
     const updateModuleRow = (index, key, value) => {
-        setData(
-            'moduleRows',
-            data.moduleRows.map((row, i) => (i === index ? { ...row, [key]: value } : row))
-        );
+        setData('moduleRows', data.moduleRows.map((row, i) => (i === index ? { ...row, [key]: value } : row)));
     };
 
     const toggleModule = (index) => {
@@ -201,11 +271,7 @@ export default function Create({ statusOptions: rawStatusOptions, statusLabels, 
             data.moduleRows.map((row, i) => {
                 if (i !== index) return row;
                 const actief = !row.actief;
-                return {
-                    ...row,
-                    actief,
-                    aantal: actief && Number(row.aantal || 0) < 1 ? 1 : row.aantal,
-                };
+                return { ...row, actief, aantal: actief && Number(row.aantal || 0) < 1 ? 1 : row.aantal };
             })
         );
     };
@@ -217,7 +283,10 @@ export default function Create({ statusOptions: rawStatusOptions, statusLabels, 
     const isOpgezegd = data.status === 'opgezegd';
     const required = !isLead;
     const hasIban = data.iban.trim() !== '';
+    const addressRequired = required || hasIban;
     const demoEnd = isDemo ? addDaysToDateInput(data.proefperiode_start, data.demo_duur_dagen) : null;
+    const demoDaysLeft = demoEnd ? daysFromToday(demoEnd) : null;
+    const ibanValid = ibanLooksValid(data.iban);
 
     const formRef = useRef(null);
     const submit = (event) => {
@@ -291,288 +360,435 @@ export default function Create({ statusOptions: rawStatusOptions, statusLabels, 
         }));
     };
 
-    const field = (name) => ({
-        name,
-        value: data[name],
-        onChange: (value) => setData(name, value),
-        error: fieldError(errors, name),
-    });
+    const field = (name) => ({ name, value: data[name], onChange: (value) => setData(name, value), error: fieldError(errors, name) });
+    const filled = (name) => String(data[name] ?? '').trim() !== '';
 
-    const selectClass = (name) => cx(inputClasses, fieldError(errors, name) && 'border-rose-400');
+    // Voortgang per stap voor de badges en het overzicht aan de zijkant.
+    const steps = [
+        {
+            id: 'stap-bedrijf',
+            title: 'Bedrijf',
+            icon: 'building',
+            state: filled('bedrijfsnaam') && (!addressRequired || ['straatnaam_en_nummer', 'postcode', 'plaats'].every(filled)) && (!required || filled('land')) ? 'done' : 'todo',
+        },
+        {
+            id: 'stap-contact',
+            title: 'Contact',
+            icon: 'user',
+            state: filled('voor_en_achternaam') && filled('email') && (!required || filled('telefoonnummer')) ? 'done' : 'todo',
+        },
+        {
+            id: 'stap-status',
+            title: 'Status en demo',
+            icon: 'sparkles',
+            state: filled('status') && (!isDemo || demoEnd) && (!isOpgezegd || (filled('opgezegd_op') && filled('opzegreden'))) ? 'done' : 'todo',
+        },
+        { id: 'stap-modules', title: 'Modules', icon: 'package', state: totals.actieveModules > 0 ? 'done' : 'optional' },
+        { id: 'stap-incasso', title: 'Incasso', icon: 'credit-card', state: hasIban ? (filled('plaats_van_tekenen') && filled('datum_van_tekenen') && ibanValid !== false ? 'done' : 'todo') : 'optional' },
+    ];
+    const stepState = (id) => steps.find((s) => s.id === id)?.state;
+    const requiredDone = steps.filter((s) => s.state !== 'optional').every((s) => s.state === 'done');
+
+    const statusLabel = statusLabels?.[data.status] || data.status;
+    const previewName = data.bedrijfsnaam.trim() || 'Nieuwe klant';
 
     return (
-        <div className={cx('mx-auto max-w-4xl', FOCUS_SCOPE)}>
+        <div className={FOCUS_SCOPE}>
             <Head title="Nieuwe klant" />
 
             <PageHeader
+                back={{ href: urls.index, label: 'Klanten' }}
                 title="Nieuwe klant"
-                description="Leg een garagebedrijf vast. Kies eerst de status: die bepaalt welke velden verplicht zijn."
-                actions={
-                    <Link href={urls.index} className={buttonClasses({ variant: 'secondary' })}>
-                        Terug naar klanten
-                    </Link>
-                }
+                description={isLead ? 'Voor een demo-aanvraag heb je alleen de bedrijfsnaam, een naam en een e-mailadres nodig. De rest vul je later aan.' : 'Leg een garagebedrijf vast. Velden met een sterretje zijn verplicht voor deze status.'}
             />
 
-            <form ref={formRef} onSubmit={submit} noValidate className="space-y-5">
-                {errorCount > 0 && !processing && (
-                    <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-                        <span className="font-semibold">De klant is nog niet opgeslagen.</span>{' '}
-                        {errorCount === 1 ? 'Er is 1 veld dat aandacht nodig heeft.' : `Er zijn ${errorCount} velden die aandacht nodig hebben.`}
+            <form ref={formRef} onSubmit={submit} noValidate className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_19rem] xl:grid-cols-[minmax(0,1fr)_21rem]">
+                <div className="min-w-0 space-y-5">
+                    {errorCount > 0 && !processing ? (
+                        <div role="alert" className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+                            <IconTile icon="alert-circle" tone="danger" size="sm" className="bg-rose-100" />
+                            <div>
+                                <p className="font-semibold">De klant is nog niet opgeslagen</p>
+                                <p className="mt-0.5">{errorCount === 1 ? 'Er is 1 veld dat aandacht nodig heeft.' : `Er zijn ${errorCount} velden die aandacht nodig hebben.`} Het eerste veld is gemarkeerd.</p>
+                            </div>
+                        </div>
+                    ) : null}
+
+                    <div aria-live="polite">
+                        <DuplicateWarning matches={duplicates} />
                     </div>
-                )}
 
-                <div aria-live="polite">
-                    <DuplicateWarning matches={duplicates} />
-                </div>
-
-                <Section title="Status en bron" description="Hoe staat deze klant ervoor en hoe is hij binnengekomen?">
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div>
-                            <label className="mb-1 block text-sm font-medium text-zinc-800" htmlFor="gc-status">Status</label>
-                            <select
-                                id="gc-status"
-                                className={selectClass('status')}
-                                value={data.status}
-                                onChange={(e) => handleStatusChange(e.target.value)}
-                                aria-invalid={errors.status ? 'true' : undefined}
-                                aria-describedby="gc-status-hint"
-                            >
-                                {statusOptions.map((status) => (
-                                    <option key={status} value={status}>
-                                        {statusLabels?.[status] || status}
-                                    </option>
-                                ))}
-                            </select>
-                            {errors.status ? (
-                                <p className="mt-1 text-xs font-medium text-rose-700">{errors.status}</p>
-                            ) : (
-                                <p id="gc-status-hint" className="mt-1 text-xs text-zinc-500">
-                                    {isLead
-                                        ? 'Alleen bedrijfsnaam, naam en e-mail zijn verplicht. De rest kun je later aanvullen.'
-                                        : 'Bedrijfs-, contact- en adresgegevens zijn verplicht.'}
-                                </p>
-                            )}
+                    <StepSection
+                        id="stap-bedrijf"
+                        step={1}
+                        total={5}
+                        icon="building"
+                        title="Bedrijf"
+                        description={isLead && !hasIban ? 'Alleen de bedrijfsnaam is nu verplicht. Het adres kun je later aanvullen.' : 'Naam en vestigingsadres van de garage.'}
+                        state={stepState('stap-bedrijf')}
+                    >
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
+                            <TextField {...field('bedrijfsnaam')} label="Bedrijfsnaam" required className="sm:col-span-4" inputProps={{ autoComplete: 'organization', maxLength: 255 }} />
+                            <TextField {...field('kvk_nummer')} label="KVK-nummer" className="sm:col-span-2" inputProps={{ inputMode: 'numeric', maxLength: 50 }} />
+                            <TextField {...field('straatnaam_en_nummer')} label="Straat en huisnummer" required={addressRequired} className="sm:col-span-6" icon="map-pin" inputProps={{ autoComplete: 'street-address' }} />
+                            <TextField {...field('postcode')} label="Postcode" required={addressRequired} className="sm:col-span-2" inputProps={{ autoComplete: 'postal-code', maxLength: 20 }} />
+                            <TextField {...field('plaats')} label="Plaats" required={addressRequired} className="sm:col-span-2" inputProps={{ autoComplete: 'address-level2' }} />
+                            <TextField {...field('land')} label="Land" required={required} className="sm:col-span-2" inputProps={{ autoComplete: 'country-name' }} />
                         </div>
-                        <div>
-                            <label className="mb-1 block text-sm font-medium text-zinc-800" htmlFor="gc-bron">Bron</label>
-                            <select
-                                id="gc-bron"
-                                className={selectClass('bron')}
-                                value={data.bron}
-                                onChange={(e) => setData('bron', e.target.value)}
-                                aria-invalid={errors.bron ? 'true' : undefined}
-                            >
-                                {sourceOptions.map((source) => (
-                                    <option key={source} value={source}>
-                                        {SOURCE_LABELS[source] || source}
-                                    </option>
-                                ))}
-                            </select>
-                            {errors.bron && <p className="mt-1 text-xs font-medium text-rose-700">{errors.bron}</p>}
+                    </StepSection>
+
+                    <StepSection id="stap-contact" step={2} total={5} icon="user" title="Contact" description="Deze persoon wordt de primaire contactpersoon (eigenaar) van het bedrijf." state={stepState('stap-contact')}>
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <TextField
+                                {...field('voor_en_achternaam')}
+                                label="Volledige naam"
+                                required
+                                className="sm:col-span-2"
+                                hint={isLead ? undefined : 'Voor- en achternaam, gescheiden door een spatie.'}
+                                inputProps={{ autoComplete: 'name' }}
+                            />
+                            <TextField {...field('email')} label="E-mail" type="email" required icon="mail" inputProps={{ autoComplete: 'email' }} />
+                            <TextField {...field('telefoonnummer')} label="Telefoon" type="tel" required={required} icon="phone" inputProps={{ autoComplete: 'tel' }} />
                         </div>
 
-                        {isDemo && (
-                            <>
+                        <div className="mt-6 rounded-xl bg-zinc-50 p-4 ring-1 ring-inset ring-zinc-100">
+                            <div className="mb-3 flex items-start gap-2.5">
+                                <Icon name="key" className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" />
+                                <div>
+                                    <p className="text-sm font-semibold text-zinc-900">Login voor Kivii <span className="font-normal text-zinc-500">(optioneel)</span></p>
+                                    <p className="text-xs text-zinc-500">Met alleen een login-e-mail krijgt de klant een activatielink; een wachtwoord is dan niet nodig.</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <TextField {...field('login_email')} label="Login-e-mail" type="email" inputProps={{ autoComplete: 'off' }} />
+                                <div className="min-w-0">
+                                    <label className="label mb-1.5" htmlFor="gc-login_password">Wachtwoord</label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            id="gc-login_password"
+                                            type={showPassword ? 'text' : 'password'}
+                                            autoComplete="new-password"
+                                            className={cx(inputClasses, 'min-w-0 flex-1', errors.login_password && 'border-rose-400')}
+                                            value={data.login_password}
+                                            onChange={(e) => setData('login_password', e.target.value)}
+                                            aria-invalid={errors.login_password ? 'true' : undefined}
+                                            aria-describedby={errors.login_password ? 'gc-login_password-error' : 'gc-login_password-hint'}
+                                        />
+                                        <Button
+                                            variant="secondary"
+                                            iconOnly
+                                            icon="eye"
+                                            aria-label={showPassword ? 'Wachtwoord verbergen' : 'Wachtwoord tonen'}
+                                            aria-pressed={showPassword}
+                                            aria-controls="gc-login_password"
+                                            onClick={() => setShowPassword((prev) => !prev)}
+                                        />
+                                        <Button
+                                            variant="secondary"
+                                            icon="refresh"
+                                            onClick={() => {
+                                                setData('login_password', generatePassword());
+                                                setShowPassword(true);
+                                            }}
+                                        >
+                                            Genereer
+                                        </Button>
+                                    </div>
+                                    {errors.login_password ? (
+                                        <p id="gc-login_password-error" className="field-error">{errors.login_password}</p>
+                                    ) : (
+                                        <p id="gc-login_password-hint" className="field-hint">Minimaal 8 tekens. Leeg laten mag.</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </StepSection>
+
+                    <StepSection id="stap-status" step={3} total={5} icon="sparkles" title="Status en demo" description="De status bepaalt welke velden verplicht zijn en of er een demo loopt." state={stepState('stap-status')}>
+                        <fieldset>
+                            <legend className="label mb-2">Status</legend>
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3" role="radiogroup" aria-describedby={errors.status ? 'gc-status-error' : undefined}>
+                                {statusOptions.map((status) => {
+                                    const meta = STATUS_META[status] ?? { icon: 'info', text: '' };
+                                    const checked = data.status === status;
+                                    return (
+                                        <label
+                                            key={status}
+                                            className={cx(
+                                                'relative flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors focus-within:ring-2 focus-within:ring-indigo-600 focus-within:ring-offset-2',
+                                                checked ? 'border-indigo-500 bg-indigo-50/70 ring-1 ring-indigo-500' : 'border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50'
+                                            )}
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="status"
+                                                id={`gc-status-${status}`}
+                                                value={status}
+                                                checked={checked}
+                                                onChange={() => handleStatusChange(status)}
+                                                className="sr-only"
+                                                aria-invalid={errors.status ? 'true' : undefined}
+                                            />
+                                            <span className={cx('inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', checked ? 'bg-indigo-600 text-white' : 'bg-zinc-100 text-zinc-500')} aria-hidden="true">
+                                                <Icon name={meta.icon} className="h-4 w-4" />
+                                            </span>
+                                            <span className="min-w-0">
+                                                <span className="block text-sm font-semibold text-zinc-900">{statusLabels?.[status] || status}</span>
+                                                {meta.text ? <span className="block text-xs text-zinc-500">{meta.text}</span> : null}
+                                            </span>
+                                            {checked ? <Icon name="check-circle" className="absolute right-2.5 top-2.5 h-4 w-4 text-indigo-700" /> : null}
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                            {errors.status ? <p id="gc-status-error" className="field-error">{errors.status}</p> : null}
+                        </fieldset>
+
+                        {isDemo ? (
+                            <div className="mt-5 grid grid-cols-1 gap-4 rounded-xl bg-amber-50/60 p-4 ring-1 ring-inset ring-amber-100 sm:grid-cols-2">
                                 <TextField {...field('proefperiode_start')} label="Demo start" type="date" />
                                 <TextField
                                     {...field('demo_duur_dagen')}
-                                    label="Demo duur (dagen)"
+                                    label="Demoduur (dagen)"
                                     type="number"
                                     hint={demoEnd ? `Demo eindigt op ${formatDateNl(demoEnd)}.` : 'Vul een startdatum en duur in.'}
                                     inputProps={{ min: 1, max: 365, inputMode: 'numeric' }}
                                 />
-                            </>
-                        )}
-                        {showActiefVanaf && <TextField {...field('actief_vanaf')} label="Actief vanaf" type="date" />}
-                        {isOpgezegd && (
-                            <>
-                                <TextField {...field('opgezegd_op')} label="Opgezegd op" type="date" required />
-                                <TextField {...field('opzegreden')} label="Opzegreden" required className="sm:col-span-2" inputProps={{ maxLength: 255 }} />
-                            </>
-                        )}
-                        <div className="sm:col-span-2">
-                            <label className="mb-1 block text-sm font-medium text-zinc-800" htmlFor="gc-tags">Tags</label>
-                            <input
-                                id="gc-tags"
-                                className={cx(inputClasses, errors.tags && 'border-rose-400')}
-                                value={data.tags}
-                                onChange={(e) => setData('tags', e.target.value)}
-                                placeholder="bijv. premium, bosch"
-                                aria-invalid={errors.tags ? 'true' : undefined}
-                                aria-describedby="gc-tags-hint"
-                            />
-                            {errors.tags ? (
-                                <p className="mt-1 text-xs font-medium text-rose-700">{errors.tags}</p>
-                            ) : (
-                                <p id="gc-tags-hint" className="mt-1 text-xs text-zinc-500">Meerdere tags scheiden met een komma.</p>
-                            )}
-                        </div>
-                    </div>
-                </Section>
-
-                <Section title="Bedrijf">
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <TextField {...field('bedrijfsnaam')} label="Bedrijfsnaam" required className="sm:col-span-2" inputProps={{ autoComplete: 'organization', maxLength: 255 }} />
-                        <TextField {...field('kvk_nummer')} label="KVK nummer" inputProps={{ inputMode: 'numeric', maxLength: 50 }} />
-                        <TextField {...field('land')} label="Land" required={required} inputProps={{ autoComplete: 'country-name' }} />
-                    </div>
-                </Section>
-
-                <Section title="Contactpersoon" description="Wordt de primaire contactpersoon (eigenaar) van het bedrijf.">
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <TextField
-                            {...field('voor_en_achternaam')}
-                            label="Volledige naam"
-                            required
-                            className="sm:col-span-2"
-                            hint={isLead ? undefined : 'Voor- en achternaam, gescheiden door een spatie.'}
-                            inputProps={{ autoComplete: 'name' }}
-                        />
-                        <TextField {...field('email')} label="E-mail" type="email" required inputProps={{ autoComplete: 'email' }} />
-                        <TextField {...field('telefoonnummer')} label="Telefoon" type="tel" required={required} inputProps={{ autoComplete: 'tel' }} />
-                    </div>
-                </Section>
-
-                <Section title="Adres" description={isLead ? 'Optioneel bij een demo-aanvraag, tenzij je een IBAN invult.' : undefined}>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                        <TextField {...field('straatnaam_en_nummer')} label="Straat en huisnummer" required={required || hasIban} className="sm:col-span-3" inputProps={{ autoComplete: 'street-address' }} />
-                        <TextField {...field('postcode')} label="Postcode" required={required || hasIban} inputProps={{ autoComplete: 'postal-code', maxLength: 20 }} />
-                        <TextField {...field('plaats')} label="Plaats" required={required || hasIban} className="sm:col-span-2" inputProps={{ autoComplete: 'address-level2' }} />
-                    </div>
-                </Section>
-
-                <Section title="Incasso (SEPA)" description="Optioneel. Met een IBAN wordt een SEPA mandaat met status pending vastgelegd.">
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <TextField
-                            {...field('iban')}
-                            label="IBAN"
-                            hint="Spaties mogen, bijvoorbeeld NL91 ABNA 0417 1643 00."
-                            inputProps={{ autoComplete: 'off', spellCheck: false, maxLength: 42 }}
-                        />
-                        <TextField {...field('bic')} label="BIC" inputProps={{ autoComplete: 'off', spellCheck: false, maxLength: 14 }} />
-                        <TextField {...field('plaats_van_tekenen')} label="Plaats van tekenen" required={hasIban} inputProps={{ autoComplete: 'off' }} />
-                        <TextField {...field('datum_van_tekenen')} label="Datum van tekenen" type="date" required={hasIban} />
-                    </div>
-                </Section>
-
-                <Section title="Login voor Kivii" description="Optioneel. Met alleen een login e-mail krijgt de klant een activatielink; een wachtwoord is niet nodig.">
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <TextField {...field('login_email')} label="Login e-mail" type="email" inputProps={{ autoComplete: 'off' }} />
-                        <div className="min-w-0">
-                            <label className="mb-1 block text-sm font-medium text-zinc-800" htmlFor="gc-login_password">Wachtwoord</label>
-                            <div className="flex gap-2">
-                                <input
-                                    id="gc-login_password"
-                                    type={showPassword ? 'text' : 'password'}
-                                    autoComplete="new-password"
-                                    className={cx(inputClasses, errors.login_password && 'border-rose-400')}
-                                    value={data.login_password}
-                                    onChange={(e) => setData('login_password', e.target.value)}
-                                    aria-invalid={errors.login_password ? 'true' : undefined}
-                                    aria-describedby="gc-login_password-hint"
-                                />
-                                <Button variant="secondary" aria-pressed={showPassword} aria-controls="gc-login_password" onClick={() => setShowPassword((prev) => !prev)}>
-                                    {showPassword ? 'Verberg' : 'Toon'}
-                                </Button>
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => {
-                                        setData('login_password', generatePassword());
-                                        setShowPassword(true);
-                                    }}
-                                >
-                                    Genereer
-                                </Button>
+                                <div className="flex flex-wrap gap-1.5 sm:col-span-2" role="group" aria-label="Snel een demoduur kiezen">
+                                    {[7, 14, 30].map((days) => (
+                                        <button
+                                            key={days}
+                                            type="button"
+                                            onClick={() => setData('demo_duur_dagen', days)}
+                                            aria-pressed={Number(data.demo_duur_dagen) === days}
+                                            className={cx(
+                                                'h-8 rounded-full px-3 text-xs font-medium ring-1 ring-inset transition-colors focus-ring',
+                                                Number(data.demo_duur_dagen) === days ? 'bg-zinc-900 text-white ring-zinc-900' : 'bg-white text-zinc-700 ring-zinc-200 hover:bg-zinc-50'
+                                            )}
+                                        >
+                                            {days} dagen{days === defaultDemoDays ? ' (standaard)' : ''}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
-                            {errors.login_password ? (
-                                <p className="mt-1 text-xs font-medium text-rose-700">{errors.login_password}</p>
-                            ) : (
-                                <p id="gc-login_password-hint" className="mt-1 text-xs text-zinc-500">Minimaal 8 tekens. Leeg laten mag.</p>
-                            )}
+                        ) : null}
+
+                        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div className="min-w-0">
+                                <label className="label mb-1.5" htmlFor="gc-bron">Bron</label>
+                                <select
+                                    id="gc-bron"
+                                    className={cx(inputClasses, errors.bron && 'border-rose-400')}
+                                    value={data.bron}
+                                    onChange={(e) => setData('bron', e.target.value)}
+                                    aria-invalid={errors.bron ? 'true' : undefined}
+                                    aria-describedby={errors.bron ? 'gc-bron-error' : undefined}
+                                >
+                                    {sourceOptions.map((source) => (
+                                        <option key={source} value={source}>{SOURCE_LABELS[source] || source}</option>
+                                    ))}
+                                </select>
+                                {errors.bron ? <p id="gc-bron-error" className="field-error">{errors.bron}</p> : null}
+                            </div>
+                            {showActiefVanaf ? <TextField {...field('actief_vanaf')} label="Actief vanaf" type="date" /> : null}
+                            {isOpgezegd ? (
+                                <>
+                                    <TextField {...field('opgezegd_op')} label="Opgezegd op" type="date" required />
+                                    <TextField {...field('opzegreden')} label="Opzegreden" required className="sm:col-span-2" inputProps={{ maxLength: 255 }} />
+                                </>
+                            ) : null}
+                            <TextField {...field('tags')} label="Tags" icon="tag" className="sm:col-span-2" hint="Meerdere tags scheiden met een komma." inputProps={{ placeholder: 'bijv. premium, bosch' }} />
                         </div>
-                    </div>
-                </Section>
+                    </StepSection>
 
-                <Section
-                    title="Modules en prijzen"
-                    description={`Prijsafspraken per maand. ${totals.actieveModules} van ${totals.totaleModules} modules actief. Een actieve module heeft minimaal aantal 1; prijs 0 mag.`}
-                >
-                    <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                        <Stat label="Totaal excl. btw" value={formatEuro(totals.totaalExcl)} tone="brand" />
-                        <Stat label="Btw" value={formatEuro(totals.btw)} />
-                        <Stat label="Totaal incl. btw" value={formatEuro(totals.totaalIncl)} />
-                    </div>
+                    <StepSection
+                        id="stap-modules"
+                        step={4}
+                        total={5}
+                        icon="package"
+                        title="Modules"
+                        description={`Prijsafspraken per maand. ${totals.actieveModules} van ${totals.totaleModules} modules actief. Een actieve module heeft minimaal aantal 1; prijs 0 mag.`}
+                        state={stepState('stap-modules')}
+                    >
+                        {data.moduleRows.length === 0 ? (
+                            <EmptyState compact illustration="tasks" title="Nog geen modules beschikbaar" description="Je kunt de klant wel opslaan en later modules toevoegen in het klantdossier." />
+                        ) : (
+                            <ul className="space-y-2">
+                                {data.moduleRows.map((row, index) => {
+                                    const err = (key) => errors[`moduleRows.${index}.${key}`];
+                                    const rowHasError = ['aantal', 'prijs_maand_excl', 'btw_percentage'].some((key) => err(key));
+                                    const showInputs = row.actief || rowHasError;
+                                    const subtotal = numberValue(row.prijs_maand_excl) * Math.max(1, Number(row.aantal || 1));
+                                    const checkboxId = `gc-module-${index}-actief`;
+                                    return (
+                                        <li key={row.module_id ?? index} className={cx('rounded-xl border p-3 transition-colors', row.actief ? 'border-indigo-300 bg-indigo-50/50' : 'border-zinc-200 bg-white')}>
+                                            <div className="flex items-center gap-3">
+                                                <input id={checkboxId} type="checkbox" className="checkbox h-5 w-5" checked={!!row.actief} onChange={() => toggleModule(index)} />
+                                                <label htmlFor={checkboxId} className="min-w-0 flex-1 cursor-pointer">
+                                                    <span className="block truncate text-sm font-semibold text-zinc-900">{row.naam}</span>
+                                                    {!row.actief ? <span className="block text-xs text-zinc-500">{formatEuro(numberValue(row.prijs_maand_excl))} per maand excl. btw</span> : null}
+                                                </label>
+                                                {row.actief ? <span className="shrink-0 text-sm font-semibold tabular-nums text-zinc-900">{formatEuro(subtotal)}<span className="font-normal text-zinc-500"> p/m</span></span> : null}
+                                            </div>
+                                            {showInputs ? (
+                                                <div className="mt-3 grid grid-cols-3 gap-2 sm:ml-8 sm:max-w-md">
+                                                    {[
+                                                        { key: 'aantal', label: 'Aantal', props: { min: 0, max: 999, inputMode: 'numeric' } },
+                                                        { key: 'prijs_maand_excl', label: 'Prijs p/m excl.', props: { min: 0, step: '0.01', inputMode: 'decimal' } },
+                                                        { key: 'btw_percentage', label: 'Btw %', props: { min: 0, max: 100, step: '0.01', inputMode: 'decimal' } },
+                                                    ].map((col) => {
+                                                        const inputId = `gc-module-${index}-${col.key}`;
+                                                        return (
+                                                            <div key={col.key} className="min-w-0">
+                                                                <label htmlFor={inputId} className="mb-1 block text-xs font-medium text-zinc-500">
+                                                                    {col.label}
+                                                                    <span className="sr-only"> {row.naam}</span>
+                                                                </label>
+                                                                <input
+                                                                    id={inputId}
+                                                                    type="number"
+                                                                    className={cx(inputClasses, 'tabular-nums', err(col.key) && 'border-rose-400')}
+                                                                    value={row[col.key] ?? ''}
+                                                                    onChange={(e) => updateModuleRow(index, col.key, e.target.value)}
+                                                                    aria-invalid={err(col.key) ? 'true' : undefined}
+                                                                    aria-describedby={err(col.key) ? `${inputId}-error` : undefined}
+                                                                    {...col.props}
+                                                                />
+                                                                {err(col.key) ? <p id={`${inputId}-error`} className="field-error">{err(col.key)}</p> : null}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            ) : null}
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+                    </StepSection>
 
-                    {data.moduleRows.length === 0 ? (
-                        <EmptyState title="Nog geen modules" description="Er zijn nog geen modules beschikbaar. Je kunt de klant wel opslaan en later modules toevoegen." />
-                    ) : (
-                        <div className={tableClasses.wrapper}>
-                            <table className={tableClasses.table}>
-                                <caption className="sr-only">Modules en prijzen per maand</caption>
-                                <thead className={tableClasses.thead}>
-                                    <tr>
-                                        <th scope="col" className={tableClasses.th}>Actief</th>
-                                        <th scope="col" className={tableClasses.th}>Module</th>
-                                        <th scope="col" className={tableClasses.th}>Aantal</th>
-                                        <th scope="col" className={tableClasses.th}>Prijs p/m excl.</th>
-                                        <th scope="col" className={tableClasses.th}>Btw %</th>
-                                    </tr>
-                                </thead>
-                                <tbody className={tableClasses.tbody}>
-                                    {data.moduleRows.map((row, index) => {
-                                        const err = (key) => errors[`moduleRows.${index}.${key}`];
-                                        return (
-                                            <tr key={row.module_id ?? index} className={cx(tableClasses.tr, row.actief && 'bg-indigo-50/40')}>
-                                                <td className="px-4 py-3">
-                                                    <input
-                                                        id={`gc-module-${index}-actief`}
-                                                        type="checkbox"
-                                                        className="h-5 w-5 rounded border-zinc-300 text-indigo-600"
-                                                        checked={!!row.actief}
-                                                        onChange={() => toggleModule(index)}
-                                                    />
-                                                </td>
-                                                <td className={cx(tableClasses.td, 'font-semibold text-zinc-900')}>
-                                                    <label htmlFor={`gc-module-${index}-actief`} className="cursor-pointer">{row.naam}</label>
-                                                </td>
-                                                {[
-                                                    { key: 'aantal', label: `Aantal ${row.naam}`, width: 'w-20', props: { min: 0, max: 999, inputMode: 'numeric' } },
-                                                    { key: 'prijs_maand_excl', label: `Prijs per maand excl. btw ${row.naam}`, width: 'w-32', props: { min: 0, step: '0.01', inputMode: 'decimal' } },
-                                                    { key: 'btw_percentage', label: `Btw percentage ${row.naam}`, width: 'w-20', props: { min: 0, max: 100, step: '0.01', inputMode: 'decimal' } },
-                                                ].map((col) => (
-                                                    <td key={col.key} className="px-4 py-3 align-top">
-                                                        <input
-                                                            type="number"
-                                                            className={cx(inputClasses, col.width, 'tabular-nums', err(col.key) && 'border-rose-400')}
-                                                            value={row[col.key] ?? ''}
-                                                            onChange={(e) => updateModuleRow(index, col.key, e.target.value)}
-                                                            aria-label={col.label}
-                                                            aria-invalid={err(col.key) ? 'true' : undefined}
-                                                            {...col.props}
-                                                        />
-                                                        {err(col.key) && <p className="mt-1 max-w-[12rem] text-xs font-medium text-rose-700">{err(col.key)}</p>}
-                                                    </td>
-                                                ))}
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                    <StepSection
+                        id="stap-incasso"
+                        step={5}
+                        total={5}
+                        icon="credit-card"
+                        title="Incasso (SEPA)"
+                        description="Optioneel. Met een IBAN wordt een SEPA-mandaat met status pending vastgelegd."
+                        state={stepState('stap-incasso')}
+                    >
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <TextField
+                                {...field('iban')}
+                                label="IBAN"
+                                hint="Spaties mogen, bijvoorbeeld NL91 ABNA 0417 1643 00."
+                                warning={ibanValid === false ? 'Dit IBAN lijkt niet te kloppen. Controleer de cijfers.' : null}
+                                inputProps={{ autoComplete: 'off', spellCheck: false, maxLength: 42 }}
+                            />
+                            <TextField {...field('bic')} label="BIC" inputProps={{ autoComplete: 'off', spellCheck: false, maxLength: 14 }} />
+                            <TextField {...field('plaats_van_tekenen')} label="Plaats van tekenen" required={hasIban} inputProps={{ autoComplete: 'off' }} />
+                            <TextField {...field('datum_van_tekenen')} label="Datum van tekenen" type="date" required={hasIban} />
                         </div>
-                    )}
-                </Section>
+                        {hasIban && !['straatnaam_en_nummer', 'postcode', 'plaats'].every(filled) ? (
+                            <p className="mt-4 flex items-center gap-2 text-xs text-zinc-600">
+                                <Icon name="info" className="h-4 w-4 shrink-0 text-sky-600" />
+                                Met een IBAN is ook het adres bij
+                                <a href="#stap-bedrijf" className="link font-medium">Bedrijf</a>
+                                verplicht.
+                            </p>
+                        ) : null}
+                    </StepSection>
+                </div>
 
-                <div className="sticky bottom-0 z-20 -mx-4 border-t border-zinc-200 bg-white/95 backdrop-blur sm:mx-0 sm:rounded-xl sm:border sm:shadow-lg">
+                {/* Live samenvatting */}
+                <aside className="hidden lg:block" aria-label="Samenvatting">
+                    <div className="sticky top-6 space-y-4">
+                        <Card padded={false}>
+                            <div className="flex items-center gap-3 border-b border-zinc-100 p-5">
+                                <Avatar name={previewName} size="lg" />
+                                <div className="min-w-0">
+                                    <p className="truncate font-semibold text-zinc-900" title={previewName}>{previewName}</p>
+                                    <p className="truncate text-xs text-zinc-500">{[data.plaats.trim(), data.voor_en_achternaam.trim()].filter(Boolean).join(', ') || 'Nog geen plaats of contact'}</p>
+                                    <StatusBadge status={data.status} labels={statusLabels} className="mt-1.5" />
+                                </div>
+                            </div>
+
+                            <div className="space-y-4 p-5">
+                                <div>
+                                    <p className="text-xs font-medium text-zinc-500">MRR excl. btw</p>
+                                    <p className="mt-0.5 text-2xl font-semibold tabular-nums tracking-display text-zinc-900">{formatEuro(totals.totaalExcl)}</p>
+                                    <p className="text-xs text-zinc-500">
+                                        {formatEuro(totals.totaalIncl)} incl. btw, {totals.actieveModules} {totals.actieveModules === 1 ? 'module' : 'modules'}
+                                    </p>
+                                </div>
+                                <div className="flex items-start gap-3 rounded-xl bg-zinc-50 p-3">
+                                    <Icon name="calendar" className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" />
+                                    <div className="min-w-0 text-sm">
+                                        {isDemo ? (
+                                            demoEnd ? (
+                                                <>
+                                                    <p className="font-medium text-zinc-900">Demo eindigt {formatDateNl(demoEnd, false)}</p>
+                                                    <p className="text-xs text-zinc-500">
+                                                        {Number(data.demo_duur_dagen)} dagen
+                                                        {demoDaysLeft !== null ? (demoDaysLeft >= 0 ? `, nog ${demoDaysLeft} ${demoDaysLeft === 1 ? 'dag' : 'dagen'}` : ', al verlopen') : ''}
+                                                    </p>
+                                                </>
+                                            ) : (
+                                                <p className="text-zinc-600">Vul de demostart en duur in.</p>
+                                            )
+                                        ) : (
+                                            <p className="text-zinc-600">Geen lopende demo bij status {statusLabel}.</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <nav aria-label="Stappen" className="border-t border-zinc-100 p-3">
+                                <ol className="space-y-0.5">
+                                    {steps.map((step, i) => (
+                                        <li key={step.id}>
+                                            <a href={`#${step.id}`} className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 focus-ring">
+                                                <span
+                                                    className={cx(
+                                                        'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-2xs font-semibold',
+                                                        step.state === 'done' ? 'bg-emerald-500 text-white' : 'bg-zinc-100 text-zinc-600 ring-1 ring-inset ring-zinc-200'
+                                                    )}
+                                                    aria-hidden="true"
+                                                >
+                                                    {step.state === 'done' ? <Icon name="check" className="h-3.5 w-3.5" strokeWidth={2.5} /> : i + 1}
+                                                </span>
+                                                <span className="flex-1">{step.title}</span>
+                                                <span className="text-xs text-zinc-400">{STEP_STATE_BADGE[step.state].text}</span>
+                                            </a>
+                                        </li>
+                                    ))}
+                                </ol>
+                            </nav>
+
+                            <div className="space-y-2 rounded-b-2xl border-t border-zinc-100 bg-zinc-50/60 p-4">
+                                <Button type="submit" size="lg" className="w-full" icon="check" loading={processing}>
+                                    {processing ? 'Opslaan...' : 'Klant opslaan'}
+                                </Button>
+                                <Link href={urls.index} className={buttonClasses({ variant: 'ghost', className: 'w-full' })}>
+                                    Annuleren
+                                </Link>
+                                {!requiredDone ? <p className="pt-1 text-center text-xs text-zinc-500">Nog niet alle verplichte stappen zijn compleet.</p> : null}
+                            </div>
+                        </Card>
+                    </div>
+                </aside>
+
+                {/* Mobiel: vaste balk onderaan met totaal en opslaan */}
+                <div className="sticky bottom-0 z-20 -mx-4 border-t border-zinc-200 bg-white/95 backdrop-blur sm:mx-0 sm:rounded-2xl sm:border sm:shadow-pop lg:hidden">
                     <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                        <div className="text-sm text-zinc-600">
-                            <span className="font-semibold tabular-nums text-zinc-900">{formatEuro(totals.totaalExcl)}</span> per maand excl. btw
+                        <div className="min-w-0 text-sm text-zinc-600">
+                            <span className="font-semibold tabular-nums text-zinc-900">{formatEuro(totals.totaalExcl)}</span> p/m excl.
+                            {isDemo && demoEnd ? <span className="block text-xs text-zinc-500">Demo tot {formatDateNl(demoEnd, false)}</span> : null}
                         </div>
                         <div className="flex flex-1 justify-end gap-2 sm:flex-none">
                             <Link href={urls.index} className={buttonClasses({ variant: 'ghost', size: 'lg' })}>
                                 Annuleren
                             </Link>
-                            <Button type="submit" size="lg" loading={processing}>
+                            <Button type="submit" size="lg" icon="check" loading={processing}>
                                 {processing ? 'Opslaan...' : 'Klant opslaan'}
                             </Button>
                         </div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useId, useMemo, useState } from 'react';
 import { useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import LinkExtension from '@tiptap/extension-link';
@@ -6,7 +6,7 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { Head, router, useForm } from '@inertiajs/react';
 import { useConfirm } from '../../../components/ConfirmProvider';
 import { FOCUS_SCOPE } from '../../../components/StatusBadge';
-import { cx } from '../../../components/ui';
+import { TabPanel, cx } from '../../../components/ui';
 import CustomerHeader from './partials/CustomerHeader';
 import OverviewTab from './partials/OverviewTab';
 import ContactTab from './partials/ContactTab';
@@ -20,9 +20,11 @@ import {
     LEGACY_TABS,
     MANDATE_STATUS_LABELS,
     TABS,
+    WELCOME_TAB,
     formatDate,
     formatDateTime,
     keepOriginalIfSameDate,
+    personName,
     numberValue,
     scrollToForm,
     startOfDay,
@@ -55,6 +57,7 @@ export default function Show({
     mandates: mandatesProp,
     activities,
     tasks: tasksProp,
+    crmTasks: crmTasksProp,
     appointments: appointmentsProp,
     recentNotes,
     welcomeSentActivityAt,
@@ -72,6 +75,8 @@ export default function Show({
     const mandates = asList(mandatesProp);
     const tasks = asList(tasksProp);
     const appointments = asList(appointmentsProp);
+    const crmTasks = asList(crmTasksProp);
+    const tabsIdBase = useId();
 
     // Welkomstmail is eenmalig: verstuurd (status/sent_at of tijdlijn) = ingeklapt met "Al verstuurd op ...".
     const welcomeSentAt = welcomeEmail?.sent_at || welcomeSentActivityAt || null;
@@ -82,7 +87,7 @@ export default function Show({
     const mappedTab = legacyTab ? legacyTab.tab : requestedTab;
     // Welkomstmail-tab alleen tonen als die relevant is (nog niet verstuurd) of expliciet gevraagd.
     const showWelcomeTab = !welcomeEmailSent || mappedTab === 'welkomst';
-    const visibleTabs = showWelcomeTab ? [...TABS, { key: 'welkomst', label: 'Welkomstmail' }] : TABS;
+    const visibleTabs = showWelcomeTab ? [...TABS, WELCOME_TAB] : TABS;
     const activeTab = visibleTabs.some((item) => item.key === mappedTab) ? mappedTab : 'overzicht';
     const confirm = useConfirm();
 
@@ -762,7 +767,7 @@ export default function Show({
 
     const welcomeEditor = useEditor({
         extensions: [
-            StarterKit.configure({ heading: { levels: [2, 3] } }),
+            StarterKit.configure({ heading: { levels: [2, 3] }, link: false }),
             LinkExtension.configure({ openOnClick: false, autolink: true, defaultProtocol: 'https' }),
             Placeholder.configure({ placeholder: 'Typ hier je welkomstmail...' }),
         ],
@@ -961,9 +966,17 @@ export default function Show({
         const item = openItems[0];
         if (!item) return null;
         const overdue = Boolean(item.due_at && new Date(item.due_at) < new Date());
-        const when = item.due_at ? ` (${formatDateTime(item.due_at)}${overdue ? ', te laat' : ''})` : '';
-        return { text: `${item.kind}: ${item.titel}${when}`, overdue };
+        const meta = `${item.kind}${item.due_at ? `, ${formatDateTime(item.due_at)}` : ', geen planning'}${overdue ? ', te laat' : ''}`;
+        return { title: item.titel, meta, overdue };
     })();
+
+    const activeModuleRows = asList(moduleRows).filter((row) => row.actief);
+    const tabCounts = {
+        contact: persons.length + seats.length,
+        abonnement: activeModuleRows.length,
+        activiteit: openItems.length || undefined,
+    };
+    const tabItems = visibleTabs.map((item) => ({ ...item, count: tabCounts[item.key] }));
 
     return (
         <div className={cx('space-y-6', FOCUS_SCOPE)}>
@@ -979,8 +992,10 @@ export default function Show({
                 onNextActionClick={() => changeTab('activiteit', 'sectie-klantafspraken')}
                 phone={contactPhone}
                 email={contactEmail}
+                primaryName={personName(garageCompany.primary_person)}
                 indexUrl={urls.index}
-                tabs={visibleTabs.map((item) => ({ ...item, href: `${urls.show}?tab=${item.key}` }))}
+                tabs={tabItems}
+                tabsIdBase={tabsIdBase}
                 activeTab={activeTab}
                 onTabChange={(key) => changeTab(key)}
                 isDemo={isDemoStatus}
@@ -994,157 +1009,176 @@ export default function Show({
                 onSubmitNote={submitNote}
             />
 
-            {activeTab === 'overzicht' && (
-                <OverviewTab
-                    company={garageCompany}
-                    status={normalizedCompanyStatus}
-                    statusErrors={statusErrors}
-                    hasActiveMandate={hasActiveMandate}
-                    sourceOptions={sourceOptions}
-                    recentNotes={recentNotes}
-                    openItems={openItems}
-                    overviewForm={overviewForm}
-                    editingOverview={editingOverview}
-                    showPasswordField={showPasswordField}
-                    setShowPasswordField={setShowPasswordField}
-                    onStartEdit={startOverviewEdit}
-                    onCancelEdit={cancelOverviewEdit}
-                    onSubmit={submitOverview}
-                    onAddNote={() => setHeaderPanel('note')}
-                    changeTab={changeTab}
-                    onDeleteCompany={deleteCompany}
-                />
-            )}
+            <TabPanel idBase={tabsIdBase} value="overzicht" active={activeTab === 'overzicht'}>
+                    <OverviewTab
+                        company={garageCompany}
+                        status={normalizedCompanyStatus}
+                        statusErrors={statusErrors}
+                        hasActiveMandate={hasActiveMandate}
+                        sourceOptions={sourceOptions}
+                        recentNotes={recentNotes}
+                        openItems={openItems}
+                        crmTasks={crmTasks}
+                        tasksUrl={urls.tasks_index || '/taken'}
+                        persons={persons}
+                        seats={seats}
+                        mandates={mandates}
+                        activeMandate={activeMandate}
+                        activeModules={activeModuleRows}
+                        activities={activities}
+                        statusLabels={safeStatusLabels}
+                        welcome={{
+                            sent: welcomeEmailSent,
+                            text: welcomeSentText,
+                            status: welcomeEmail?.status,
+                            onOpen: () => {
+                                if (welcomeEmailSent) setWelcomeExpanded(false);
+                                changeTab('welkomst');
+                            },
+                        }}
+                        overviewForm={overviewForm}
+                        editingOverview={editingOverview}
+                        showPasswordField={showPasswordField}
+                        setShowPasswordField={setShowPasswordField}
+                        onStartEdit={startOverviewEdit}
+                        onCancelEdit={cancelOverviewEdit}
+                        onSubmit={submitOverview}
+                        onAddNote={() => setHeaderPanel('note')}
+                        changeTab={changeTab}
+                        onDeleteCompany={deleteCompany}
+                    />
+            </TabPanel>
 
-            {activeTab === 'contact' && (
-                <ContactTab
-                    persons={persons}
-                    seats={seats}
-                    personProps={{
-                        form: personForm,
-                        showForm: showPersonForm,
-                        editingId: editingPersonId,
-                        onCreate: startPersonCreate,
-                        onEdit: startPersonEdit,
-                        onCancel: cancelPerson,
-                        onSubmit: submitPerson,
-                        onDelete: deletePerson,
-                    }}
-                    seatProps={{
-                        form: seatForm,
-                        showForm: showSeatForm,
-                        editingId: editingSeatId,
-                        onCreate: startSeatCreate,
-                        onEdit: startSeatEdit,
-                        onCancel: cancelSeat,
-                        onSubmit: submitSeat,
-                        onDelete: deleteSeat,
-                    }}
-                />
-            )}
+            <TabPanel idBase={tabsIdBase} value="contact" active={activeTab === 'contact'}>
+                    <ContactTab
+                        persons={persons}
+                        seats={seats}
+                        personProps={{
+                            form: personForm,
+                            showForm: showPersonForm,
+                            editingId: editingPersonId,
+                            onCreate: startPersonCreate,
+                            onEdit: startPersonEdit,
+                            onCancel: cancelPerson,
+                            onSubmit: submitPerson,
+                            onDelete: deletePerson,
+                        }}
+                        seatProps={{
+                            form: seatForm,
+                            showForm: showSeatForm,
+                            editingId: editingSeatId,
+                            onCreate: startSeatCreate,
+                            onEdit: startSeatEdit,
+                            onCancel: cancelSeat,
+                            onSubmit: submitSeat,
+                            onDelete: deleteSeat,
+                        }}
+                    />
+            </TabPanel>
 
-            {activeTab === 'abonnement' && (
-                <SubscriptionTab
-                    moduleProps={{
-                        form: moduleForm,
-                        totals: moduleTotalsLive,
-                        extraUsersHint,
-                        onToggle: toggleModule,
-                        onUpdateRow: updateModuleRow,
-                        onSubmit: submitModules,
-                        changeTab,
-                    }}
-                    incassoProps={{
-                        company: garageCompany,
-                        incasso,
-                        activeMandate,
-                        mandates,
-                        omschrijving: incassoOmschrijvingPreview,
-                        mandateForm,
-                        showMandateForm,
-                        editingMandateId,
-                        onNewMandate: startMandateNew,
-                        onEditMandate: startMandateEdit,
-                        onCancelMandate: cancelMandate,
-                        onSubmitMandate: submitMandate,
-                        onChangeMandateStatus: changeMandateStatus,
-                        mandateBusyId,
-                    }}
-                    exportProps={{ form: exportForm, maandOpties: MAAND_OPTIES, jaarOpties, onExport: exportIncasso }}
-                />
-            )}
+            <TabPanel idBase={tabsIdBase} value="abonnement" active={activeTab === 'abonnement'}>
+                    <SubscriptionTab
+                        moduleProps={{
+                            form: moduleForm,
+                            totals: moduleTotalsLive,
+                            extraUsersHint,
+                            onToggle: toggleModule,
+                            onUpdateRow: updateModuleRow,
+                            onSubmit: submitModules,
+                            changeTab,
+                        }}
+                        incassoProps={{
+                            company: garageCompany,
+                            incasso,
+                            activeMandate,
+                            mandates,
+                            omschrijving: incassoOmschrijvingPreview,
+                            mandateForm,
+                            showMandateForm,
+                            editingMandateId,
+                            onNewMandate: startMandateNew,
+                            onEditMandate: startMandateEdit,
+                            onCancelMandate: cancelMandate,
+                            onSubmitMandate: submitMandate,
+                            onChangeMandateStatus: changeMandateStatus,
+                            mandateBusyId,
+                        }}
+                        exportProps={{ form: exportForm, maandOpties: MAAND_OPTIES, jaarOpties, onExport: exportIncasso }}
+                    />
+            </TabPanel>
 
-            {activeTab === 'activiteit' && (
-                <ActivityTab
-                    taskForm={taskForm}
-                    onSubmitTask={submitTask}
-                    reminderChannels={reminderChannels}
-                    tasks={tasks}
-                    appointments={appointments}
-                    onMarkDone={markDone}
-                    doneBusyId={doneBusyId}
-                    noteForm={noteForm}
-                    onSubmitNote={submitNote}
-                    activities={activities}
-                    timelineFilter={timelineFilter}
-                    setTimelineFilter={setTimelineFilter}
-                    statusLabels={safeStatusLabels}
-                />
-            )}
+            <TabPanel idBase={tabsIdBase} value="activiteit" active={activeTab === 'activiteit'}>
+                    <ActivityTab
+                        taskForm={taskForm}
+                        onSubmitTask={submitTask}
+                        reminderChannels={reminderChannels}
+                        tasks={tasks}
+                        appointments={appointments}
+                        onMarkDone={markDone}
+                        doneBusyId={doneBusyId}
+                        noteForm={noteForm}
+                        onSubmitNote={submitNote}
+                        activities={activities}
+                        timelineFilter={timelineFilter}
+                        setTimelineFilter={setTimelineFilter}
+                        statusLabels={safeStatusLabels}
+                    />
+            </TabPanel>
 
-            {activeTab === 'demo_status' && (
-                <DemoStatusTab
-                    status={normalizedCompanyStatus}
-                    statusLabels={safeStatusLabels}
-                    statusLabel={statusLabel}
-                    statusOptions={statusOptions}
-                    statusForm={statusForm}
-                    onSubmitStatus={submitDemoStatus}
-                    onSetStatus={setDemoStatus}
-                    onActivate={activateCompany}
-                    statusBusy={statusBusy}
-                    hasActiveMandate={hasActiveMandate}
-                    demoInfo={demoInfo}
-                    welcomeEmailSent={welcomeEmailSent}
-                    welcomeSentText={welcomeSentText}
-                    onResendWelcome={() => {
-                        setWelcomeExpanded(true);
-                        changeTab('welkomst');
-                    }}
-                    demoForm={demoForm}
-                    onSubmitDates={submitDemoDates}
-                    demoEndPreview={demoEndPreview}
-                    extendForm={extendForm}
-                    onSubmitExtend={submitExtend}
-                />
-            )}
+            <TabPanel idBase={tabsIdBase} value="demo_status" active={activeTab === 'demo_status'}>
+                    <DemoStatusTab
+                        company={garageCompany}
+                        status={normalizedCompanyStatus}
+                        statusLabels={safeStatusLabels}
+                        statusLabel={statusLabel}
+                        statusOptions={statusOptions}
+                        statusForm={statusForm}
+                        onSubmitStatus={submitDemoStatus}
+                        onSetStatus={setDemoStatus}
+                        onActivate={activateCompany}
+                        statusBusy={statusBusy}
+                        hasActiveMandate={hasActiveMandate}
+                        demoInfo={demoInfo}
+                        welcomeEmailSent={welcomeEmailSent}
+                        welcomeSentText={welcomeSentText}
+                        onResendWelcome={() => {
+                            setWelcomeExpanded(true);
+                            changeTab('welkomst');
+                        }}
+                        demoForm={demoForm}
+                        onSubmitDates={submitDemoDates}
+                        demoEndPreview={demoEndPreview}
+                        extendForm={extendForm}
+                        onSubmitExtend={submitExtend}
+                    />
+            </TabPanel>
 
-            {activeTab === 'welkomst' && (
-                <WelcomeTab
-                    welcomeEmail={welcomeEmail}
-                    welcomeEmailSent={welcomeEmailSent}
-                    welcomeExpanded={welcomeExpanded}
-                    setWelcomeExpanded={setWelcomeExpanded}
-                    welcomeSentText={welcomeSentText}
-                    form={welcomeForm}
-                    editor={welcomeEditor}
-                    templates={templates}
-                    smtpConfigured={smtpConfigured}
-                    onRefresh={refreshWelcome}
-                    onSave={saveWelcome}
-                    onOpenPicker={openTemplatePicker}
-                    sending={sendingWelcome}
-                    picker={{
-                        open: templatePickerOpen,
-                        pendingSend,
-                        selectedTemplateId,
-                        setSelectedTemplateId,
-                        selectedTemplate,
-                        onClose: closeTemplatePicker,
-                        onConfirm: confirmTemplatePicker,
-                    }}
-                />
-            )}
+            <TabPanel idBase={tabsIdBase} value="welkomst" active={activeTab === 'welkomst'}>
+                    <WelcomeTab
+                        welcomeEmail={welcomeEmail}
+                        welcomeEmailSent={welcomeEmailSent}
+                        welcomeExpanded={welcomeExpanded}
+                        setWelcomeExpanded={setWelcomeExpanded}
+                        welcomeSentText={welcomeSentText}
+                        form={welcomeForm}
+                        editor={welcomeEditor}
+                        templates={templates}
+                        smtpConfigured={smtpConfigured}
+                        onRefresh={refreshWelcome}
+                        onSave={saveWelcome}
+                        onOpenPicker={openTemplatePicker}
+                        sending={sendingWelcome}
+                        picker={{
+                            open: templatePickerOpen,
+                            pendingSend,
+                            selectedTemplateId,
+                            setSelectedTemplateId,
+                            selectedTemplate,
+                            onClose: closeTemplatePicker,
+                            onConfirm: confirmTemplatePicker,
+                        }}
+                    />
+            </TabPanel>
         </div>
     );
 }

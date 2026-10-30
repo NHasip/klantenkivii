@@ -140,12 +140,98 @@ export const ACTIVITY_TYPE_LABELS = {
 };
 
 export const TABS = [
-    { key: 'overzicht', label: 'Overzicht' },
-    { key: 'contact', label: 'Contact & gebruikers' },
-    { key: 'abonnement', label: 'Abonnement' },
-    { key: 'activiteit', label: 'Activiteit' },
-    { key: 'demo_status', label: 'Demo & status' },
+    { key: 'overzicht', label: 'Overzicht', icon: 'grid' },
+    { key: 'contact', label: 'Contact & gebruikers', icon: 'users' },
+    { key: 'abonnement', label: 'Abonnement', icon: 'credit-card' },
+    { key: 'activiteit', label: 'Activiteit', icon: 'activity' },
+    { key: 'demo_status', label: 'Demo & status', icon: 'sparkles' },
 ];
+
+export const WELCOME_TAB = { key: 'welkomst', label: 'Welkomstmail', icon: 'mail' };
+
+// Icoon en kleur per tijdlijntype (mails herkennen we aan de titel).
+const ACTIVITY_VISUALS = {
+    status_wijziging: { icon: 'refresh', tone: 'info' },
+    notitie: { icon: 'message-square', tone: 'brand' },
+    taak: { icon: 'check-square', tone: 'warning' },
+    afspraak: { icon: 'calendar', tone: 'info' },
+    demo: { icon: 'sparkles', tone: 'brand' },
+    mandate: { icon: 'credit-card', tone: 'success' },
+    module: { icon: 'package', tone: 'neutral' },
+    systeem: { icon: 'settings', tone: 'neutral' },
+};
+
+export function activityVisual(activity) {
+    if (activity?.type !== 'notitie' && /mail/i.test(`${activity?.titel || ''}`)) return { icon: 'mail', tone: 'info' };
+    if (activity?.type === 'taak' && activity?.done_at) return { icon: 'check-circle', tone: 'success' };
+    return ACTIVITY_VISUALS[activity?.type] || { icon: 'activity', tone: 'neutral' };
+}
+
+export function activityTypeLabel(activity) {
+    if (!activity?.type) return 'Activiteit';
+    return ACTIVITY_TYPE_LABELS[activity.type] || activity.type.replace(/_/g, ' ');
+}
+
+// Relatieve dag voor groepering in de tijdlijn: Vandaag, Gisteren of de datum voluit.
+export function dayLabel(value) {
+    if (!value) return 'Onbekende datum';
+    const date = parseDate(value);
+    if (Number.isNaN(date.getTime())) return 'Onbekende datum';
+    const diff = Math.round((startOfDay(new Date()) - startOfDay(date)) / 86400000);
+    if (diff === 0) return 'Vandaag';
+    if (diff === 1) return 'Gisteren';
+    try {
+        return new Intl.DateTimeFormat('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: date.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' }).format(date);
+    } catch {
+        return formatDate(value);
+    }
+}
+
+export function formatTime(value) {
+    if (!value) return '';
+    const date = parseDate(value);
+    if (Number.isNaN(date.getTime())) return '';
+    try {
+        return new Intl.DateTimeFormat('nl-NL', { hour: '2-digit', minute: '2-digit' }).format(date);
+    } catch {
+        return '';
+    }
+}
+
+// Korte datum zonder jaar als het dit jaar is ("12 nov"), anders met jaar.
+export function formatShortDate(value) {
+    if (!value) return '-';
+    const date = parseDate(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    try {
+        return new Intl.DateTimeFormat('nl-NL', { day: 'numeric', month: 'short', year: date.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' }).format(date);
+    } catch {
+        return formatDate(value);
+    }
+}
+
+export function personName(person) {
+    if (!person) return '';
+    return `${person.voornaam || ''} ${person.achternaam || ''}`.trim();
+}
+
+export function telHref(value) {
+    return `tel:${String(value).replace(/[^\d+]/g, '')}`;
+}
+
+export const CRM_TASK_STATUS = {
+    open: { label: 'Open', tone: 'neutral' },
+    in_behandeling: { label: 'In behandeling', tone: 'info' },
+    wacht_op_klant: { label: 'Wacht op klant', tone: 'warning' },
+    afgerond: { label: 'Afgerond', tone: 'success' },
+};
+
+export const CRM_TASK_PRIORITY = {
+    laag: 'Laag',
+    normaal: 'Normaal',
+    hoog: 'Hoog',
+    kritiek: 'Kritiek',
+};
 
 // Oude ?tab= waarden blijven werken: ze openen de nieuwe tab en scrollen naar de sectie.
 export const LEGACY_TABS = {

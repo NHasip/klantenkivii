@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import LinkExtension from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import { useConfirm } from '../../../components/ConfirmProvider';
-import { Badge, Button, Card, CardHeader, EmptyState, Field, PageHeader, buttonClasses, cx, inputClasses } from '../../../components/ui';
+import { Avatar, Badge, Button, EmptyState, Field, IconTile, PageHeader, Spinner, StatusDot, Tooltip, cx, inputClasses } from '../../../components/ui';
+import { Icon } from '../../../components/icons';
 
 const EMPTY_BODY = '<p></p>';
 const LEAVE_MESSAGE = 'Je hebt wijzigingen die nog niet zijn opgeslagen. Weet je zeker dat je deze pagina wilt verlaten?';
@@ -20,14 +21,39 @@ function ToolbarButton({ active, disabled, onClick, children, title }) {
             onClick={onClick}
             disabled={disabled}
             className={cx(
-                'h-8 rounded-md px-2.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1',
-                active ? 'bg-indigo-600 text-white' : 'text-zinc-700 hover:bg-zinc-200/70',
+                'inline-flex h-8 min-w-[2rem] items-center justify-center rounded-lg px-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1',
+                active ? 'bg-white text-indigo-700 shadow-card ring-1 ring-indigo-200' : 'text-zinc-700 hover:bg-zinc-200/70',
                 disabled && 'cursor-not-allowed opacity-40'
             )}
         >
             {children}
         </button>
     );
+}
+
+// Vriendelijke naam en icoon per veld; onbekende velden tonen de technische naam.
+const VARIABLE_META = {
+    activatielink: { label: 'Activatielink', icon: 'link' },
+    reset_link: { label: 'Wachtwoordlink', icon: 'key' },
+    naam: { label: 'Naam', icon: 'user' },
+    bedrijfsnaam: { label: 'Bedrijfsnaam', icon: 'building' },
+    loginnaam: { label: 'Loginnaam', icon: 'mail' },
+    wachtwoord: { label: 'Wachtwoord', icon: 'key' },
+    weblink: { label: 'Weblink', icon: 'globe' },
+};
+
+function variableMeta(token) {
+    return VARIABLE_META[token] ?? { label: token, icon: 'tag' };
+}
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
+}
+
+/** Vult {{ veld }} in met voorbeeldwaarden (alleen voor het live voorbeeld in de browser). */
+function fillSample(text, values, escape) {
+    const map = values || {};
+    return String(text || '').replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, key) => (Object.prototype.hasOwnProperty.call(map, key) ? (escape ? escapeHtml(map[key]) : String(map[key])) : match));
 }
 
 function ToolbarDivider() {
@@ -48,6 +74,9 @@ export default function Index({ templates = [], variables, urls, previewCustomer
     const [previewSource, setPreviewSource] = useState(null);
     const [previewLoading, setPreviewLoading] = useState(false);
     const [previewError, setPreviewError] = useState('');
+    const [previewMode, setPreviewMode] = useState('sample'); // sample | customer
+    const [search, setSearch] = useState('');
+    const [savedAt, setSavedAt] = useState(null);
     const previewSeqRef = useRef(0);
     // body: genormaliseerde editor-HTML van de geladen versie (null = nog vastleggen).
     const baselineRef = useRef({ name: '', subject: '', is_active: 1, body: null, source: null });
@@ -105,7 +134,8 @@ export default function Index({ templates = [], variables, urls, previewCustomer
         // Zorgt dat de actieve status van de toolbarknoppen meebeweegt met de cursor.
         shouldRerenderOnTransaction: true,
         extensions: [
-            StarterKit.configure({ heading: { levels: [2, 3] } }),
+            // StarterKit v3 bevat zelf al Link; uitzetten voorkomt een dubbele extensie (eigen Link hieronder).
+            StarterKit.configure({ heading: { levels: [2, 3] }, link: false }),
             LinkExtension.configure({ openOnClick: false, autolink: true, defaultProtocol: 'https' }),
             Placeholder.configure({ placeholder: 'Schrijf hier de inhoud van de e-mail...' }),
         ],
@@ -191,6 +221,7 @@ export default function Index({ templates = [], variables, urls, previewCustomer
             if (!ok) return;
         }
         setFlash(null);
+        setSavedAt(null);
         setSelectedId(id);
     };
 
@@ -229,6 +260,7 @@ export default function Index({ templates = [], variables, urls, previewCustomer
                     source: latestHtml,
                 };
                 form.setData((data) => ({ ...data, name: payload.name, subject: payload.subject }));
+                setSavedAt(new Date());
                 options.onSuccess?.(page);
             },
             onError: (errors) => {
@@ -261,6 +293,20 @@ export default function Index({ templates = [], variables, urls, previewCustomer
             submitTemplate(urls.update_post ? 'post' : 'patch', targetUrl);
         }
     };
+
+    // Ctrl/Cmd + S slaat op (ook vanuit de editor).
+    const saveRef = useRef(null);
+    saveRef.current = saveTemplate;
+    useEffect(() => {
+        const onKey = (event) => {
+            if ((event.ctrlKey || event.metaKey) && String(event.key).toLowerCase() === 's') {
+                event.preventDefault();
+                saveRef.current?.();
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, []);
 
     const deleteTemplate = async () => {
         if (deleting || saving || !selectedTemplate || isProtected) return;
@@ -380,56 +426,90 @@ export default function Index({ templates = [], variables, urls, previewCustomer
         editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
     };
 
+    const query = search.trim().toLowerCase();
+    const visibleTemplates = query ? templates.filter((t) => `${t.name ?? ''} ${t.subject ?? ''}`.toLowerCase().includes(query)) : templates;
+
+    // Live voorbeeld met voorbeeldgegevens: direct bij elke toetsaanslag, zonder serververzoek.
+    const liveBody = editor ? editor.getHTML() : form.data.body_html || '';
+    const liveSubject = fillSample(form.data.subject || '', variables, false);
+    const liveHtml = fillSample(liveBody, variables, true);
+    const showLive = previewMode === 'sample';
+    const frameHtml = showLive ? liveHtml : preview?.html || '';
+
+    let saveState;
+    if (saving) saveState = { tone: 'neutral', icon: null, text: 'Opslaan...' };
+    else if (dirty) saveState = { tone: 'warning', icon: 'alert-circle', text: 'Niet opgeslagen wijzigingen' };
+    else if (isNew) saveState = { tone: 'neutral', icon: 'edit', text: 'Nieuw, nog niet opgeslagen' };
+    else if (savedAt) saveState = { tone: 'success', icon: 'check-circle', text: `Opgeslagen om ${savedAt.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}` };
+    else saveState = { tone: 'success', icon: 'check-circle', text: 'Alles is opgeslagen' };
+    const saveStateClass = { warning: 'bg-amber-50 text-amber-900 ring-amber-200', success: 'bg-emerald-50 text-emerald-800 ring-emerald-200', neutral: 'bg-zinc-100 text-zinc-700 ring-zinc-200' }[saveState.tone];
+
     return (
         <div>
             <Head title="E-mail templates" />
 
             <PageHeader
                 title="E-mail templates"
-                description="Beheer je e-mail templates en gebruik variabelen voor persoonlijke velden."
+                description="Schrijf vaste e-mails en maak ze persoonlijk met velden zoals naam en activatielink."
+                back={{ href: urls.back || '/dashboard', label: 'Terug' }}
                 actions={
-                    <Link href={urls.back || '/dashboard'} className={buttonClasses({ variant: 'secondary' })}>
-                        Terug
-                    </Link>
+                    <Button icon="plus" onClick={() => selectTemplate('new')} disabled={busy || isNew}>
+                        Nieuwe template
+                    </Button>
                 }
             />
 
             {flashText ? (
                 <div
                     role={flashIsError ? 'alert' : 'status'}
-                    className={cx(
-                        'mb-6 flex items-start justify-between gap-3 rounded-lg border px-4 py-3 text-sm',
-                        flashIsError ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                    )}
+                    className={cx('mb-6 flex items-start gap-3 rounded-2xl border bg-white p-3 pr-2 text-sm shadow-card', flashIsError ? 'border-rose-200' : 'border-emerald-200')}
                 >
-                    <div>{flashText}</div>
-                    <button
-                        type="button"
-                        className="shrink-0 rounded text-xs font-semibold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1"
-                        onClick={() => setFlash(null)}
-                    >
-                        Sluiten
-                    </button>
+                    <IconTile icon={flashIsError ? 'alert-circle' : 'check-circle'} tone={flashIsError ? 'danger' : 'success'} size="sm" />
+                    <div className="min-w-0 flex-1 pt-1.5 text-zinc-800">{flashText}</div>
+                    <Button variant="ghost" size="xs" iconOnly icon="x" aria-label="Melding sluiten" onClick={() => setFlash(null)} />
                 </div>
             ) : null}
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-                <div className="space-y-6 lg:col-span-4">
-                    <Card>
-                        <CardHeader
-                            title="Templates"
-                            className="mb-3"
-                            actions={
-                                <Button variant="secondary" size="sm" onClick={() => selectTemplate('new')} aria-pressed={isNew} disabled={busy}>
-                                    Nieuwe template
-                                </Button>
-                            }
-                        />
-                        {templates.length === 0 ? (
-                            <EmptyState title="Nog geen templates" description="Maak je eerste template aan met de knop hierboven." className="py-6" />
+                {/* Linkerpaneel: lijst met zoeken */}
+                <aside className="lg:col-span-4 xl:col-span-3" aria-label="Templates">
+                    <div className="card overflow-hidden lg:sticky lg:top-6">
+                        <div className="border-b border-zinc-100 p-3">
+                            <label htmlFor="email-template-search" className="sr-only">
+                                Templates zoeken
+                            </label>
+                            <div className="relative">
+                                <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                                <input id="email-template-search" type="search" className={cx(inputClasses, 'pl-9')} placeholder="Zoek op naam of onderwerp" value={search} onChange={(e) => setSearch(e.target.value)} />
+                            </div>
+                        </div>
+                        {templates.length === 0 && !isNew ? (
+                            <EmptyState
+                                bare
+                                compact
+                                illustration="inbox"
+                                title="Nog geen templates"
+                                description="Maak je eerste template, bijvoorbeeld een welkomstmail."
+                                action={
+                                    <Button size="sm" icon="plus" onClick={() => selectTemplate('new')}>
+                                        Nieuwe template
+                                    </Button>
+                                }
+                            />
                         ) : (
-                            <ul className="space-y-1.5">
-                                {templates.map((template) => {
+                            <ul className="max-h-[60vh] space-y-1 overflow-y-auto p-2 lg:max-h-[calc(100vh-14rem)]">
+                                {isNew ? (
+                                    <li>
+                                        <div className="flex items-center gap-3 rounded-xl bg-indigo-50 px-2.5 py-2.5 ring-1 ring-inset ring-indigo-200" aria-current="true">
+                                            <IconTile icon="edit" tone="brand" size="sm" />
+                                            <div className="min-w-0">
+                                                <div className="truncate text-sm font-semibold text-indigo-900">{form.data.name.trim() || 'Nieuwe template'}</div>
+                                                <div className="truncate text-xs text-indigo-800">{form.data.subject.trim() || 'Nog geen onderwerp'}</div>
+                                            </div>
+                                        </div>
+                                    </li>
+                                ) : null}
+                                {visibleTemplates.map((template) => {
                                     const active = selectedId === template.id;
                                     return (
                                         <li key={template.id}>
@@ -439,78 +519,76 @@ export default function Index({ templates = [], variables, urls, previewCustomer
                                                 aria-current={active ? 'true' : undefined}
                                                 disabled={busy && !active}
                                                 className={cx(
-                                                    'w-full rounded-lg border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1 disabled:opacity-60',
-                                                    active ? 'border-indigo-300 bg-indigo-50' : 'border-transparent hover:border-zinc-200 hover:bg-zinc-50'
+                                                    'flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:opacity-60',
+                                                    active ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-200' : 'hover:bg-zinc-50',
                                                 )}
                                             >
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <span className={cx('truncate text-sm font-semibold', active ? 'text-indigo-900' : 'text-zinc-900')}>
-                                                        {template.name || 'Template zonder naam'}
+                                                <IconTile icon="mail" tone={!template.is_active ? 'neutral' : active ? 'brand' : 'neutral'} size="sm" />
+                                                <span className="min-w-0 flex-1">
+                                                    <span className="flex items-center gap-1.5">
+                                                        <span className={cx('truncate text-sm font-semibold', active ? 'text-indigo-900' : 'text-zinc-900')}>{template.name || 'Template zonder naam'}</span>
+                                                        {active && dirty ? <StatusDot tone="warning" label="Niet opgeslagen" /> : null}
                                                     </span>
-                                                    <span className="flex shrink-0 items-center gap-1">
-                                                        {template.is_system ? <Badge tone="brand">Standaard</Badge> : null}
-                                                        {!template.is_active ? <Badge tone="warning">Inactief</Badge> : null}
-                                                    </span>
-                                                </div>
-                                                <div className={cx('mt-0.5 truncate text-xs', active ? 'text-indigo-800' : 'text-zinc-500')}>
-                                                    {template.subject || 'Geen onderwerp'}
-                                                </div>
+                                                    <span className={cx('mt-0.5 block truncate text-xs', active ? 'text-indigo-800' : 'text-zinc-500')}>{template.subject || 'Geen onderwerp'}</span>
+                                                    {template.is_system || !template.is_active ? (
+                                                        <span className="mt-1.5 flex flex-wrap gap-1">
+                                                            {template.is_system ? (
+                                                                <Badge tone="brand" icon="shield">
+                                                                    Standaard
+                                                                </Badge>
+                                                            ) : null}
+                                                            {!template.is_active ? <Badge tone="warning">Inactief</Badge> : null}
+                                                        </span>
+                                                    ) : null}
+                                                </span>
                                             </button>
                                         </li>
                                     );
                                 })}
-                                {isNew ? (
-                                    <li>
-                                        <div className="rounded-lg border border-dashed border-indigo-300 bg-indigo-50/60 px-3 py-2.5 text-sm font-semibold text-indigo-900" aria-current="true">
-                                            {form.data.name.trim() || 'Nieuwe template'}
-                                        </div>
+                                {query && visibleTemplates.length === 0 ? (
+                                    <li className="px-3 py-6 text-center text-sm text-zinc-500">
+                                        Geen templates gevonden voor "{search.trim()}".
+                                        <button type="button" className="link mt-1 block w-full text-center text-sm" onClick={() => setSearch('')}>
+                                            Zoekopdracht wissen
+                                        </button>
                                     </li>
                                 ) : null}
                             </ul>
                         )}
-                    </Card>
+                    </div>
+                </aside>
 
-                    <Card>
-                        <CardHeader title="Beschikbare velden" description="Klik om in te voegen op de cursor, in het onderwerp of de inhoud." className="mb-3" />
-                        {variableKeys.length === 0 ? (
-                            <p className="text-sm text-zinc-500">Geen variabelen beschikbaar.</p>
-                        ) : (
-                            <div className="space-y-1.5">
-                                {variableKeys.map((token, index) => {
-                                    const recommended = index === 0 && token === 'activatielink';
-                                    return (
-                                        <button
-                                            key={token}
-                                            type="button"
-                                            onMouseDown={(event) => event.preventDefault()}
-                                            onClick={() => insertVariable(token)}
-                                            title={`Voorbeeld: ${variables[token]}`}
-                                            aria-label={`Variabele ${token} invoegen`}
-                                            className={cx(
-                                                'flex min-h-[2rem] w-full items-center justify-between gap-2 rounded-md border px-2.5 py-1 text-left font-mono text-xs text-zinc-700 transition-colors hover:border-indigo-300 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1',
-                                                recommended ? 'border-indigo-200 bg-indigo-50/60' : 'border-zinc-200 bg-zinc-50'
-                                            )}
-                                        >
-                                            <span className="truncate">{`{{ ${token} }}`}</span>
-                                            {recommended ? <Badge tone="brand" className="font-sans">Aanbevolen</Badge> : null}
-                                        </button>
-                                    );
-                                })}
+                {/* Rechterpaneel: editor en live voorbeeld */}
+                <div className="min-w-0 space-y-6 lg:col-span-8 xl:col-span-9">
+                    <form onSubmit={saveTemplate} noValidate className="card">
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-5 py-4 sm:px-6">
+                            <div className="flex min-w-0 items-center gap-3">
+                                <IconTile icon={isNew ? 'edit' : 'mail'} tone="brand" />
+                                <div className="min-w-0">
+                                    <h2 className="section-heading truncate">{isNew ? 'Nieuwe template' : selectedTemplate?.name || 'Template'}</h2>
+                                    <span className={cx('mt-1 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset', saveStateClass)} aria-live="polite">
+                                        {saving ? <Spinner className="h-3 w-3" /> : <Icon name={saveState.icon} className="h-3.5 w-3.5" />}
+                                        {saveState.text}
+                                    </span>
+                                </div>
                             </div>
-                        )}
-                    </Card>
-                </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                {!isNew && selectedTemplate ? (
+                                    <Tooltip content={isProtected ? 'Standaard templates kun je niet verwijderen zolang ze actief zijn.' : 'Template verwijderen'}>
+                                        <Button variant="danger-ghost" size="sm" icon="trash" onClick={deleteTemplate} disabled={isProtected || saving} loading={deleting}>
+                                            {deleting ? 'Verwijderen...' : 'Verwijderen'}
+                                        </Button>
+                                    </Tooltip>
+                                ) : null}
+                                <Button type="submit" icon="check" loading={saving} disabled={deleting || (!dirty && !isNew)} title="Opslaan (Ctrl + S)">
+                                    {saving ? 'Opslaan...' : isNew ? 'Template toevoegen' : 'Opslaan'}
+                                </Button>
+                            </div>
+                        </div>
 
-                <div className="space-y-6 lg:col-span-8">
-                    <form onSubmit={saveTemplate} className="space-y-6" noValidate>
-                        <Card>
-                            <CardHeader
-                                title={isNew ? 'Nieuwe template' : selectedTemplate?.name || 'Template'}
-                                description={isNew ? 'Vul een naam en onderwerp in en schrijf de inhoud.' : null}
-                                actions={dirty ? <Badge tone="warning">Niet opgeslagen</Badge> : null}
-                            />
+                        <div className="space-y-5 p-5 sm:p-6">
                             <div className="grid gap-4 sm:grid-cols-2">
-                                <Field id="email-template-name" label="Naam" required error={form.errors.name}>
+                                <Field id="email-template-name" label="Naam" hint="Alleen voor intern gebruik." required error={form.errors.name}>
                                     <input
                                         id="email-template-name"
                                         maxLength={120}
@@ -521,7 +599,7 @@ export default function Index({ templates = [], variables, urls, previewCustomer
                                         onChange={(e) => form.setData('name', e.target.value)}
                                     />
                                 </Field>
-                                <Field id="email-template-subject" label="Onderwerp" required error={form.errors.subject}>
+                                <Field id="email-template-subject" label="Onderwerp" hint="Velden werken hier ook." required error={form.errors.subject}>
                                     <input
                                         id="email-template-subject"
                                         ref={subjectInputRef}
@@ -537,161 +615,236 @@ export default function Index({ templates = [], variables, urls, previewCustomer
                                     />
                                 </Field>
                             </div>
-                            <div className="mt-4">
-                                <label htmlFor="email-template-active" className="inline-flex items-center gap-2 text-sm font-medium text-zinc-800">
+
+                            <div>
+                                <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                                    <span id="email-template-fields-label" className="label">
+                                        Velden invoegen
+                                    </span>
+                                    <span className="text-xs text-zinc-500">Klik om in te voegen op de cursor, in het onderwerp of de inhoud.</span>
+                                </div>
+                                {variableKeys.length === 0 ? (
+                                    <p className="text-sm text-zinc-500">Geen velden beschikbaar.</p>
+                                ) : (
+                                    <div className="flex flex-wrap gap-1.5" role="group" aria-labelledby="email-template-fields-label">
+                                        {variableKeys.map((token, index) => {
+                                            const recommended = index === 0 && token === 'activatielink';
+                                            const meta = variableMeta(token);
+                                            return (
+                                                <button
+                                                    key={token}
+                                                    type="button"
+                                                    onMouseDown={(event) => event.preventDefault()}
+                                                    onClick={() => insertVariable(token)}
+                                                    title={`{{ ${token} }} Voorbeeld: ${variables[token]}`}
+                                                    aria-label={`Veld ${meta.label} invoegen`}
+                                                    className={cx(
+                                                        'inline-flex h-8 items-center gap-1.5 rounded-full pl-2 pr-3 text-xs font-medium ring-1 ring-inset transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600',
+                                                        recommended ? 'bg-indigo-50 text-indigo-900 ring-indigo-200 hover:bg-indigo-100' : 'bg-white text-zinc-700 ring-zinc-200 hover:bg-zinc-50 hover:ring-zinc-300',
+                                                    )}
+                                                >
+                                                    <Icon name={meta.icon} className={cx('h-3.5 w-3.5', recommended ? 'text-indigo-600' : 'text-zinc-400')} />
+                                                    {meta.label}
+                                                    {recommended ? <span className="rounded-full bg-indigo-600 px-1.5 text-2xs font-semibold text-white">Aanbevolen</span> : null}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div>
+                                <span id="email-template-body-label" className="label mb-1.5">
+                                    Inhoud
+                                </span>
+                                <div className="overflow-hidden rounded-xl border border-zinc-300 shadow-sm transition-colors focus-within:border-indigo-600 focus-within:ring-1 focus-within:ring-indigo-600">
+                                    <div className="flex flex-wrap items-center gap-0.5 border-b border-zinc-200 bg-zinc-50/80 px-2 py-1.5" role="toolbar" aria-label="Opmaak">
+                                        <ToolbarButton title="Vet" active={editor?.isActive('bold')} disabled={!editor} onClick={() => editor?.chain().focus().toggleBold().run()}>
+                                            <span className="font-bold">B</span>
+                                        </ToolbarButton>
+                                        <ToolbarButton title="Cursief" active={editor?.isActive('italic')} disabled={!editor} onClick={() => editor?.chain().focus().toggleItalic().run()}>
+                                            <span className="font-serif italic">I</span>
+                                        </ToolbarButton>
+                                        <ToolbarDivider />
+                                        <ToolbarButton title="Opsomming" active={editor?.isActive('bulletList')} disabled={!editor} onClick={() => editor?.chain().focus().toggleBulletList().run()}>
+                                            <Icon name="list" className="h-4 w-4" />
+                                        </ToolbarButton>
+                                        <ToolbarButton title="Genummerde lijst" active={editor?.isActive('orderedList')} disabled={!editor} onClick={() => editor?.chain().focus().toggleOrderedList().run()}>
+                                            <span className="tabular-nums">1.</span>
+                                        </ToolbarButton>
+                                        <ToolbarButton title="Link" active={editor?.isActive('link')} disabled={!editor} onClick={setLink}>
+                                            <Icon name="link" className="h-4 w-4" />
+                                        </ToolbarButton>
+                                        <ToolbarDivider />
+                                        <ToolbarButton title="Opmaak wissen" disabled={!editor} onClick={() => editor?.chain().focus().clearNodes().unsetAllMarks().run()}>
+                                            Wissen
+                                        </ToolbarButton>
+                                        <span className="ml-auto flex items-center gap-0.5">
+                                            <ToolbarButton title="Ongedaan maken" disabled={!editor || !editor.can().undo()} onClick={() => editor?.chain().focus().undo().run()}>
+                                                Ongedaan
+                                            </ToolbarButton>
+                                            <ToolbarButton title="Opnieuw" disabled={!editor || !editor.can().redo()} onClick={() => editor?.chain().focus().redo().run()}>
+                                                Opnieuw
+                                            </ToolbarButton>
+                                        </span>
+                                    </div>
+                                    <EditorContent editor={editor} className="bg-white px-4 py-3 text-sm leading-6 text-zinc-900 [&_.tiptap]:min-h-[240px]" />
+                                </div>
+                                {form.errors.body_html ? (
+                                    <p className="field-error" role="alert">
+                                        {form.errors.body_html}
+                                    </p>
+                                ) : null}
+                            </div>
+
+                            <div className="rounded-xl bg-zinc-50 p-3.5">
+                                <label htmlFor="email-template-active" className="flex items-start gap-3 text-sm">
                                     <input
                                         id="email-template-active"
                                         name="is_active"
                                         type="checkbox"
-                                        className="rounded border-zinc-300 text-indigo-600 focus-visible:ring-indigo-600"
+                                        className="checkbox mt-0.5"
                                         checked={!!form.data.is_active}
                                         onChange={(e) => form.setData('is_active', e.target.checked ? 1 : 0)}
                                     />
-                                    Actief
+                                    <span>
+                                        <span className="font-medium text-zinc-900">Actief</span>
+                                        <span className="block text-xs text-zinc-500">Alleen actieve templates kun je kiezen bij het versturen.</span>
+                                    </span>
                                 </label>
-                                {selectedTemplate?.is_system && !form.data.is_active ? (
-                                    <p className="mt-1 text-xs text-amber-800">
-                                        Dit is een standaardtemplate. Na opslaan als inactief wordt deze uit de lijst verborgen.
+                                {selectedTemplate?.is_system && !form.data.is_active ? <p className="mt-2 text-xs text-amber-800">Dit is een standaardtemplate. Na opslaan als inactief wordt deze uit de lijst verborgen.</p> : null}
+                                {form.errors.is_active ? (
+                                    <p className="field-error" role="alert">
+                                        {form.errors.is_active}
                                     </p>
                                 ) : null}
-                                {form.errors.is_active ? <p className="mt-1 text-xs font-medium text-rose-700" role="alert">{form.errors.is_active}</p> : null}
                             </div>
-                        </Card>
-
-                        <Card>
-                            <h2 id="email-template-body-label" className="mb-3 text-base font-semibold text-zinc-900">
-                                Inhoud
-                            </h2>
-                            <div className="overflow-hidden rounded-lg border border-zinc-300 shadow-sm focus-within:border-indigo-600 focus-within:ring-1 focus-within:ring-indigo-600">
-                                <div className="flex flex-wrap items-center gap-0.5 border-b border-zinc-200 bg-zinc-50 px-2 py-1.5" role="toolbar" aria-label="Opmaak">
-                                    <ToolbarButton title="Vet" active={editor?.isActive('bold')} disabled={!editor} onClick={() => editor?.chain().focus().toggleBold().run()}>
-                                        Vet
-                                    </ToolbarButton>
-                                    <ToolbarButton title="Cursief" active={editor?.isActive('italic')} disabled={!editor} onClick={() => editor?.chain().focus().toggleItalic().run()}>
-                                        Cursief
-                                    </ToolbarButton>
-                                    <ToolbarDivider />
-                                    <ToolbarButton title="Opsomming" active={editor?.isActive('bulletList')} disabled={!editor} onClick={() => editor?.chain().focus().toggleBulletList().run()}>
-                                        Lijst
-                                    </ToolbarButton>
-                                    <ToolbarButton title="Genummerde lijst" active={editor?.isActive('orderedList')} disabled={!editor} onClick={() => editor?.chain().focus().toggleOrderedList().run()}>
-                                        Nummering
-                                    </ToolbarButton>
-                                    <ToolbarButton title="Link" active={editor?.isActive('link')} disabled={!editor} onClick={setLink}>
-                                        Link
-                                    </ToolbarButton>
-                                    <ToolbarDivider />
-                                    <ToolbarButton title="Opmaak wissen" disabled={!editor} onClick={() => editor?.chain().focus().clearNodes().unsetAllMarks().run()}>
-                                        Wissen
-                                    </ToolbarButton>
-                                    <ToolbarButton title="Ongedaan maken" disabled={!editor || !editor.can().undo()} onClick={() => editor?.chain().focus().undo().run()}>
-                                        Ongedaan
-                                    </ToolbarButton>
-                                    <ToolbarButton title="Opnieuw" disabled={!editor || !editor.can().redo()} onClick={() => editor?.chain().focus().redo().run()}>
-                                        Opnieuw
-                                    </ToolbarButton>
-                                </div>
-                                <EditorContent editor={editor} className="bg-white px-3 py-2.5 text-sm text-zinc-900 [&_.tiptap]:min-h-[220px]" />
-                            </div>
-                            {form.errors.body_html ? <p className="mt-1 text-xs font-medium text-rose-700" role="alert">{form.errors.body_html}</p> : null}
-                        </Card>
-
-                        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="flex flex-wrap items-center gap-3">
-                                {!isNew && selectedTemplate ? (
-                                    <Button variant="danger-ghost" onClick={deleteTemplate} disabled={isProtected || saving} loading={deleting}>
-                                        {deleting ? 'Verwijderen...' : 'Verwijderen'}
-                                    </Button>
-                                ) : null}
-                                {isProtected ? <p className="text-xs text-zinc-500">Standaard templates kun je niet verwijderen zolang ze actief zijn.</p> : null}
-                            </div>
-                            <Button type="submit" loading={saving} disabled={deleting}>
-                                {saving ? 'Opslaan...' : isNew ? 'Template toevoegen' : 'Opslaan'}
-                            </Button>
                         </div>
                     </form>
 
-                    <Card aria-labelledby="email-template-preview-title">
-                        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-                            <div className="min-w-0">
-                                <h2 id="email-template-preview-title" className="text-base font-semibold text-zinc-900">
-                                    Voorbeeld met klantgegevens
-                                </h2>
-                                <p className="mt-0.5 text-sm text-zinc-500">
-                                    Gebruikt de huidige inhoud, ook als die nog niet is opgeslagen. Er wordt niets verstuurd of opgeslagen.
-                                </p>
+                    <section className="card" aria-labelledby="email-template-preview-title">
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-5 py-4 sm:px-6">
+                            <div className="flex min-w-0 items-center gap-3">
+                                <IconTile icon="eye" tone="info" size="sm" />
+                                <div className="min-w-0">
+                                    <h2 id="email-template-preview-title" className="section-heading">
+                                        Voorbeeld
+                                    </h2>
+                                    <p className="text-sm text-zinc-500">Er wordt niets verstuurd of opgeslagen.</p>
+                                </div>
+                            </div>
+                            <div className="inline-flex rounded-xl bg-zinc-100 p-1" role="group" aria-label="Gegevens voor het voorbeeld">
+                                {[
+                                    ['sample', 'Voorbeeldgegevens', 'sparkles'],
+                                    ['customer', 'Echte klant', 'building'],
+                                ].map(([mode, label, icon]) => (
+                                    <button
+                                        key={mode}
+                                        type="button"
+                                        aria-pressed={previewMode === mode}
+                                        onClick={() => setPreviewMode(mode)}
+                                        className={cx(
+                                            'inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600',
+                                            previewMode === mode ? 'bg-white text-zinc-900 shadow-card ring-1 ring-black/5' : 'text-zinc-600 hover:text-zinc-900',
+                                        )}
+                                    >
+                                        <Icon name={icon} className={cx('h-3.5 w-3.5', previewMode === mode ? 'text-indigo-600' : 'text-zinc-400')} />
+                                        {label}
+                                    </button>
+                                ))}
                             </div>
                         </div>
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                            <Field id="email-template-preview-customer" label="Klant" className="sm:w-80">
-                                <select
-                                    id="email-template-preview-customer"
-                                    className={inputClasses}
-                                    value={previewCompanyId}
-                                    onChange={(e) => {
-                                        const value = e.target.value;
-                                        setPreviewCompanyId(value);
-                                        if (value) {
-                                            loadPreview(value);
-                                        } else {
-                                            previewSeqRef.current += 1;
-                                            setPreview(null);
-                                            setPreviewError('');
-                                            setPreviewLoading(false);
-                                        }
-                                    }}
-                                >
-                                    <option value="">Kies een klant</option>
-                                    {previewCustomers.map((customer) => (
-                                        <option key={customer.id} value={customer.id}>
-                                            {customer.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </Field>
-                            <Button variant="secondary" disabled={!previewCompanyId} loading={previewLoading} onClick={() => loadPreview()}>
-                                {previewLoading ? 'Laden...' : 'Voorbeeld vernieuwen'}
-                            </Button>
-                        </div>
 
-                        {previewError ? (
-                            <div role="alert" className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
-                                {previewError}
-                            </div>
-                        ) : null}
+                        <div className="p-5 sm:p-6">
+                            {!showLive ? (
+                                <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end">
+                                    <Field id="email-template-preview-customer" label="Klant" className="sm:w-80">
+                                        <select
+                                            id="email-template-preview-customer"
+                                            className={inputClasses}
+                                            value={previewCompanyId}
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                setPreviewCompanyId(value);
+                                                if (value) {
+                                                    loadPreview(value);
+                                                } else {
+                                                    previewSeqRef.current += 1;
+                                                    setPreview(null);
+                                                    setPreviewError('');
+                                                    setPreviewLoading(false);
+                                                }
+                                            }}
+                                        >
+                                            <option value="">Kies een klant</option>
+                                            {previewCustomers.map((customer) => (
+                                                <option key={customer.id} value={customer.id}>
+                                                    {customer.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </Field>
+                                    <Button variant="secondary" icon="refresh" disabled={!previewCompanyId} loading={previewLoading} onClick={() => loadPreview()}>
+                                        {previewLoading ? 'Laden...' : 'Voorbeeld vernieuwen'}
+                                    </Button>
+                                </div>
+                            ) : null}
 
-                        {preview ? (
-                            <div className={cx('mt-4 overflow-hidden rounded-lg border border-zinc-200', previewLoading && 'opacity-60')}>
-                                {previewOutdated ? (
-                                    <div className="border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900" role="status">
-                                        De inhoud is gewijzigd. Klik op Voorbeeld vernieuwen voor de laatste versie.
+                            {!showLive && previewError ? (
+                                <div role="alert" className="mb-4 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+                                    <Icon name="alert-circle" className="mt-0.5 h-4 w-4 shrink-0" />
+                                    {previewError}
+                                </div>
+                            ) : null}
+
+                            {showLive || preview ? (
+                                <div className={cx('overflow-hidden rounded-2xl border border-hairline bg-white shadow-card', !showLive && previewLoading && 'opacity-60')}>
+                                    {!showLive && previewOutdated ? (
+                                        <div className="flex items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-900" role="status">
+                                            <span>De inhoud is gewijzigd sinds dit voorbeeld.</span>
+                                            <button type="button" className="shrink-0 rounded font-semibold underline underline-offset-2 focus-ring" onClick={() => loadPreview()}>
+                                                Vernieuwen
+                                            </button>
+                                        </div>
+                                    ) : null}
+                                    <div className="flex items-start gap-3 border-b border-zinc-100 px-4 py-3.5">
+                                        <Avatar name="Kivii" size="md" />
+                                        <div className="min-w-0 flex-1">
+                                            <div className="truncate text-base font-semibold text-zinc-900">{(showLive ? liveSubject : preview?.subject) || 'Geen onderwerp'}</div>
+                                            <dl className="mt-0.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-zinc-500">
+                                                <div className="flex gap-1">
+                                                    <dt>Van:</dt>
+                                                    <dd className="font-medium text-zinc-700">Kivii</dd>
+                                                </div>
+                                                <div className="flex min-w-0 gap-1">
+                                                    <dt>Aan:</dt>
+                                                    <dd className="min-w-0 truncate font-medium text-zinc-700">{showLive ? variables?.naam || 'Voorbeeldklant' : preview?.to || '-'}</dd>
+                                                </div>
+                                            </dl>
+                                        </div>
+                                        {showLive ? (
+                                            <Badge tone="info" icon="sparkles">
+                                                Live
+                                            </Badge>
+                                        ) : null}
                                     </div>
-                                ) : null}
-                                <dl className="space-y-1 border-b border-zinc-100 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
-                                    <div className="flex gap-1">
-                                        <dt className="font-semibold text-zinc-700">Aan:</dt>
-                                        <dd className="min-w-0 truncate">{preview.to || '-'}</dd>
-                                    </div>
-                                    <div className="flex gap-1">
-                                        <dt className="font-semibold text-zinc-700">Onderwerp:</dt>
-                                        <dd className="min-w-0">{preview.subject || '-'}</dd>
-                                    </div>
-                                </dl>
-                                <iframe
-                                    title="Voorbeeld van de e-mail"
-                                    sandbox=""
-                                    className="h-96 w-full bg-white"
-                                    srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:system-ui,sans-serif;font-size:14px;line-height:1.6;color:#18181b;margin:16px;}a{color:#4f46e5;}</style></head><body>${preview.html || ''}</body></html>`}
+                                    <iframe
+                                        title="Voorbeeld van de e-mail"
+                                        sandbox=""
+                                        className="h-80 w-full bg-white"
+                                        srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:system-ui,sans-serif;font-size:14px;line-height:1.6;color:#18181b;margin:16px 20px;}a{color:#667319;}</style></head><body>${frameHtml}</body></html>`}
+                                    />
+                                </div>
+                            ) : !previewError ? (
+                                <EmptyState
+                                    compact
+                                    illustration="search"
+                                    title={previewLoading ? 'Voorbeeld laden...' : 'Kies een klant'}
+                                    description={previewLoading ? null : previewCustomers.length === 0 ? 'Er zijn nog geen klanten om een voorbeeld mee te tonen.' : 'Zie hoe de e-mail eruitziet met de gegevens van een echte klant.'}
                                 />
-                            </div>
-                        ) : !previewError ? (
-                            <EmptyState
-                                className="mt-4 py-8"
-                                title={previewLoading ? 'Voorbeeld laden...' : 'Nog geen voorbeeld'}
-                                description={previewLoading ? null : previewCustomers.length === 0 ? 'Er zijn nog geen klanten om een voorbeeld mee te tonen.' : 'Kies een klant om te zien hoe de e-mail eruitziet.'}
-                            />
-                        ) : null}
-                    </Card>
+                            ) : null}
+                        </div>
+                    </section>
                 </div>
             </div>
         </div>

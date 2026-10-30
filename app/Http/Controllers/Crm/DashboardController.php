@@ -39,12 +39,23 @@ class DashboardController
             ->whereBetween('opgezegd_op', [$last30Start, $now])
             ->count();
 
+        // Vorige periode van 30 dagen (dag 30 t/m 59 geleden) voor de trendpijltjes.
+        $prev30Start = $last30Start->subDays(30);
+        $prev30End = $last30Start->subSecond();
+        $countPrev = fn (string $column) => GarageCompany::query()->whereBetween($column, [$prev30Start, $prev30End])->count();
+        $leadsPrev30 = $countPrev('created_at');
+        $activeNewPrev30 = $countPrev('actief_vanaf');
+        $cancelledPrev30 = $countPrev('opgezegd_op');
+
         // Zelfde berekening als Rapportages en klantenlijst (alleen status Actief).
         $mrr = RevenueCalculator::mrr();
         $mrrExcl = $mrr['excl'];
         $mrrBtw = $mrr['btw'];
         $mrrIncl = $mrr['incl'];
         $demoPipeline = RevenueCalculator::demoPipeline();
+        // MRR aan het eind van vorige maand (zelfde benadering als de grafiek in Rapportages).
+        $mrrHistory = RevenueCalculator::mrrHistory(2);
+        $mrrPrevMonth = count($mrrHistory) === 2 ? (float) $mrrHistory[0]['excl'] : null;
 
         $openTaskStatuses = fn ($q) => $q->where('status', '!=', TaskStatus::Afgerond);
         $customerTaskTypes = [ActivityType::Taak->value, ActivityType::Afspraak->value];
@@ -68,6 +79,12 @@ class DashboardController
             + $openCustomerActivities()->whereBetween('due_at', [$now, $now->addDays(7)->endOfDay()])->count();
 
         $userId = auth()->id();
+        $withCustomer = Task::supportsCustomer();
+        $taskCustomer = fn (Task $task) => $withCustomer && $task->garageCompany ? [
+            'id' => $task->garageCompany->id,
+            'bedrijfsnaam' => $task->garageCompany->bedrijfsnaam,
+            'url' => route('crm.garage_companies.show', ['garageCompany' => $task->garageCompany->id]),
+        ] : null;
         $todayEnd = $now->endOfDay();
 
         $myTasksToday = $openTaskStatuses(Task::query())
@@ -81,7 +98,8 @@ class DashboardController
             ->where('deadline', '<=', $todayEnd)
             ->orderBy('deadline')
             ->limit(20)
-            ->get(['id', 'titel', 'deadline', 'prioriteit'])
+            ->when($withCustomer, fn ($q) => $q->with('garageCompany:id,bedrijfsnaam'))
+            ->get($withCustomer ? ['id', 'titel', 'deadline', 'prioriteit', 'garage_company_id'] : ['id', 'titel', 'deadline', 'prioriteit'])
             ->map(fn (Task $task) => [
                 'id' => $task->id,
                 'titel' => $task->titel,
@@ -90,6 +108,7 @@ class DashboardController
                 'overdue' => $task->deadline !== null && $task->deadline->lt($now),
                 'prioriteit' => $task->prioriteit?->value,
                 'url' => route('crm.tasks.show', ['task' => $task->id]),
+                'garage_company' => $taskCustomer($task),
             ])
             ->values();
 
@@ -118,6 +137,8 @@ class DashboardController
             ->take(20)
             ->map(function (GarageCompany $company) use ($now) {
                 $end = CarbonImmutable::parse($company->effectiveDemoEnd())->setTimezone('Europe/Amsterdam')->startOfDay();
+                $startRaw = $company->proefperiode_start ?? $company->demo_aangevraagd_op;
+                $start = $startRaw ? CarbonImmutable::parse($startRaw)->setTimezone('Europe/Amsterdam')->startOfDay() : null;
 
                 return [
                     'id' => $company->id,
@@ -125,17 +146,26 @@ class DashboardController
                     'demo_eind_op' => $end->toDateString(),
                     'demo_eind_berekend' => $company->demoEndIsComputed(),
                     'days_left' => (int) $now->startOfDay()->diffInDays($end, false),
+                    'demo_start_op' => $start?->toDateString(),
+                    'total_days' => $start ? max(1, (int) $start->diffInDays($end, false)) : null,
                     'url' => route('crm.garage_companies.show', ['garageCompany' => $company->id, 'tab' => 'demo_status']),
+                    'contact_url' => route('crm.garage_companies.show', ['garageCompany' => $company->id, 'tab' => 'contact']),
+                    'activity_url' => route('crm.garage_companies.show', ['garageCompany' => $company->id, 'tab' => 'activiteit']),
                 ];
             })
             ->values();
 
+        $taskColumns = ['id', 'task_project_id', 'titel', 'status', 'prioriteit', 'deadline'];
+        if ($withCustomer) {
+            $taskColumns[] = 'garage_company_id';
+        }
+
         $taskItems = Task::query()
-            ->with(['project:id,naam'])
+            ->with($withCustomer ? ['project:id,naam', 'garageCompany:id,bedrijfsnaam'] : ['project:id,naam'])
             ->where('status', '!=', TaskStatus::Afgerond)
             ->orderByRaw('case when deadline is null then 1 else 0 end, deadline asc')
             ->limit(12)
-            ->get(['id', 'task_project_id', 'titel', 'status', 'prioriteit', 'deadline'])
+            ->get($taskColumns)
             ->map(fn (Task $task) => [
                 'id' => $task->id,
                 'titel' => $task->titel,
@@ -148,6 +178,7 @@ class DashboardController
                     'id' => $task->project->id,
                     'naam' => $task->project->naam,
                 ] : null,
+                'garage_company' => $taskCustomer($task),
             ])
             ->values();
 
@@ -239,6 +270,30 @@ class DashboardController
 
         $activeSepaIssues = SepaChecklist::activeCompaniesWithIssues();
 
+        // Laatste tijdlijnregels over alle klanten heen (alleen-lezen feed).
+        $recentActivity = Activity::query()
+            ->with(['garageCompany:id,bedrijfsnaam', 'creator:id,name'])
+            ->whereHas('garageCompany')
+            ->latest()
+            ->latest('id')
+            ->limit(10)
+            ->get(['id', 'garage_company_id', 'type', 'titel', 'created_at', 'due_at', 'done_at', 'created_by'])
+            ->map(fn (Activity $activity) => [
+                'id' => $activity->id,
+                'type' => $activity->type?->value,
+                'titel' => $activity->titel,
+                'created_at' => $activity->created_at?->toIso8601String(),
+                'due_at' => $activity->due_at?->toIso8601String(),
+                'done' => $activity->done_at !== null,
+                'creator' => $activity->creator?->name,
+                'garage_company' => [
+                    'id' => $activity->garageCompany->id,
+                    'bedrijfsnaam' => $activity->garageCompany->bedrijfsnaam,
+                    'url' => route('crm.garage_companies.show', ['garageCompany' => $activity->garageCompany->id, 'tab' => 'timeline']),
+                ],
+            ])
+            ->values();
+
         return Inertia::render('Crm/Dashboard', [
             'kpis' => [
                 'companies_total' => $companiesTotal,
@@ -248,6 +303,10 @@ class DashboardController
                 'active_new_last_30' => $activeNewLast30,
                 'demo_requested_last_30' => $demoRequestedLast30,
                 'cancelled_last_30' => $cancelledLast30,
+                'leads_prev_30' => $leadsPrev30,
+                'active_new_prev_30' => $activeNewPrev30,
+                'cancelled_prev_30' => $cancelledPrev30,
+                'mrr_prev_month' => $mrrPrevMonth,
                 'mrr_excl' => $mrrExcl,
                 'mrr_btw' => $mrrBtw,
                 'mrr_incl' => $mrrIncl,
@@ -284,6 +343,7 @@ class DashboardController
                     'customer' => $customerToday,
                 ],
                 'demo_ending' => $demoEnding,
+                'recent_activity' => $recentActivity,
             ],
             'urls' => [
                 'tasks' => route('crm.tasks.index'),
@@ -292,6 +352,8 @@ class DashboardController
             ],
             'meta' => [
                 'generated_at' => $now->format('d-m-Y H:i'),
+                'hour' => (int) $now->format('G'),
+                'today' => $now->toDateString(),
             ],
         ]);
     }

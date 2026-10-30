@@ -1,5 +1,6 @@
 import React from 'react';
-import { Badge, Button, Card, CardHeader, EmptyState, cx } from '../../../../components/ui';
+import { Icon } from '../../../../components/icons';
+import { ActivityItem, ActivityList, Avatar, Badge, Button, Card, CardHeader, EmptyState, IconTile, cx } from '../../../../components/ui';
 import { isNoopStatusChange, translateStatusText } from '../../../../components/StatusBadge';
 import {
     ACTIVITY_TYPE_LABELS,
@@ -9,8 +10,12 @@ import {
     FormField,
     Pagination,
     TIMELINE_FILTERS,
+    activityTypeLabel,
+    activityVisual,
     dateShortcut,
+    dayLabel,
     formatDateTime,
+    formatTime,
     isOverdue,
     matchesTimelineFilter,
 } from './showUtils';
@@ -83,32 +88,45 @@ function TaskForm({ form, onSubmit, reminderChannels }) {
     );
 }
 
-function OpenList({ title, items, emptyText, onDone, busyId }) {
+function OpenList({ title, icon, tone, items, emptyText, onDone, busyId }) {
     return (
         <div>
-            <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-zinc-900">
-                {title} <Badge>{items.length}</Badge>
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-900">
+                <Icon name={icon} className="h-4 w-4 text-zinc-400" />
+                {title}
+                <span className="rounded-full bg-zinc-100 px-1.5 text-2xs font-semibold tabular-nums text-zinc-600">{items.length}</span>
             </h3>
             {items.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-zinc-200 px-4 py-4 text-sm text-zinc-500">{emptyText}</p>
+                <p className="rounded-xl border border-dashed border-zinc-200 px-4 py-4 text-sm text-zinc-500">{emptyText}</p>
             ) : (
-                <ul className="divide-y divide-zinc-100 rounded-lg border border-zinc-200">
+                <ul className="space-y-2">
                     {items.map((item) => {
                         const overdue = isOverdue(item.due_at);
                         return (
-                            <li key={item.id} className="flex items-start justify-between gap-3 px-4 py-3">
-                                <div className="min-w-0">
-                                    <p className="break-words text-sm font-semibold text-zinc-900">{item.titel}</p>
-                                    {item.inhoud && <p className="mt-0.5 whitespace-pre-line break-words text-sm text-zinc-600">{item.inhoud}</p>}
-                                    <p className={cx('mt-1 flex flex-wrap items-center gap-2 text-xs', overdue ? 'text-rose-700' : 'text-zinc-500')}>
-                                        {item.due_at ? `Planning: ${formatDateTime(item.due_at)}` : 'Geen planning'}
-                                        {overdue && <Badge tone="danger">Te laat</Badge>}
-                                    </p>
+                            <li
+                                key={item.id}
+                                className={cx(
+                                    'flex flex-col gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:items-start sm:justify-between',
+                                    overdue ? 'border-rose-200 bg-rose-50/40' : 'border-zinc-200 bg-white'
+                                )}
+                            >
+                                <div className="flex min-w-0 items-start gap-3">
+                                    <IconTile icon={icon} tone={overdue ? 'danger' : tone} size="sm" />
+                                    <div className="min-w-0">
+                                        <p className="break-words text-sm font-semibold text-zinc-900">{item.titel}</p>
+                                        {item.inhoud && <p className="mt-0.5 whitespace-pre-line break-words text-sm text-zinc-600">{item.inhoud}</p>}
+                                        <p className={cx('mt-1 flex flex-wrap items-center gap-2 text-xs', overdue ? 'text-rose-700' : 'text-zinc-500')}>
+                                            <Icon name="clock" className="h-3.5 w-3.5" />
+                                            {item.due_at ? `Planning: ${formatDateTime(item.due_at)}` : 'Geen planning'}
+                                            {overdue && <Badge tone="danger">Te laat</Badge>}
+                                        </p>
+                                    </div>
                                 </div>
                                 <Button
                                     variant="secondary"
                                     size="sm"
-                                    className="shrink-0"
+                                    icon="check"
+                                    className="shrink-0 self-start"
                                     loading={busyId === item.id}
                                     disabled={busyId !== null && busyId !== undefined}
                                     onClick={() => onDone(item.id)}
@@ -142,14 +160,26 @@ function NoteForm({ form, onSubmit }) {
     );
 }
 
+function groupByDay(items) {
+    const groups = [];
+    items.forEach((activity) => {
+        const label = dayLabel(activity.created_at);
+        const last = groups[groups.length - 1];
+        if (last && last.label === label) last.items.push(activity);
+        else groups.push({ label, items: [activity] });
+    });
+    return groups;
+}
+
 function Timeline({ activities, filter, setFilter, statusLabels }) {
     const all = (activities?.data || []).filter((activity) => !isNoopStatusChange(activity, statusLabels));
     const filtered = all.filter((activity) => matchesTimelineFilter(activity, filter));
+    const groups = groupByDay(filtered);
 
     return (
         <Card>
-            <CardHeader title="Tijdlijn" description="Alle activiteit rond deze klant, nieuwste eerst." />
-            <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Filter tijdlijn">
+            <CardHeader icon="activity" title="Tijdlijn" description="Alle activiteit rond deze klant, nieuwste eerst." />
+            <div className="mb-6 flex flex-wrap gap-1.5" role="group" aria-label="Filter tijdlijn">
                 {TIMELINE_FILTERS.map((item) => {
                     const count = item.key === 'alles' ? all.length : all.filter((activity) => matchesTimelineFilter(activity, item.key)).length;
                     const active = filter === item.key;
@@ -160,8 +190,8 @@ function Timeline({ activities, filter, setFilter, statusLabels }) {
                             aria-pressed={active}
                             onClick={() => setFilter(item.key)}
                             className={cx(
-                                'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors',
-                                active ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
+                                'inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold ring-1 ring-inset transition-colors focus-ring',
+                                active ? 'bg-zinc-900 text-white ring-zinc-900' : 'bg-white text-zinc-700 ring-zinc-200 hover:bg-zinc-50'
                             )}
                         >
                             {item.label}
@@ -173,34 +203,52 @@ function Timeline({ activities, filter, setFilter, statusLabels }) {
 
             {filtered.length === 0 ? (
                 <EmptyState
+                    compact
+                    illustration={all.length === 0 ? 'inbox' : 'search'}
                     title={all.length === 0 ? 'Nog geen activiteiten' : 'Niets gevonden'}
                     description={all.length === 0 ? 'Notities, statuswijzigingen en verstuurde mails verschijnen hier.' : 'Geen activiteiten van dit type op deze pagina.'}
                 />
             ) : (
-                <ol className="relative space-y-4 border-l border-zinc-200 pl-5">
-                    {filtered.map((activity) => (
-                        <li key={activity.id} className="relative">
-                            <span className="absolute -left-[1.6rem] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-zinc-400 ring-1 ring-zinc-200" aria-hidden="true" />
-                            <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-                                <p className="min-w-0 break-words text-sm font-semibold text-zinc-900">
-                                    {activity.type === 'status_wijziging' ? translateStatusText(activity.titel, statusLabels) : activity.titel}
-                                </p>
-                                {activity.creator && <p className="text-xs font-medium text-zinc-500">{activity.creator.name}</p>}
-                            </div>
-                            <p className="mt-0.5 text-xs text-zinc-500">
-                                {activity.type ? ACTIVITY_TYPE_LABELS[activity.type] || activity.type.replace(/_/g, ' ') : 'Activiteit'} · {formatDateTime(activity.created_at)}
-                            </p>
-                            {activity.inhoud && <p className="mt-2 whitespace-pre-line break-words text-sm text-zinc-700">{activity.inhoud}</p>}
-                            {(activity.due_at || activity.done_at) && (
-                                <p className="mt-2 text-xs text-zinc-500">
-                                    {activity.due_at && `Gepland: ${formatDateTime(activity.due_at)}`}
-                                    {activity.due_at && activity.done_at ? ' · ' : ''}
-                                    {activity.done_at && `Afgerond: ${formatDateTime(activity.done_at)}`}
-                                </p>
-                            )}
-                        </li>
+                <div className="space-y-6">
+                    {groups.map((group) => (
+                        <section key={group.label} aria-label={group.label}>
+                            <h3 className="mb-3 text-xs font-semibold text-zinc-500 first-letter:uppercase">{group.label}</h3>
+                            <ActivityList>
+                                {group.items.map((activity) => {
+                                    const visual = activityVisual(activity);
+                                    const title = activity.type === 'status_wijziging' ? translateStatusText(activity.titel, statusLabels) : activity.titel;
+                                    const meta = (
+                                        <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+                                            <span>{activityTypeLabel(activity)}</span>
+                                            {activity.creator ? (
+                                                <span className="inline-flex items-center gap-1">
+                                                    <Avatar name={activity.creator.name} size="xs" className="h-4 w-4 text-[8px]" />
+                                                    {activity.creator.name}
+                                                </span>
+                                            ) : null}
+                                            {activity.due_at ? <span>Gepland: {formatDateTime(activity.due_at)}</span> : null}
+                                            {activity.done_at ? <span className="text-emerald-700">Afgerond: {formatDateTime(activity.done_at)}</span> : null}
+                                        </span>
+                                    );
+                                    return (
+                                        <ActivityItem
+                                            key={activity.id}
+                                            icon={visual.icon}
+                                            tone={visual.tone}
+                                            title={<span className="break-words font-semibold text-zinc-900">{title}</span>}
+                                            meta={meta}
+                                            time={<time dateTime={activity.created_at} title={formatDateTime(activity.created_at)}>{formatTime(activity.created_at)}</time>}
+                                        >
+                                            {activity.inhoud ? (
+                                                <p className="whitespace-pre-line break-words rounded-xl bg-zinc-50 px-3 py-2 text-sm text-zinc-700">{activity.inhoud}</p>
+                                            ) : null}
+                                        </ActivityItem>
+                                    );
+                                })}
+                            </ActivityList>
+                        </section>
                     ))}
-                </ol>
+                </div>
             )}
 
             <Pagination links={activities?.links} lastPage={activities?.last_page} tabKey="activiteit" />
@@ -231,10 +279,10 @@ export default function ActivityTab({
                         <TaskForm form={taskForm} onSubmit={onSubmitTask} reminderChannels={reminderChannels} />
                     </div>
                     <Card className="min-w-0 lg:col-span-2">
-                        <CardHeader title="Open klantafspraken" description="Rond een taak of afspraak af zodra die gedaan is." />
+                        <CardHeader icon="check-square" title="Open klantafspraken" description="Rond een taak of afspraak af zodra die gedaan is." />
                         <div className="space-y-6">
-                            <OpenList title="Taken" items={tasks} emptyText="Geen open taken." onDone={onMarkDone} busyId={doneBusyId} />
-                            <OpenList title="Afspraken" items={appointments} emptyText="Geen open afspraken." onDone={onMarkDone} busyId={doneBusyId} />
+                            <OpenList title="Taken" icon="check-square" tone="warning" items={tasks} emptyText="Geen open taken." onDone={onMarkDone} busyId={doneBusyId} />
+                            <OpenList title="Afspraken" icon="calendar" tone="info" items={appointments} emptyText="Geen open afspraken." onDone={onMarkDone} busyId={doneBusyId} />
                         </div>
                     </Card>
                 </div>

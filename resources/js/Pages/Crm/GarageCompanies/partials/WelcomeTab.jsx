@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { EditorContent } from '@tiptap/react';
-import { Badge, Button, Card, Field, cx } from '../../../../components/ui';
+import { Badge, Button, Card, Field, IconTile, cx } from '../../../../components/ui';
 import { CURRENT_DRAFT, FormField, Notice, ToolbarButton, WELCOME_STATUS_LABELS, WELCOME_STATUS_TONES, formatDateTime } from './showUtils';
 
 const TOKENS = ['{{ naam }}', '{{ bedrijfsnaam }}', '{{ loginnaam }}', '{{ activatielink }}', '{{ reset_link }}', '{{ weblink }}'];
@@ -205,26 +205,29 @@ export default function WelcomeTab({
 
             <Card>
                 <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="min-w-0">
+                    <div className="flex min-w-0 items-start gap-3">
+                        <IconTile icon="mail" size="sm" />
+                        <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                            <h2 className="text-base font-semibold text-zinc-900">Welkomstmail</h2>
+                            <h2 className="section-heading">Welkomstmail</h2>
                             {welcomeEmail && <Badge tone={WELCOME_STATUS_TONES[status] || 'neutral'}>{WELCOME_STATUS_LABELS[status] || status}</Badge>}
                             {form.isDirty && <Badge tone="warning">Niet opgeslagen</Badge>}
                         </div>
                         <p className="mt-0.5 text-sm text-zinc-500">Concept op basis van een template. Controleer, pas aan en verstuur handmatig.</p>
                         {welcomeEmail?.sent_at && <p className="mt-1 text-xs text-zinc-500">Laatst verstuurd: {formatDateTime(welcomeEmail.sent_at)}</p>}
+                        </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        <Button variant="ghost" size="sm" onClick={onRefresh} disabled={!welcomeEmail || sending}>
+                        <Button variant="ghost" size="sm" icon="refresh" onClick={onRefresh} disabled={!welcomeEmail || sending}>
                             Concept vernieuwen
                         </Button>
-                        <Button variant="secondary" size="sm" onClick={() => onOpenPicker(false)} disabled={!welcomeEmail || !templates.length || sending}>
+                        <Button variant="secondary" size="sm" icon="layers" onClick={() => onOpenPicker(false)} disabled={!welcomeEmail || !templates.length || sending}>
                             Template kiezen
                         </Button>
                         <Button variant="secondary" size="sm" onClick={onSave} disabled={!welcomeEmail || sending} loading={form.processing}>
                             Concept opslaan
                         </Button>
-                        <Button size="sm" onClick={() => onOpenPicker(true)} disabled={!welcomeEmail || sending} loading={sending}>
+                        <Button size="sm" icon="mail" onClick={() => onOpenPicker(true)} disabled={!welcomeEmail || sending} loading={sending}>
                             {sending ? 'Versturen...' : welcomeEmailSent ? 'Opnieuw versturen' : 'Verstuur welkomstmail'}
                         </Button>
                     </div>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Icon } from '../../../../components/icons';
 
 // IBAN in groepen van 4, hoofdletters (alleen weergave, opgeslagen waarde blijft ongewijzigd).
 export function formatIban(value) {
@@ -53,9 +54,11 @@ export default function CopyButton({ value, label = 'Kopieer' }) {
                 type="button"
                 onClick={onClick}
                 aria-label={`${label}: ${value}`}
-                className="ml-2 inline-flex items-center rounded border border-zinc-200 bg-white px-1.5 py-0.5 text-[11px] font-semibold text-zinc-600 hover:bg-zinc-50"
+                title={label}
+                className="ml-1.5 inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 focus-ring"
             >
-                Kopieer
+                <Icon name={toast?.ok ? 'check' : 'copy'} className={`h-3.5 w-3.5 ${toast?.ok ? 'text-emerald-600' : ''}`} />
+                <span className="font-sans">{toast?.ok ? 'Gekopieerd' : 'Kopieer'}</span>
             </button>
             {toast && (
                 <span

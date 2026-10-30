@@ -1,15 +1,16 @@
 import React from 'react';
-import { Badge, Button, Card, CardHeader, EmptyState, cx } from '../../../../components/ui';
-import { CheckboxField, FormActions, FormField, formatDate, roleLabel } from './showUtils';
+import { Icon } from '../../../../components/icons';
+import { Avatar, Badge, Button, Card, CardHeader, EmptyState, cx } from '../../../../components/ui';
+import { CheckboxField, FormActions, FormField, formatDate, roleLabel, telHref } from './showUtils';
 
 const LINK = 'text-indigo-700 underline-offset-2 hover:underline';
 
-function SectionCard({ id, title, description, action, children }) {
+function SectionCard({ id, icon, title, description, action, children }) {
     return (
         <section id={id} className="scroll-mt-48">
             <Card padded={false}>
-                <div className="px-4 pt-4 sm:px-5 sm:pt-5">
-                    <CardHeader title={title} description={description} actions={action} />
+                <div className="px-5 pt-5 sm:px-6 sm:pt-6">
+                    <CardHeader icon={icon} title={title} description={description} actions={action} />
                 </div>
                 {children}
             </Card>
@@ -19,7 +20,7 @@ function SectionCard({ id, title, description, action, children }) {
 
 function InlineForm({ id, title, onSubmit, children }) {
     return (
-        <form id={id} onSubmit={onSubmit} noValidate className="scroll-mt-48 border-y border-zinc-200 bg-zinc-50/70 px-4 py-5 sm:px-5" aria-labelledby={`${id}-title`}>
+        <form id={id} onSubmit={onSubmit} noValidate className="scroll-mt-48 border-y border-zinc-200 bg-zinc-50/70 px-5 py-5 sm:px-6" aria-labelledby={`${id}-title`}>
             <h3 id={`${id}-title`} className="mb-4 text-sm font-semibold text-zinc-900">{title}</h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{children}</div>
         </form>
@@ -30,11 +31,12 @@ function PersonsSection({ persons, form, showForm, editingId, onCreate, onEdit, 
     return (
         <SectionCard
             id="sectie-contactpersonen"
+            icon="users"
             title="Contactpersonen"
             description="Wie je spreekt bij deze garage. De hoofdcontact staat ook bij Klantgegevens."
             action={
                 !showForm || editingId ? (
-                    <Button size="sm" onClick={onCreate}>
+                    <Button size="sm" icon="plus" onClick={onCreate}>
                         Contactpersoon toevoegen
                     </Button>
                 ) : null
@@ -72,8 +74,9 @@ function PersonsSection({ persons, form, showForm, editingId, onCreate, onEdit, 
 
             {persons.length === 0 ? (
                 !showForm && (
-                    <div className="px-4 pb-5 sm:px-5">
+                    <div className="px-5 pb-6 sm:px-6">
                         <EmptyState
+                            illustration="people"
                             title="Nog geen contactpersonen"
                             description="Voeg de eigenaar of een vaste contactpersoon toe."
                             action={<Button size="sm" onClick={onCreate}>Contactpersoon toevoegen</Button>}
@@ -81,44 +84,63 @@ function PersonsSection({ persons, form, showForm, editingId, onCreate, onEdit, 
                     </div>
                 )
             ) : (
-                <ul className="divide-y divide-zinc-100 border-t border-zinc-100">
+                <ul className={cx('grid grid-cols-1 gap-4 px-5 pb-6 sm:grid-cols-2 sm:px-6 xl:grid-cols-3', showForm && 'pt-5')}>
                     {persons.map((person) => {
                         const name = `${person.voornaam || ''} ${person.achternaam || ''}`.trim() || 'Naamloos';
                         return (
                             <li
                                 key={person.id}
                                 className={cx(
-                                    'flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:gap-4 sm:px-5',
-                                    editingId === person.id && 'bg-indigo-50/50'
+                                    'flex min-w-0 flex-col rounded-2xl border bg-white p-4 transition-colors',
+                                    editingId === person.id ? 'border-indigo-300 ring-2 ring-indigo-100' : 'border-zinc-200',
+                                    !person.active && 'bg-zinc-50/70'
                                 )}
                             >
-                                <div className="min-w-0 sm:w-1/3">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <p className="font-semibold text-zinc-900">{name}</p>
-                                        {person.is_primary && <Badge tone="brand">Hoofdcontact</Badge>}
-                                        {!person.active && <Badge>Inactief</Badge>}
+                                <div className="flex min-w-0 items-start gap-3">
+                                    <Avatar name={name} size="lg" />
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate font-semibold text-zinc-900">{name}</p>
+                                        <p className="truncate text-sm text-zinc-500">{person.rol ? roleLabel(person.rol) : 'Geen rol'}</p>
+                                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                            {person.is_primary && <Badge tone="brand" icon="check">Hoofdcontact</Badge>}
+                                            {!person.active && <Badge>Inactief</Badge>}
+                                        </div>
                                     </div>
-                                    <p className="text-xs text-zinc-500">{roleLabel(person.rol)}</p>
                                 </div>
-                                <div className="min-w-0 flex-1 text-sm">
+                                <div className="mt-4 space-y-1.5 text-sm">
                                     {person.email ? (
-                                        <a href={`mailto:${person.email}`} className={cx(LINK, 'block truncate')}>{person.email}</a>
+                                        <a href={`mailto:${person.email}`} className="flex min-w-0 items-center gap-2 rounded text-zinc-700 hover:text-indigo-800 focus-ring">
+                                            <Icon name="mail" className="h-4 w-4 shrink-0 text-zinc-400" />
+                                            <span className="truncate">{person.email}</span>
+                                        </a>
                                     ) : (
-                                        <span className="text-zinc-400">Geen e-mail</span>
+                                        <span className="flex items-center gap-2 text-zinc-400"><Icon name="mail" className="h-4 w-4" />Geen e-mail</span>
                                     )}
                                     {person.telefoon ? (
-                                        <a href={`tel:${String(person.telefoon).replace(/[^\d+]/g, '')}`} className="block text-xs text-zinc-600 hover:underline">{person.telefoon}</a>
+                                        <a href={telHref(person.telefoon)} className="flex items-center gap-2 rounded text-zinc-700 hover:text-indigo-800 focus-ring">
+                                            <Icon name="phone" className="h-4 w-4 shrink-0 text-zinc-400" />
+                                            {person.telefoon}
+                                        </a>
                                     ) : (
-                                        <span className="block text-xs text-zinc-400">Geen telefoon</span>
+                                        <span className="flex items-center gap-2 text-zinc-400"><Icon name="phone" className="h-4 w-4" />Geen telefoon</span>
                                     )}
                                 </div>
-                                <div className="flex shrink-0 gap-2">
-                                    <Button variant="secondary" size="sm" onClick={() => onEdit(person)} aria-label={`${name} bewerken`}>
+                                <div className="mt-4 flex items-center gap-1 border-t border-zinc-100 pt-3">
+                                    {person.telefoon ? (
+                                        <a href={telHref(person.telefoon)} className="btn btn-secondary btn-sm btn-icon" aria-label={`${name} bellen`} title="Bellen">
+                                            <Icon name="phone" className="h-4 w-4" />
+                                        </a>
+                                    ) : null}
+                                    {person.email ? (
+                                        <a href={`mailto:${person.email}`} className="btn btn-secondary btn-sm btn-icon" aria-label={`${name} mailen`} title="Mailen">
+                                            <Icon name="mail" className="h-4 w-4" />
+                                        </a>
+                                    ) : null}
+                                    <span className="flex-1" />
+                                    <Button variant="ghost" size="sm" icon="edit" onClick={() => onEdit(person)} aria-label={`${name} bewerken`}>
                                         Bewerken
                                     </Button>
-                                    <Button variant="danger-ghost" size="sm" onClick={() => onDelete(person.id)} aria-label={`${name} verwijderen`}>
-                                        Verwijderen
-                                    </Button>
+                                    <Button variant="danger-ghost" size="sm" iconOnly icon="trash" onClick={() => onDelete(person.id)} aria-label={`${name} verwijderen`} title="Verwijderen" />
                                 </div>
                             </li>
                         );
@@ -134,11 +156,12 @@ function SeatsSection({ seats, form, showForm, editingId, onCreate, onEdit, onCa
     return (
         <SectionCard
             id="sectie-gebruikers"
+            icon="key"
             title="Gebruikers"
             description={`Accounts binnen deze garage. ${activeCount} actief van ${seats.length}.`}
             action={
                 !showForm || editingId ? (
-                    <Button size="sm" onClick={onCreate}>
+                    <Button size="sm" icon="plus" onClick={onCreate}>
                         Gebruiker toevoegen
                     </Button>
                 ) : null
@@ -166,8 +189,9 @@ function SeatsSection({ seats, form, showForm, editingId, onCreate, onEdit, onCa
 
             {seats.length === 0 ? (
                 !showForm && (
-                    <div className="px-4 pb-5 sm:px-5">
+                    <div className="px-5 pb-6 sm:px-6">
                         <EmptyState
+                            illustration="people"
                             title="Nog geen gebruikers"
                             description="Voeg de accounts toe die deze garage in Kivii gebruikt."
                             action={<Button size="sm" onClick={onCreate}>Gebruiker toevoegen</Button>}
@@ -180,28 +204,29 @@ function SeatsSection({ seats, form, showForm, editingId, onCreate, onEdit, onCa
                         <li
                             key={seat.id}
                             className={cx(
-                                'flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:gap-4 sm:px-5',
+                                'flex flex-col gap-3 px-5 py-3.5 sm:flex-row sm:items-center sm:gap-4 sm:px-6',
                                 editingId === seat.id && 'bg-indigo-50/50'
                             )}
                         >
-                            <div className="min-w-0 sm:w-1/3">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <p className="font-semibold text-zinc-900">{seat.naam}</p>
-                                    {seat.actief ? <Badge tone="success">Actief</Badge> : <Badge>Inactief</Badge>}
+                            <div className="flex min-w-0 items-center gap-3 sm:w-1/3">
+                                <Avatar name={seat.naam} size="md" className={seat.actief ? '' : 'opacity-60'} />
+                                <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <p className="font-semibold text-zinc-900">{seat.naam}</p>
+                                        {seat.actief ? <Badge tone="success" dot>Actief</Badge> : <Badge>Inactief</Badge>}
+                                    </div>
+                                    <p className="text-xs text-zinc-500">{seat.rol_in_kivii ? roleLabel(seat.rol_in_kivii) : 'Geen rol'}</p>
                                 </div>
-                                <p className="text-xs text-zinc-500">{seat.rol_in_kivii ? roleLabel(seat.rol_in_kivii) : 'Geen rol'}</p>
                             </div>
                             <div className="min-w-0 flex-1 text-sm">
-                                <p className="truncate text-zinc-700">{seat.email}</p>
+                                <p className="flex min-w-0 items-center gap-2 text-zinc-700"><Icon name="mail" className="h-4 w-4 shrink-0 text-zinc-400" /><span className="truncate">{seat.email}</span></p>
                                 <p className="text-xs text-zinc-500">Aangemaakt {seat.aangemaakt_op ? formatDate(seat.aangemaakt_op) : 'onbekend'}</p>
                             </div>
                             <div className="flex shrink-0 gap-2">
-                                <Button variant="secondary" size="sm" onClick={() => onEdit(seat)} aria-label={`${seat.naam} bewerken`}>
+                                <Button variant="ghost" size="sm" icon="edit" onClick={() => onEdit(seat)} aria-label={`${seat.naam} bewerken`}>
                                     Bewerken
                                 </Button>
-                                <Button variant="danger-ghost" size="sm" onClick={() => onDelete(seat.id)} aria-label={`${seat.naam} verwijderen`}>
-                                    Verwijderen
-                                </Button>
+                                <Button variant="danger-ghost" size="sm" iconOnly icon="trash" onClick={() => onDelete(seat.id)} aria-label={`${seat.naam} verwijderen`} title="Verwijderen" />
                             </div>
                         </li>
                     ))}

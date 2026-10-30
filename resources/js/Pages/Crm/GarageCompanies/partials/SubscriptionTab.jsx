@@ -1,5 +1,5 @@
 import React from 'react';
-import { Badge, Button, Card, CardHeader, EmptyState, Field, FilePicker, Stat, cx, inputClasses } from '../../../../components/ui';
+import { Badge, Button, Card, CardHeader, EmptyState, Field, FilePicker, IconTile, KeyValue, Stat, cx, inputClasses } from '../../../../components/ui';
 import CopyButton, { formatIban } from './CopyButton';
 import {
     CheckboxField,
@@ -24,17 +24,18 @@ function ModulesSection({ form, totals, extraUsersHint, onToggle, onUpdateRow, o
     return (
         <section id="sectie-modules" className="scroll-mt-48">
             <Card padded={false}>
-                <div className="px-4 pt-4 sm:px-5 sm:pt-5">
+                <div className="px-5 pt-5 sm:px-6 sm:pt-6">
                     <CardHeader
+                        icon="package"
                         title="Modules & prijzen"
                         description="Vink modules aan of uit en pas aantal, prijs en btw per module aan."
                         actions={form.isDirty ? <Badge tone="warning">Niet opgeslagen wijzigingen</Badge> : null}
                     />
                     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                        <Stat label="Actieve modules" value={`${totals.actieveModules} / ${totals.totaleModules}`} tone="brand" />
-                        <Stat label="Totaal excl. btw" value={formatEuro(totals.totaalExcl)} />
-                        <Stat label="Btw" value={formatEuro(totals.btw)} />
-                        <Stat label="Totaal incl. btw" value={formatEuro(totals.totaalIncl)} />
+                        <Stat label="Actieve modules" value={`${totals.actieveModules} / ${totals.totaleModules}`} icon="layers" tone="brand" />
+                        <Stat label="Totaal excl. btw" value={formatEuro(totals.totaalExcl)} icon="euro" />
+                        <Stat label="Btw" value={formatEuro(totals.btw)} icon="file-text" />
+                        <Stat label="Totaal incl. btw" value={formatEuro(totals.totaalIncl)} icon="credit-card" tone="success" sub="Per maand" />
                     </div>
                     {extraUsersHint && (
                         <Notice tone={extraUsersHint.matches ? 'neutral' : 'warning'} className="mt-4">
@@ -49,12 +50,12 @@ function ModulesSection({ form, totals, extraUsersHint, onToggle, onUpdateRow, o
                 </div>
 
                 {rows.length === 0 ? (
-                    <div className="px-4 py-5 sm:px-5">
-                        <EmptyState title="Geen modules beschikbaar" description="Er zijn nog geen modules aangemaakt in Kivii." />
+                    <div className="px-5 py-6 sm:px-6">
+                        <EmptyState illustration="inbox" title="Geen modules beschikbaar" description="Er zijn nog geen modules aangemaakt in Kivii." />
                     </div>
                 ) : (
                     <div className="mt-5">
-                        <div className={cx('hidden gap-3 border-y border-zinc-200 bg-zinc-50 px-5 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 sm:grid', MODULE_GRID)} aria-hidden="true">
+                        <div className={cx('hidden gap-3 border-y border-zinc-200 bg-zinc-50 px-6 py-2 text-xs font-medium text-zinc-500 sm:grid', MODULE_GRID)} aria-hidden="true">
                             <span>Module</span>
                             <span>Aantal</span>
                             <span>Prijs excl.</span>
@@ -72,7 +73,7 @@ function ModulesSection({ form, totals, extraUsersHint, onToggle, onUpdateRow, o
                                     btw: form.errors[`rows.${index}.btw_percentage`],
                                 };
                                 return (
-                                    <li key={row.module_id} className={cx('grid grid-cols-3 gap-3 px-4 py-3 sm:items-start sm:px-5', MODULE_GRID, !row.actief && 'bg-zinc-50/70')}>
+                                    <li key={row.module_id} className={cx('grid grid-cols-3 gap-3 px-5 py-3 sm:items-start sm:px-6', MODULE_GRID, row.actief ? 'bg-white' : 'bg-zinc-50/70')}>
                                         <div className="col-span-3 pt-1.5 sm:col-span-1">
                                             <CheckboxField
                                                 id={`${base}-actief`}
@@ -137,7 +138,7 @@ function ModulesSection({ form, totals, extraUsersHint, onToggle, onUpdateRow, o
                 )}
 
                 {rows.length > 0 && (
-                    <div className="flex flex-col-reverse gap-2 rounded-b-xl border-t border-zinc-200 bg-zinc-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-5">
+                    <div className="flex flex-col-reverse gap-2 rounded-b-2xl border-t border-zinc-200 bg-zinc-50 px-5 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-6">
                         <p className="text-sm text-zinc-600 sm:mr-auto">
                             Totaal per maand: <span className="font-semibold tabular-nums text-zinc-900">{formatEuro(totals.totaalIncl)}</span> incl. btw
                         </p>
@@ -159,7 +160,7 @@ function ModulesSection({ form, totals, extraUsersHint, onToggle, onUpdateRow, o
 
 function MandateForm({ form, editing, incasso, onSubmit, onCancel }) {
     return (
-        <form id="mandate-form" onSubmit={onSubmit} noValidate className="scroll-mt-48 border-y border-zinc-200 bg-zinc-50/70 px-4 py-5 sm:px-5" aria-labelledby="mandate-form-title">
+        <form id="mandate-form" onSubmit={onSubmit} noValidate className="scroll-mt-48 border-y border-zinc-200 bg-zinc-50/70 px-5 py-5 sm:px-6" aria-labelledby="mandate-form-title">
             <h3 id="mandate-form-title" className="mb-4 text-sm font-semibold text-zinc-900">{editing ? 'Mandaat bewerken' : 'Nieuw mandaat'}</h3>
             <div className="space-y-6">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -178,7 +179,7 @@ function MandateForm({ form, editing, incasso, onSubmit, onCancel }) {
                 </div>
 
                 <fieldset className="min-w-0">
-                    <legend className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">Ondertekening en status</legend>
+                    <legend className="mb-3 text-sm font-semibold text-zinc-900">Ondertekening en status</legend>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <FormField form={form} name="ondertekenaar_naam" id="mandateForm-ondertekenaar-naam" label="Naam ondertekenaar" hint="Getypte naam van degene die tekende." />
                         <CheckboxField
@@ -305,42 +306,50 @@ function IncassoSection({
     return (
         <section id="sectie-incasso" className="scroll-mt-48">
             <Card padded={false}>
-                <div className="px-4 pt-4 sm:px-5 sm:pt-5">
+                <div className="px-5 pt-5 sm:px-6 sm:pt-6">
                     <CardHeader
+                        icon="credit-card"
                         title="Incasso en SEPA-mandaten"
                         description="Maximaal 1 actief mandaat per klant. Eerdere mandaten blijven bewaard."
                         actions={
                             !showMandateForm || editingMandateId ? (
-                                <Button size="sm" onClick={onNewMandate}>
+                                <Button size="sm" icon="plus" onClick={onNewMandate}>
                                     Nieuw mandaat
                                 </Button>
                             ) : null
                         }
                     />
 
-                    <div className="rounded-lg border border-zinc-200 bg-zinc-50/70 p-4">
-                        <div className="mb-3 flex flex-wrap items-center gap-2">
-                            <h3 className="text-sm font-semibold text-zinc-900">Gegevens voor de incasso</h3>
-                            {incasso?.is_complete ? <Badge tone="success">Compleet</Badge> : <Badge tone="warning">Onvolledig</Badge>}
-                        </div>
-                        <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-                            {overview.map(([label, value]) => (
-                                <div key={label} className="min-w-0">
-                                    <dt className="text-xs font-medium text-zinc-500">{label}</dt>
-                                    <dd className="mt-0.5 break-words font-medium text-zinc-900">{value}</dd>
+                    <div className={cx('overflow-hidden rounded-2xl border', incasso?.is_complete ? 'border-emerald-200' : 'border-amber-200')}>
+                        <div className={cx('flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between', incasso?.is_complete ? 'bg-emerald-50/60' : 'bg-amber-50/60')}>
+                            <div className="flex min-w-0 items-center gap-3">
+                                <IconTile icon={incasso?.is_complete ? 'check-circle' : 'alert-triangle'} tone={incasso?.is_complete ? 'success' : 'warning'} size="md" className="bg-white" />
+                                <div className="min-w-0">
+                                    <h3 className="text-sm font-semibold text-zinc-900">{incasso?.is_complete ? 'Klaar voor incasso' : 'Incasso nog niet compleet'}</h3>
+                                    <p className="text-sm text-zinc-600">
+                                        {activeMandate ? `Actief mandaat ${activeMandate.mandaat_id}` : 'Er is nog geen actief mandaat.'}
+                                    </p>
                                 </div>
-                            ))}
-                        </dl>
-                        {!incasso?.is_complete && (incasso?.missing_fields || []).length > 0 && (
-                            <Notice tone="warning" className="mt-4">
-                                Nog nodig: {(incasso?.missing_fields || []).join(', ')}.
-                            </Notice>
-                        )}
-                        {incasso?.kenmerk_available === false && (
-                            <Notice tone="danger" className="mt-3">
-                                Kenmerk machtiging kan nog niet opgeslagen worden: database migratie ontbreekt.
-                            </Notice>
-                        )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Badge tone={activeMandate ? 'success' : 'warning'} dot>{activeMandate ? 'Mandaat actief' : 'Geen actief mandaat'}</Badge>
+                                {incasso?.is_complete ? <Badge tone="success">Compleet</Badge> : <Badge tone="warning">Onvolledig</Badge>}
+                            </div>
+                        </div>
+                        <div className="border-t border-zinc-100 bg-white p-4">
+                            <h4 className="sr-only">Gegevens voor de incasso</h4>
+                            <KeyValue items={overview.map(([label, value]) => ({ label, value: value === '-' ? null : value }))} columns={3} />
+                            {!incasso?.is_complete && (incasso?.missing_fields || []).length > 0 && (
+                                <Notice tone="warning" className="mt-4">
+                                    Nog nodig: {(incasso?.missing_fields || []).join(', ')}.
+                                </Notice>
+                            )}
+                            {incasso?.kenmerk_available === false && (
+                                <Notice tone="danger" className="mt-3">
+                                    Kenmerk machtiging kan nog niet opgeslagen worden: database migratie ontbreekt.
+                                </Notice>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -351,8 +360,9 @@ function IncassoSection({
 
                     {mandates.length === 0 ? (
                         !showMandateForm && (
-                            <div className="px-4 pb-5 sm:px-5">
+                            <div className="px-5 pb-6 sm:px-6">
                                 <EmptyState
+                                    icon="credit-card"
                                     title="Nog geen mandaten"
                                     description="Leg het getekende SEPA-mandaat vast om te kunnen incasseren."
                                     action={<Button size="sm" onClick={onNewMandate}>Nieuw mandaat</Button>}
@@ -368,19 +378,22 @@ function IncassoSection({
                                     <li
                                         key={mandate.id}
                                         className={cx(
-                                            'flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:gap-4 sm:px-5',
+                                            'flex flex-col gap-3 px-5 py-3.5 sm:flex-row sm:items-center sm:gap-4 sm:px-6',
                                             editingMandateId === mandate.id && showMandateForm && 'bg-indigo-50/50'
                                         )}
                                     >
-                                        <div className="min-w-0 sm:w-1/3">
+                                        <div className="flex min-w-0 items-start gap-3 sm:w-1/3">
+                                            <IconTile icon="file-text" tone={MANDATE_STATUS_TONES[mandate.status] || 'neutral'} size="sm" />
+                                            <div className="min-w-0">
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <span className="inline-flex items-center break-all font-semibold text-zinc-900">
                                                     {mandate.mandaat_id}
                                                     <CopyButton value={mandate.mandaat_id || ''} label="Mandaatkenmerk kopiëren" />
                                                 </span>
-                                                <Badge tone={MANDATE_STATUS_TONES[mandate.status] || 'neutral'}>{MANDATE_STATUS_LABELS[mandate.status] || mandate.status}</Badge>
+                                                <Badge tone={MANDATE_STATUS_TONES[mandate.status] || 'neutral'} dot>{MANDATE_STATUS_LABELS[mandate.status] || mandate.status}</Badge>
                                             </div>
                                             <p className="text-xs text-zinc-500">{mandate.bedrijfsnaam}</p>
+                                            </div>
                                         </div>
                                         <div className="min-w-0 flex-1 text-sm">
                                             <p className="inline-flex items-center whitespace-nowrap font-mono text-zinc-800">
@@ -404,7 +417,7 @@ function IncassoSection({
                                                     </option>
                                                 ))}
                                             </select>
-                                            <Button variant="secondary" size="sm" onClick={() => onEditMandate(mandate)} aria-label={`Mandaat ${mandate.mandaat_id} bewerken`}>
+                                            <Button variant="ghost" size="sm" icon="edit" onClick={() => onEditMandate(mandate)} aria-label={`Mandaat ${mandate.mandaat_id} bewerken`}>
                                                 Bewerken
                                             </Button>
                                         </div>
@@ -422,7 +435,7 @@ function IncassoSection({
 function ExportCard({ form, maandOpties, jaarOpties, onExport }) {
     return (
         <Card>
-            <CardHeader title="ING incasso-export" description="Downloadt de incassobatch van alle klanten met een actief mandaat voor de gekozen maand." />
+            <CardHeader icon="download" tone="neutral" title="ING incasso-export" description="Downloadt de incassobatch van alle klanten met een actief mandaat voor de gekozen maand." />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto] lg:items-end">
                 <FormField form={form} name="maand" id="exportForm-maand" label="Maand" as="select">
                     {maandOpties.map((optie) => (
@@ -439,7 +452,7 @@ function ExportCard({ form, maandOpties, jaarOpties, onExport }) {
                     ))}
                 </FormField>
                 <FormField form={form} name="uitvoerdatum" id="exportForm-uitvoerdatum" label="Uitvoerdatum" type="date" />
-                <Button variant="secondary" onClick={onExport} disabled={!form.data.uitvoerdatum}>
+                <Button variant="secondary" icon="download" onClick={onExport} disabled={!form.data.uitvoerdatum}>
                     Exporteer ING incasso
                 </Button>
             </div>

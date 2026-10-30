@@ -1,98 +1,113 @@
 @php
-    $input = 'mt-1 block w-full rounded-lg border-zinc-300 text-sm text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-indigo-600 focus:ring-indigo-600 disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:text-zinc-500';
-    $label = 'block text-sm font-medium text-zinc-800';
-    $error = 'mt-1 text-xs font-medium text-rose-700';
-    $btnPrimary = 'inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-indigo-600 px-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
-    $btnSecondary = 'inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-white px-3.5 text-sm font-semibold text-zinc-800 shadow-sm ring-1 ring-inset ring-zinc-300 transition-colors hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:opacity-50';
-    $btnSmall = 'inline-flex h-8 items-center rounded-lg px-2.5 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600';
     $isSelfEdit = $userId !== null && $userId === $currentUserId;
     $roleLabels = ['admin' => 'Admin', 'medewerker' => 'Medewerker'];
+    $activeUsers = $users->where('active', true)->count();
+    $req = '<span class="text-rose-600" aria-hidden="true">*</span>';
 @endphp
 
 <div class="space-y-6">
-    <div class="flex flex-wrap items-end justify-between gap-4">
-        <div class="min-w-0">
-            <h1 class="text-2xl font-semibold tracking-tight text-zinc-900">Gebruikers</h1>
-            <p class="mt-1 text-sm text-zinc-500">Beheer wie toegang heeft tot het CRM. Klantlogins staan hier niet tussen.</p>
-        </div>
-        @unless($showForm && ! $userId)
-            <button type="button" class="{{ $btnPrimary }}" wire:click="startCreate" wire:loading.attr="disabled" wire:target="startCreate">
-                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" /></svg>
-                Nieuwe gebruiker
-            </button>
-        @endunless
-    </div>
+    <x-page-header title="Gebruikers" icon="users" description="Beheer wie toegang heeft tot het CRM. Klantlogins staan hier niet tussen.">
+        @if($users->isNotEmpty())
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+                <x-badge tone="success" dot>{{ $activeUsers }} actief</x-badge>
+                @if($users->count() > $activeUsers)
+                    <x-badge>{{ $users->count() - $activeUsers }} inactief</x-badge>
+                @endif
+                <x-badge tone="brand">{{ $activeAdminCount }} {{ $activeAdminCount === 1 ? 'actieve admin' : 'actieve admins' }}</x-badge>
+            </div>
+        @endif
+        <x-slot name="actions">
+            @unless($showForm && ! $userId)
+                <button type="button" class="btn btn-primary" wire:click="startCreate" wire:loading.attr="disabled" wire:target="startCreate">
+                    <x-icon name="plus" class="h-4 w-4" />
+                    Nieuwe gebruiker
+                </button>
+            @endunless
+        </x-slot>
+    </x-page-header>
 
     @if(session('livewire_status'))
-        <div role="status" class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 shadow-sm">{{ session('livewire_status') }}</div>
+        <div role="status" class="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            <x-icon name="check-circle" class="mt-0.5 h-4 w-4 text-emerald-600" />
+            <span>{{ session('livewire_status') }}</span>
+        </div>
     @endif
 
     @if($showForm)
-        <section class="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm" wire:key="user-form-{{ $userId ?? 'new' }}" aria-labelledby="user-form-title"
+        <section class="card" wire:key="user-form-{{ $userId ?? 'new' }}" aria-labelledby="user-form-title"
                  x-data x-init="$nextTick(() => { $el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); $el.querySelector('#user_name')?.focus() })">
             <form wire:submit="save">
-                <div class="p-4 sm:p-5">
-                    <div>
-                        <h2 id="user-form-title" class="text-base font-semibold text-zinc-900">{{ $userId ? 'Gebruiker bewerken' : 'Nieuwe gebruiker' }}</h2>
-                        <p class="mt-0.5 text-sm text-zinc-500">Velden met <span class="text-rose-600" aria-hidden="true">*</span><span class="sr-only">een sterretje</span> zijn verplicht.</p>
+                <div class="card-header">
+                    <div class="flex items-center gap-3">
+                        @if($userId)
+                            <x-avatar :name="$name" size="md" />
+                        @else
+                            <span class="icon-tile h-10 w-10 bg-indigo-100/80 text-indigo-700" aria-hidden="true"><x-icon name="user" class="h-5 w-5" /></span>
+                        @endif
+                        <div>
+                            <h2 id="user-form-title" class="section-heading">{{ $userId ? 'Gebruiker bewerken' : 'Nieuwe gebruiker' }}</h2>
+                            <p class="section-description">Velden met {!! $req !!}<span class="sr-only">een sterretje</span> zijn verplicht.</p>
+                        </div>
                     </div>
+                </div>
 
-                    <div class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div class="card-body">
+                    <div class="grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2">
                         <div>
-                            <label for="user_name" class="{{ $label }}">Naam <span class="text-rose-600" aria-hidden="true">*</span></label>
-                            <input id="user_name" class="{{ $input }}" wire:model="name" required autocomplete="off" @error('name') aria-invalid="true" aria-describedby="user_name_error" @enderror />
-                            @error('name') <p id="user_name_error" class="{{ $error }}">{{ $message }}</p> @enderror
+                            <label for="user_name" class="label">Naam {!! $req !!}</label>
+                            <input id="user_name" class="input mt-1.5" wire:model="name" required autocomplete="off" @error('name') aria-invalid="true" aria-describedby="user_name_error" @enderror />
+                            @error('name') <p id="user_name_error" class="field-error">{{ $message }}</p> @enderror
                         </div>
                         <div>
-                            <label for="user_email" class="{{ $label }}">E-mailadres <span class="text-rose-600" aria-hidden="true">*</span></label>
-                            <input id="user_email" type="email" class="{{ $input }}" wire:model="email" required autocomplete="off" @error('email') aria-invalid="true" aria-describedby="user_email_error" @enderror />
-                            @error('email') <p id="user_email_error" class="{{ $error }}">{{ $message }}</p> @enderror
+                            <label for="user_email" class="label">E-mailadres {!! $req !!}</label>
+                            <input id="user_email" type="email" class="input mt-1.5" wire:model="email" required autocomplete="off" @error('email') aria-invalid="true" aria-describedby="user_email_error" @enderror />
+                            @error('email') <p id="user_email_error" class="field-error">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
-                            <label for="user_phone" class="{{ $label }}">Telefoon</label>
-                            <input id="user_phone" type="tel" class="{{ $input }}" wire:model="phone" autocomplete="off" />
-                            @error('phone') <p class="{{ $error }}">{{ $message }}</p> @enderror
+                            <label for="user_phone" class="label">Telefoon</label>
+                            <input id="user_phone" type="tel" class="input mt-1.5" wire:model="phone" autocomplete="off" @error('phone') aria-invalid="true" @enderror />
+                            @error('phone') <p class="field-error">{{ $message }}</p> @enderror
                         </div>
                         <div>
-                            <label for="user_role" class="{{ $label }}">Rol</label>
-                            <select id="user_role" class="{{ $input }}" wire:model="role" @disabled($isSelfEdit) @if($isSelfEdit) aria-describedby="user_role_hint" @endif>
+                            <label for="user_role" class="label">Rol</label>
+                            <select id="user_role" class="input mt-1.5" wire:model="role" @disabled($isSelfEdit) @if($isSelfEdit) aria-describedby="user_role_hint" @endif>
                                 @foreach($roles as $r)
                                     <option value="{{ $r->value }}">{{ $roleLabels[$r->value] ?? ucfirst($r->value) }}</option>
                                 @endforeach
                             </select>
                             @if($isSelfEdit)
-                                <p id="user_role_hint" class="mt-1 text-xs text-zinc-500">Je kunt je eigen rol niet wijzigen.</p>
+                                <p id="user_role_hint" class="field-hint">Je kunt je eigen rol niet wijzigen.</p>
                             @else
-                                <p class="mt-1 text-xs text-zinc-500">Admins beheren gebruikers, modules en systeeminstellingen.</p>
+                                <p class="field-hint">Admins beheren gebruikers, modules en systeeminstellingen.</p>
                             @endif
-                            @error('role') <p class="{{ $error }}">{{ $message }}</p> @enderror
+                            @error('role') <p class="field-error">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
-                            <label for="user_password" class="{{ $label }}">
+                            <label for="user_password" class="label">
                                 {{ $userId ? 'Nieuw wachtwoord' : 'Wachtwoord' }}
-                                @unless($userId)<span class="text-rose-600" aria-hidden="true">*</span>@endunless
+                                @unless($userId){!! $req !!}@endunless
                             </label>
-                            <input id="user_password" type="password" autocomplete="new-password" class="{{ $input }}" wire:model="password" aria-describedby="user_password_hint" @unless($userId) required @endunless />
-                            <p id="user_password_hint" class="mt-1 text-xs text-zinc-500">{{ $userId ? 'Laat leeg om het huidige wachtwoord te behouden. ' : '' }}Minimaal 10 tekens.</p>
-                            @error('password') <p class="{{ $error }}">{{ $message }}</p> @enderror
+                            <input id="user_password" type="password" autocomplete="new-password" class="input mt-1.5" wire:model="password" aria-describedby="user_password_hint" @unless($userId) required @endunless @error('password') aria-invalid="true" @enderror />
+                            <p id="user_password_hint" class="field-hint">{{ $userId ? 'Laat leeg om het huidige wachtwoord te behouden. ' : '' }}Minimaal 10 tekens.</p>
+                            @error('password') <p class="field-error">{{ $message }}</p> @enderror
                         </div>
 
-                        <div class="sm:pt-6">
-                            <label for="user_active" class="flex w-fit items-center gap-2 text-sm text-zinc-800 {{ $isSelfEdit ? 'cursor-not-allowed' : 'cursor-pointer' }}">
-                                <input type="checkbox" class="h-4 w-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-600 disabled:opacity-50" wire:model="active" id="user_active" @disabled($isSelfEdit)>
+                        <div class="sm:pt-7">
+                            <label for="user_active" class="flex w-fit items-center gap-2.5 text-sm font-medium text-zinc-800 {{ $isSelfEdit ? 'cursor-not-allowed' : 'cursor-pointer' }}">
+                                <input type="checkbox" class="checkbox" wire:model="active" id="user_active" @disabled($isSelfEdit)>
                                 Account actief
                             </label>
-                            <p class="mt-1 text-xs text-zinc-500">{{ $isSelfEdit ? 'Je kunt je eigen account niet deactiveren.' : 'Inactieve gebruikers kunnen niet inloggen.' }}</p>
-                            @error('active') <p class="{{ $error }}">{{ $message }}</p> @enderror
+                            <p class="field-hint">{{ $isSelfEdit ? 'Je kunt je eigen account niet deactiveren.' : 'Inactieve gebruikers kunnen niet inloggen.' }}</p>
+                            @error('active') <p class="field-error">{{ $message }}</p> @enderror
                         </div>
                     </div>
                 </div>
 
-                <div class="flex flex-wrap items-center justify-end gap-2 border-t border-zinc-100 bg-zinc-50/70 px-4 py-3 sm:px-5">
-                    <button type="button" class="{{ $btnSecondary }}" wire:click="cancel">Annuleren</button>
-                    <button type="submit" class="{{ $btnPrimary }}" wire:loading.attr="disabled" wire:target="save">
+                <div class="card-footer">
+                    <button type="button" class="btn btn-secondary" wire:click="cancel">Annuleren</button>
+                    <button type="submit" class="btn btn-primary" wire:loading.attr="disabled" wire:target="save">
                         <svg wire:loading wire:target="save" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
                         {{ $userId ? 'Wijzigingen opslaan' : 'Gebruiker toevoegen' }}
                     </button>
@@ -102,22 +117,28 @@
     @endif
 
     @if($users->isEmpty())
-        <div class="flex flex-col items-center justify-center rounded-xl border border-dashed border-zinc-300 bg-zinc-50/60 px-6 py-10 text-center">
-            <p class="text-sm font-semibold text-zinc-800">Nog geen gebruikers</p>
+        <div class="card flex flex-col items-center justify-center px-6 py-12 text-center">
+            <span class="icon-tile mb-3 h-10 w-10 bg-zinc-100 text-zinc-600" aria-hidden="true"><x-icon name="users" class="h-5 w-5" /></span>
+            <p class="section-heading">Nog geen gebruikers</p>
             <p class="mt-1 max-w-sm text-sm text-zinc-500">Voeg een collega toe om samen in het CRM te werken.</p>
+            @unless($showForm)
+                <button type="button" class="btn btn-primary mt-4" wire:click="startCreate">
+                    <x-icon name="plus" class="h-4 w-4" />
+                    Eerste gebruiker toevoegen
+                </button>
+            @endunless
         </div>
     @else
-        <div class="min-w-0 overflow-x-auto rounded-xl border border-zinc-200 bg-white shadow-sm">
-            <table class="min-w-full divide-y divide-zinc-200 text-sm">
+        <div class="table-wrap">
+            <table class="table-base">
                 <caption class="sr-only">Gebruikers van het CRM</caption>
-                <thead class="bg-zinc-50">
+                <thead class="table-head">
                     <tr>
-                        <th scope="col" class="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Naam</th>
-                        <th scope="col" class="hidden px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 md:table-cell">E-mailadres</th>
-                        <th scope="col" class="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Rol</th>
-                        <th scope="col" class="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Status</th>
-                        <th scope="col" class="hidden px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 lg:table-cell">Laatste login</th>
-                        <th scope="col" class="px-4 py-2.5"><span class="sr-only">Acties</span></th>
+                        <th scope="col" class="table-th">Gebruiker</th>
+                        <th scope="col" class="table-th">Rol</th>
+                        <th scope="col" class="table-th">Status</th>
+                        <th scope="col" class="table-th hidden lg:table-cell">Laatste login</th>
+                        <th scope="col" class="table-th"><span class="sr-only">Acties</span></th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-zinc-100">
@@ -126,38 +147,57 @@
                             $isSelf = $u->id === $currentUserId;
                             $isLastAdmin = $u->isAdmin() && $u->active && $activeAdminCount <= 1;
                         @endphp
-                        <tr wire:key="user-row-{{ $u->id }}" @class(['hover:bg-zinc-50/80', 'bg-indigo-50/40' => $userId === $u->id])>
-                            <td class="px-4 py-3 align-middle">
-                                <div class="font-semibold text-zinc-900">
-                                    {{ $u->name }}
-                                    @if($isSelf)<span class="ml-1 text-xs font-normal text-zinc-500">(jij)</span>@endif
+                        <tr wire:key="user-row-{{ $u->id }}" @class(['table-row', 'bg-indigo-50/50' => $userId === $u->id])>
+                            <td class="table-td">
+                                <div class="flex min-w-0 items-center gap-3">
+                                    <x-avatar :name="$u->name" size="sm" @class(['opacity-60' => ! $u->active]) />
+                                    <div class="min-w-0">
+                                        <div @class(['flex items-center gap-1.5 font-semibold', 'text-zinc-900' => $u->active, 'text-zinc-500' => ! $u->active])>
+                                            <span class="truncate">{{ $u->name }}</span>
+                                            @if($isSelf)<span class="text-xs font-normal text-zinc-500">(jij)</span>@endif
+                                        </div>
+                                        <div class="truncate text-xs text-zinc-500">{{ $u->email }}</div>
+                                    </div>
                                 </div>
-                                <div class="truncate text-xs text-zinc-500 md:hidden">{{ $u->email }}</div>
                             </td>
-                            <td class="hidden px-4 py-3 align-middle text-zinc-700 md:table-cell">{{ $u->email }}</td>
-                            <td class="px-4 py-3 align-middle">
-                                <span @class(['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset', 'bg-indigo-50 text-indigo-800 ring-indigo-200' => $u->isAdmin(), 'bg-zinc-100 text-zinc-700 ring-zinc-200' => ! $u->isAdmin()])>{{ $roleLabels[$u->role->value] ?? ucfirst($u->role->value) }}</span>
-                            </td>
-                            <td class="px-4 py-3 align-middle">
-                                @if($u->active)
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-800"><span class="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true"></span>Actief</span>
+                            <td class="table-td">
+                                @if($u->isAdmin())
+                                    <x-badge tone="brand"><x-icon name="shield" class="h-3 w-3" />{{ $roleLabels[$u->role->value] ?? ucfirst($u->role->value) }}</x-badge>
                                 @else
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500"><span class="h-1.5 w-1.5 rounded-full bg-zinc-400" aria-hidden="true"></span>Inactief</span>
+                                    <x-badge>{{ $roleLabels[$u->role->value] ?? ucfirst($u->role->value) }}</x-badge>
                                 @endif
                             </td>
-                            <td class="hidden whitespace-nowrap px-4 py-3 align-middle tabular-nums text-zinc-600 lg:table-cell">{{ $u->last_login_at?->format('d-m-Y H:i') ?? 'Nog nooit' }}</td>
-                            <td class="whitespace-nowrap px-4 py-3 text-right align-middle">
+                            <td class="table-td">
+                                @if($u->active)
+                                    <x-badge tone="success" dot>Actief</x-badge>
+                                @else
+                                    <x-badge dot>Inactief</x-badge>
+                                @endif
+                            </td>
+                            <td class="table-td hidden whitespace-nowrap lg:table-cell">
+                                @if($u->last_login_at)
+                                    <time datetime="{{ $u->last_login_at->toIso8601String() }}" title="{{ $u->last_login_at->format('d-m-Y H:i') }}" class="text-zinc-600">{{ $u->last_login_at->locale('nl')->diffForHumans() }}</time>
+                                @else
+                                    <span class="text-zinc-400">Nog nooit</span>
+                                @endif
+                            </td>
+                            <td class="table-td whitespace-nowrap text-right">
                                 <div class="inline-flex items-center gap-1">
-                                    <button type="button" class="{{ $btnSmall }} text-zinc-700 hover:bg-zinc-100" wire:click="startEdit({{ $u->id }})" aria-label="{{ $u->name }} bewerken">Bewerken</button>
+                                    <button type="button" class="btn btn-ghost btn-sm" wire:click="startEdit({{ $u->id }})" aria-label="{{ $u->name }} bewerken">
+                                        <x-icon name="edit" class="h-4 w-4" />
+                                        <span class="hidden sm:inline">Bewerken</span>
+                                    </button>
                                     @if($isSelf || $isLastAdmin)
-                                        <span class="px-2.5 text-xs text-zinc-400" title="{{ $isSelf ? 'Je kunt je eigen account niet verwijderen.' : 'De laatste actieve admin kan niet worden verwijderd.' }}">
-                                            {{ $isSelf ? 'Eigen account' : 'Laatste admin' }}
+                                        <span class="inline-flex h-8 w-8 items-center justify-center text-zinc-300" title="{{ $isSelf ? 'Je kunt je eigen account niet verwijderen.' : 'De laatste actieve admin kan niet worden verwijderd.' }}">
+                                            <x-icon name="trash" class="h-4 w-4" title="{{ $isSelf ? 'Eigen account kan niet worden verwijderd' : 'Laatste admin kan niet worden verwijderd' }}" />
                                         </span>
                                     @else
                                         <form method="POST" action="{{ route('crm.users.delete', ['user' => $u->id]) }}" class="inline" onsubmit="return confirm(@js('Weet je zeker dat je '.$u->name.' wilt verwijderen? Dit kan niet ongedaan worden gemaakt.'))">
                                             @csrf
                                             @method('DELETE')
-                                            <button type="submit" class="{{ $btnSmall }} text-rose-700 hover:bg-rose-50 focus-visible:ring-rose-600" aria-label="{{ $u->name }} verwijderen">Verwijderen</button>
+                                            <button type="submit" class="btn btn-danger-ghost btn-icon btn-sm" aria-label="{{ $u->name }} verwijderen" title="Verwijderen">
+                                                <x-icon name="trash" class="h-4 w-4" />
+                                            </button>
                                         </form>
                                     @endif
                                 </div>

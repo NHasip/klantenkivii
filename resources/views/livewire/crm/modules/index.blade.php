@@ -1,13 +1,9 @@
 @php
-    $input = 'mt-1 block w-full rounded-lg border-zinc-300 text-sm text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-indigo-600 focus:ring-indigo-600';
-    $label = 'block text-sm font-medium text-zinc-800';
-    $error = 'mt-1 text-xs font-medium text-rose-700';
-    $btnPrimary = 'inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-indigo-600 px-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
-    $btnSecondary = 'inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-white px-3.5 text-sm font-semibold text-zinc-800 shadow-sm ring-1 ring-inset ring-zinc-300 transition-colors hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:opacity-50';
-    $actionSlot = 'w-[6.5rem] shrink-0 justify-center';
-    $btnSmall = 'inline-flex h-8 items-center rounded-lg px-2.5 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:opacity-50';
-    $th = 'px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500';
+    $req = '<span class="text-rose-600" aria-hidden="true">*</span>';
+    $actionSlot = 'w-[7.5rem] shrink-0';
     $activeCount = $supportsArchive ? $modules->whereNull('archived_at')->count() : $modules->count();
+    $archivedCount = $modules->count() - $activeCount;
+    $tileTones = ['bg-indigo-100/80 text-indigo-700', 'bg-emerald-50 text-emerald-700', 'bg-sky-50 text-sky-700', 'bg-amber-50 text-amber-700', 'bg-violet-50 text-violet-700', 'bg-teal-50 text-teal-700'];
 @endphp
 
 <div
@@ -45,79 +41,92 @@
     }"
     @keydown.escape.window="if (confirmOpen) closeConfirm()"
 >
-    <div class="flex flex-wrap items-end justify-between gap-4">
-        <div class="min-w-0">
-            <h1 class="text-2xl font-semibold tracking-tight text-zinc-900">Modules</h1>
-            <p class="mt-1 text-sm text-zinc-500">Modules die je aan klanten kunt koppelen, met standaardprijs en btw.</p>
-        </div>
-        @unless($showForm && ! $moduleId)
-            <button type="button" class="{{ $btnPrimary }}" wire:click="startCreate" wire:loading.attr="disabled" wire:target="startCreate">
-                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" /></svg>
-                Nieuwe module
-            </button>
-        @endunless
-    </div>
+    <x-page-header title="Modules" icon="layers" description="Modules die je aan klanten kunt koppelen, met standaardprijs en btw.">
+        @if($modules->isNotEmpty())
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+                <x-badge tone="success" dot>{{ $activeCount }} actief</x-badge>
+                @if($archivedCount > 0)
+                    <x-badge><x-icon name="archive" class="h-3 w-3" />{{ $archivedCount }} gearchiveerd</x-badge>
+                @endif
+            </div>
+        @endif
+        <x-slot name="actions">
+            @unless($showForm && ! $moduleId)
+                <button type="button" class="btn btn-primary" wire:click="startCreate" wire:loading.attr="disabled" wire:target="startCreate">
+                    <x-icon name="plus" class="h-4 w-4" />
+                    Nieuwe module
+                </button>
+            @endunless
+        </x-slot>
+    </x-page-header>
 
     @if(session('livewire_status'))
-        <div role="status" class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 shadow-sm">{{ session('livewire_status') }}</div>
+        <div role="status" class="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"><x-icon name="check-circle" class="mt-0.5 h-4 w-4 text-emerald-600" /><span>{{ session('livewire_status') }}</span></div>
     @endif
     @if(session('livewire_error'))
-        <div role="alert" class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 shadow-sm">{{ session('livewire_error') }}</div>
+        <div role="alert" class="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900"><x-icon name="alert-circle" class="mt-0.5 h-4 w-4 text-rose-600" /><span>{{ session('livewire_error') }}</span></div>
     @endif
 
     @if($showForm)
-        <section class="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm" wire:key="module-form-{{ $moduleId ?? 'new' }}" aria-labelledby="module-form-title"
+        <section class="card" wire:key="module-form-{{ $moduleId ?? 'new' }}" aria-labelledby="module-form-title"
                  x-init="$nextTick(() => { $el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); $el.querySelector('#module_naam')?.focus() })">
             <form wire:submit="save">
-                <div class="p-4 sm:p-5">
-                    <h2 id="module-form-title" class="text-base font-semibold text-zinc-900">{{ $moduleId ? 'Module bewerken' : 'Nieuwe module' }}</h2>
-                    <p class="mt-0.5 text-sm text-zinc-500">Prijs en btw zijn standaardwaarden bij een nieuwe koppeling; bestaande klanten veranderen niet mee.</p>
-
-                    <div class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div class="card-header">
+                    <div class="flex items-center gap-3">
+                        <span class="icon-tile h-10 w-10 bg-indigo-100/80 text-indigo-700" aria-hidden="true"><x-icon name="layers" class="h-5 w-5" /></span>
+                        <div>
+                            <h2 id="module-form-title" class="section-heading">{{ $moduleId ? 'Module bewerken' : 'Nieuwe module' }}</h2>
+                            <p class="section-description">Prijs en btw zijn standaardwaarden bij een nieuwe koppeling. Bestaande klanten veranderen niet mee.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2">
                         <div class="sm:col-span-2">
-                            <label for="module_naam" class="{{ $label }}">Naam <span class="text-rose-600" aria-hidden="true">*</span></label>
-                            <input id="module_naam" class="{{ $input }}" wire:model="naam" required autocomplete="off" @error('naam') aria-invalid="true" @enderror />
-                            @error('naam') <p class="{{ $error }}">{{ $message }}</p> @enderror
+                            <label for="module_naam" class="label">Naam {!! $req !!}</label>
+                            <input id="module_naam" class="input mt-1.5" wire:model="naam" required autocomplete="off" @error('naam') aria-invalid="true" @enderror />
+                            @error('naam') <p class="field-error">{{ $message }}</p> @enderror
                         </div>
                         @if($supportsDefaultPricing)
                             <div>
-                                <label for="module_prijs" class="{{ $label }}">Prijs per maand, excl. btw <span class="text-rose-600" aria-hidden="true">*</span></label>
-                                <div class="relative">
+                                <label for="module_prijs" class="label">Prijs per maand, excl. btw {!! $req !!}</label>
+                                <div class="relative mt-1.5">
                                     <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm text-zinc-500" aria-hidden="true">&euro;</span>
-                                    <input id="module_prijs" type="text" inputmode="decimal" class="{{ $input }} pl-7 tabular-nums" wire:model="default_prijs_maand_excl" required autocomplete="off" />
+                                    <input id="module_prijs" type="text" inputmode="decimal" class="input pl-7 tabular-nums" wire:model="default_prijs_maand_excl" required autocomplete="off" />
                                 </div>
-                                @error('default_prijs_maand_excl') <p class="{{ $error }}">{{ $message }}</p> @enderror
+                                @error('default_prijs_maand_excl') <p class="field-error">{{ $message }}</p> @enderror
                             </div>
                             <div>
-                                <label for="module_btw" class="{{ $label }}">Btw-percentage <span class="text-rose-600" aria-hidden="true">*</span></label>
-                                <div class="relative">
-                                    <input id="module_btw" type="text" inputmode="decimal" class="{{ $input }} pr-8 tabular-nums" wire:model="default_btw_percentage" required autocomplete="off" />
+                                <label for="module_btw" class="label">Btw-percentage {!! $req !!}</label>
+                                <div class="relative mt-1.5">
+                                    <input id="module_btw" type="text" inputmode="decimal" class="input pr-8 tabular-nums" wire:model="default_btw_percentage" required autocomplete="off" />
                                     <span class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-sm text-zinc-500" aria-hidden="true">%</span>
                                 </div>
-                                @error('default_btw_percentage') <p class="{{ $error }}">{{ $message }}</p> @enderror
+                                @error('default_btw_percentage') <p class="field-error">{{ $message }}</p> @enderror
                             </div>
                         @else
-                            <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 sm:col-span-2">
+                            <div class="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 sm:col-span-2">
+                                <x-icon name="alert-triangle" class="mt-0.5 h-4 w-4 text-amber-600" />
                                 Standaard moduleprijzen zijn nog niet beschikbaar. Draai eerst de nieuwste migraties.
                             </div>
                         @endif
                         <div class="sm:col-span-2">
-                            <label for="module_omschrijving" class="{{ $label }}">Omschrijving</label>
-                            <textarea id="module_omschrijving" class="{{ $input }}" rows="3" wire:model="omschrijving"></textarea>
-                            @error('omschrijving') <p class="{{ $error }}">{{ $message }}</p> @enderror
+                            <label for="module_omschrijving" class="label">Omschrijving</label>
+                            <textarea id="module_omschrijving" class="input mt-1.5" rows="3" wire:model="omschrijving"></textarea>
+                            @error('omschrijving') <p class="field-error">{{ $message }}</p> @enderror
                         </div>
                         <div class="sm:col-span-2">
-                            <label for="default_visible" class="flex w-fit cursor-pointer items-center gap-2 text-sm text-zinc-800">
-                                <input type="checkbox" class="h-4 w-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-600" wire:model="default_visible" id="default_visible">
+                            <label for="default_visible" class="flex w-fit cursor-pointer items-center gap-2.5 text-sm font-medium text-zinc-800">
+                                <input type="checkbox" class="checkbox" wire:model="default_visible" id="default_visible">
                                 Standaard zichtbaar bij nieuwe klanten
                             </label>
                         </div>
                     </div>
                 </div>
 
-                <div class="flex flex-wrap items-center justify-end gap-2 border-t border-zinc-100 bg-zinc-50/70 px-4 py-3 sm:px-5">
-                    <button type="button" class="{{ $btnSecondary }}" wire:click="cancel">Annuleren</button>
-                    <button type="submit" class="{{ $btnPrimary }}" wire:loading.attr="disabled" wire:target="save">
+                <div class="card-footer">
+                    <button type="button" class="btn btn-secondary" wire:click="cancel">Annuleren</button>
+                    <button type="submit" class="btn btn-primary" wire:loading.attr="disabled" wire:target="save">
                         <svg wire:loading wire:target="save" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
                         {{ $moduleId ? 'Wijzigingen opslaan' : 'Module toevoegen' }}
                     </button>
@@ -127,27 +136,31 @@
     @endif
 
     @if($modules->isEmpty())
-        <div class="flex flex-col items-center justify-center rounded-xl border border-dashed border-zinc-300 bg-zinc-50/60 px-6 py-10 text-center">
-            <p class="text-sm font-semibold text-zinc-800">Nog geen modules</p>
+        <div class="card flex flex-col items-center justify-center px-6 py-12 text-center">
+            <span class="icon-tile mb-3 h-10 w-10 bg-zinc-100 text-zinc-600" aria-hidden="true"><x-icon name="layers" class="h-5 w-5" /></span>
+            <p class="section-heading">Nog geen modules</p>
             <p class="mt-1 max-w-sm text-sm text-zinc-500">Voeg een module toe om hem aan klanten te kunnen koppelen.</p>
             @unless($showForm)
-                <button type="button" class="{{ $btnPrimary }} mt-4" wire:click="startCreate">Eerste module toevoegen</button>
+                <button type="button" class="btn btn-primary mt-4" wire:click="startCreate">
+                    <x-icon name="plus" class="h-4 w-4" />
+                    Eerste module toevoegen
+                </button>
             @endunless
         </div>
     @else
-        <div class="min-w-0 overflow-x-auto rounded-xl border border-zinc-200 bg-white shadow-sm">
-            <table class="min-w-full divide-y divide-zinc-200 text-sm">
+        <div class="table-wrap">
+            <table class="table-base">
                 <caption class="sr-only">Modules ({{ $activeCount }} actief)</caption>
-                <thead class="bg-zinc-50">
+                <thead class="table-head">
                     <tr>
-                        <th scope="col" class="{{ $th }}">Naam</th>
+                        <th scope="col" class="table-th">Module</th>
                         @if($supportsDefaultPricing)
-                            <th scope="col" class="{{ $th }} text-right">Prijs p/m excl.</th>
-                            <th scope="col" class="{{ $th }} text-right">Btw</th>
+                            <th scope="col" class="table-th text-right">Prijs p/m excl.</th>
+                            <th scope="col" class="table-th hidden text-right sm:table-cell">Btw</th>
                         @endif
-                        <th scope="col" class="{{ $th }} text-right">Klanten</th>
-                        <th scope="col" class="{{ $th }} hidden md:table-cell">Standaard zichtbaar</th>
-                        <th scope="col" class="px-4 py-2.5"><span class="sr-only">Acties</span></th>
+                        <th scope="col" class="table-th text-right">Klanten</th>
+                        <th scope="col" class="table-th hidden md:table-cell">Nieuwe klanten</th>
+                        <th scope="col" class="table-th"><span class="sr-only">Acties</span></th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-zinc-100">
@@ -156,47 +169,76 @@
                             $inUse = (int) ($usage[$m->id] ?? 0);
                             $archived = $supportsArchive && $m->archived_at !== null;
                         @endphp
-                        <tr @class(['hover:bg-zinc-50/80', 'bg-zinc-50/60' => $archived, 'bg-indigo-50/40' => $moduleId === $m->id]) wire:key="module-{{ $m->id }}">
-                            <td class="max-w-md px-4 py-3 align-middle">
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <span @class(['font-semibold', 'text-zinc-900' => ! $archived, 'text-zinc-500' => $archived])>{{ $m->naam }}</span>
-                                    @if($archived)
-                                        <span class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 ring-1 ring-inset ring-zinc-200">Gearchiveerd</span>
-                                    @endif
+                        <tr @class(['table-row', 'bg-zinc-50/70' => $archived, 'bg-indigo-50/50' => $moduleId === $m->id]) wire:key="module-{{ $m->id }}">
+                            <td class="table-td max-w-md">
+                                <div class="flex min-w-0 items-start gap-3">
+                                    <span @class(['icon-tile mt-0.5 h-8 w-8 rounded-lg', 'bg-zinc-100 text-zinc-400' => $archived, $tileTones[$m->id % count($tileTones)] => ! $archived]) aria-hidden="true">
+                                        <x-icon :name="$archived ? 'archive' : 'package'" class="h-4 w-4" />
+                                    </span>
+                                    <div class="min-w-0">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <span @class(['font-semibold', 'text-zinc-900' => ! $archived, 'text-zinc-500' => $archived])>{{ $m->naam }}</span>
+                                            @if($archived)
+                                                <x-badge>Gearchiveerd</x-badge>
+                                            @endif
+                                        </div>
+                                        @if(filled($m->omschrijving))
+                                            <p class="mt-0.5 line-clamp-2 text-xs leading-5 text-zinc-500" title="{{ $m->omschrijving }}">{{ $m->omschrijving }}</p>
+                                        @endif
+                                    </div>
                                 </div>
-                                @if(filled($m->omschrijving))
-                                    <p class="mt-0.5 line-clamp-2 text-xs text-zinc-500" title="{{ $m->omschrijving }}">{{ $m->omschrijving }}</p>
-                                @endif
                             </td>
                             @if($supportsDefaultPricing)
                                 @php
                                     $btw = (float) $m->default_btw_percentage;
                                     $btwDecimals = abs($btw - round($btw)) < 0.001 ? 0 : 2;
                                 @endphp
-                                <td class="whitespace-nowrap px-4 py-3 text-right align-middle tabular-nums text-zinc-700">&euro; {{ number_format((float) $m->default_prijs_maand_excl, 2, ',', '.') }}</td>
-                                <td class="whitespace-nowrap px-4 py-3 text-right align-middle tabular-nums text-zinc-700">{{ number_format($btw, $btwDecimals, ',', '.') }}%</td>
+                                <td class="table-td whitespace-nowrap text-right tabular-nums">
+                                    <span class="font-semibold text-zinc-900">&euro; {{ number_format((float) $m->default_prijs_maand_excl, 2, ',', '.') }}</span>
+                                </td>
+                                <td class="table-td hidden whitespace-nowrap text-right tabular-nums sm:table-cell">{{ number_format($btw, $btwDecimals, ',', '.') }}%</td>
                             @endif
-                            <td class="whitespace-nowrap px-4 py-3 text-right align-middle tabular-nums text-zinc-700">{{ number_format($inUse, 0, ',', '.') }}</td>
-                            <td class="hidden px-4 py-3 align-middle text-zinc-700 md:table-cell">{{ $m->default_visible ? 'Ja' : 'Nee' }}</td>
-                            <td class="whitespace-nowrap px-4 py-3 text-right align-middle">
+                            <td class="table-td whitespace-nowrap text-right">
+                                <span @class(['inline-flex items-center gap-1.5 tabular-nums', 'font-semibold text-zinc-900' => $inUse > 0, 'text-zinc-400' => $inUse === 0])>
+                                    <x-icon name="building" class="h-3.5 w-3.5 text-zinc-400" />
+                                    {{ number_format($inUse, 0, ',', '.') }}
+                                    <span class="sr-only">{{ $inUse === 1 ? 'klant' : 'klanten' }}</span>
+                                </span>
+                            </td>
+                            <td class="table-td hidden md:table-cell">
+                                @if($m->default_visible)
+                                    <x-badge tone="info"><x-icon name="eye" class="h-3 w-3" />Zichtbaar</x-badge>
+                                @else
+                                    <x-badge>Verborgen</x-badge>
+                                @endif
+                            </td>
+                            <td class="table-td whitespace-nowrap text-right">
                                 {{-- Vaste, rechts uitgelijnde groep met drie slots, zodat knoppen per rij onder elkaar staan. --}}
                                 <div class="flex items-center justify-end gap-1">
-                                    <button type="button" class="{{ $btnSmall }} {{ $actionSlot }} text-zinc-700 hover:bg-zinc-100" wire:click="startEdit({{ $m->id }})" aria-label="{{ $m->naam }} bewerken">Bewerken</button>
+                                    <button type="button" class="btn btn-ghost btn-sm" wire:click="startEdit({{ $m->id }})" aria-label="{{ $m->naam }} bewerken">
+                                        <x-icon name="edit" class="h-4 w-4" /><span class="hidden lg:inline">Bewerken</span>
+                                    </button>
                                     @if($archived)
-                                        <button type="button" class="{{ $btnSmall }} {{ $actionSlot }} text-zinc-700 hover:bg-zinc-100" wire:click="restoreModule({{ $m->id }})" wire:loading.attr="disabled" wire:target="restoreModule({{ $m->id }})" aria-label="{{ $m->naam }} herstellen">Herstellen</button>
+                                        <button type="button" class="btn btn-ghost btn-sm {{ $actionSlot }}" wire:click="restoreModule({{ $m->id }})" wire:loading.attr="disabled" wire:target="restoreModule({{ $m->id }})" aria-label="{{ $m->naam }} herstellen">
+                                            <x-icon name="refresh" class="h-4 w-4" />Herstellen
+                                        </button>
                                     @elseif($supportsArchive)
-                                        <button type="button" class="{{ $btnSmall }} {{ $actionSlot }} text-amber-800 hover:bg-amber-50" aria-label="{{ $m->naam }} archiveren"
-                                                @click="ask('archiveModule', {{ $m->id }}, 'Module archiveren?', 'Bestaande klanten houden de module, maar je kunt hem niet meer kiezen bij nieuwe koppelingen.', 'Archiveren')">Archiveren</button>
+                                        <button type="button" class="btn btn-ghost btn-sm {{ $actionSlot }} text-amber-800 hover:bg-amber-50 hover:text-amber-900" aria-label="{{ $m->naam }} archiveren"
+                                                @click="ask('archiveModule', {{ $m->id }}, 'Module archiveren?', 'Bestaande klanten houden de module, maar je kunt hem niet meer kiezen bij nieuwe koppelingen.', 'Archiveren')">
+                                            <x-icon name="archive" class="h-4 w-4" />Archiveren
+                                        </button>
                                     @elseif($inUse > 0)
-                                        <span class="{{ $actionSlot }} inline-flex items-center text-xs text-zinc-400" title="Draai de nieuwste migraties om archiveren mogelijk te maken.">In gebruik</span>
+                                        <span class="{{ $actionSlot }} inline-flex items-center justify-center text-xs text-zinc-400" title="Draai de nieuwste migraties om archiveren mogelijk te maken.">In gebruik</span>
                                     @else
                                         <span class="{{ $actionSlot }}" aria-hidden="true"></span>
                                     @endif
                                     @if(! $archived && $inUse === 0)
-                                        <button type="button" class="{{ $btnSmall }} {{ $actionSlot }} text-rose-700 hover:bg-rose-50 focus-visible:ring-rose-600" aria-label="{{ $m->naam }} verwijderen"
-                                                @click="ask('deleteModule', {{ $m->id }}, 'Module verwijderen?', 'Weet je zeker dat je deze module wilt verwijderen? Dit kan niet ongedaan worden gemaakt.', 'Verwijderen', true)">Verwijderen</button>
+                                        <button type="button" class="btn btn-danger-ghost btn-icon btn-sm" aria-label="{{ $m->naam }} verwijderen" title="Verwijderen"
+                                                @click="ask('deleteModule', {{ $m->id }}, 'Module verwijderen?', 'Weet je zeker dat je deze module wilt verwijderen? Dit kan niet ongedaan worden gemaakt.', 'Verwijderen', true)">
+                                            <x-icon name="trash" class="h-4 w-4" />
+                                        </button>
                                     @else
-                                        <span class="{{ $actionSlot }}" aria-hidden="true"></span>
+                                        <span class="inline-block w-8 shrink-0" aria-hidden="true"></span>
                                     @endif
                                 </div>
                             </td>
@@ -215,18 +257,23 @@
         @click.self="closeConfirm()"
         style="display: none;"
     >
-        <div class="w-full max-w-md overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xl"
+        <div class="w-full max-w-md overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-pop"
              role="alertdialog" aria-modal="true" aria-labelledby="module-confirm-title" aria-describedby="module-confirm-message"
              x-trap.noscroll="confirmOpen">
-            <div class="px-5 pb-4 pt-5">
-                <h2 id="module-confirm-title" class="text-base font-semibold text-zinc-900" x-text="confirmTitle"></h2>
-                <p id="module-confirm-message" class="mt-2 text-sm text-zinc-600" x-text="confirmMessage"></p>
+            <div class="flex items-start gap-3 px-5 pb-4 pt-5">
+                <span class="icon-tile h-10 w-10" :class="confirmDanger ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'" aria-hidden="true">
+                    <x-icon name="alert-triangle" class="h-5 w-5" />
+                </span>
+                <div class="min-w-0">
+                <h2 id="module-confirm-title" class="section-heading" x-text="confirmTitle"></h2>
+                <p id="module-confirm-message" class="mt-1 text-sm leading-6 text-zinc-600" x-text="confirmMessage"></p>
+                </div>
             </div>
-            <div class="flex justify-end gap-2 border-t border-zinc-100 bg-zinc-50/70 px-5 py-3">
-                <button type="button" x-ref="confirmCancel" class="{{ $btnSecondary }}" @click="closeConfirm()">Annuleren</button>
+            <div class="card-footer">
+                <button type="button" x-ref="confirmCancel" class="btn btn-secondary" @click="closeConfirm()">Annuleren</button>
                 <button
                     type="button"
-                    class="inline-flex h-9 items-center justify-center rounded-lg px-3.5 text-sm font-semibold text-white shadow-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                    class="btn text-white shadow-sm"
                     :class="confirmDanger ? 'bg-rose-600 hover:bg-rose-700 focus-visible:ring-rose-600' : 'bg-amber-700 hover:bg-amber-800 focus-visible:ring-amber-700'"
                     @click="runConfirm()"
                     x-text="confirmLabel"
