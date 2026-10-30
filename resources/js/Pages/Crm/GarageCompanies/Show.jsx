@@ -510,6 +510,56 @@ export default function Show({
         setDemoStatus('actief');
     };
 
+    // ---- Pauzeren / hervatten ----
+    const pauseForm = useForm({ tot: '', reden: '' });
+    const [showPauseForm, setShowPauseForm] = useState(false);
+
+    const formatIsoDate = (value) => {
+        const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+        return match ? `${match[3]}-${match[2]}-${match[1]}` : '';
+    };
+
+    const submitPause = async (event) => {
+        event.preventDefault();
+        if (pauseForm.processing || !urls.pause) return;
+        const tot = formatIsoDate(pauseForm.data.tot);
+        const ok = await confirm({
+            title: 'Klant pauzeren',
+            message: `${tot ? `Klant wordt gepauzeerd tot ${tot}.` : 'Klant wordt gepauzeerd zonder einddatum.'} Tijdens de pauze telt de klant niet mee voor MRR en wordt er niet geïncasseerd. Dit wordt vastgelegd in de tijdlijn.`,
+            confirmText: 'Pauzeren',
+            cancelText: 'Annuleren',
+            tone: 'primary',
+        });
+        if (!ok) return;
+        pauseForm.post(urls.pause, {
+            preserveScroll: true,
+            preserveState: false,
+            onSuccess: () => {
+                pauseForm.reset();
+                setShowPauseForm(false);
+                setHeaderPanel(null);
+            },
+        });
+    };
+
+    const resumeCompany = async () => {
+        if (statusBusy || !urls.resume) return;
+        const ok = await confirm({
+            title: 'Klant hervatten',
+            message: 'Status wordt weer Actief en de pauzegegevens worden gewist. Dit wordt vastgelegd in de tijdlijn.',
+            confirmText: 'Hervatten',
+            cancelText: 'Annuleren',
+            tone: 'success',
+        });
+        if (!ok) return;
+        router.post(urls.resume, {}, {
+            preserveScroll: true,
+            preserveState: false,
+            onStart: () => setStatusBusy(true),
+            onFinish: () => setStatusBusy(false),
+        });
+    };
+
     const submitDemoStatus = async (event) => {
         event.preventDefault();
         if (statusForm.processing || statusBusy) return;
@@ -1007,6 +1057,9 @@ export default function Show({
                 onSubmitExtend={submitExtend}
                 noteForm={noteForm}
                 onSubmitNote={submitNote}
+                pauseForm={pauseForm}
+                onSubmitPause={submitPause}
+                onResume={resumeCompany}
             />
 
             <TabPanel idBase={tabsIdBase} value="overzicht" active={activeTab === 'overzicht'}>
@@ -1136,6 +1189,11 @@ export default function Show({
                         onSubmitStatus={submitDemoStatus}
                         onSetStatus={setDemoStatus}
                         onActivate={activateCompany}
+                        pauseForm={pauseForm}
+                        onSubmitPause={submitPause}
+                        showPauseForm={showPauseForm}
+                        setShowPauseForm={setShowPauseForm}
+                        onResume={resumeCompany}
                         statusBusy={statusBusy}
                         hasActiveMandate={hasActiveMandate}
                         demoInfo={demoInfo}

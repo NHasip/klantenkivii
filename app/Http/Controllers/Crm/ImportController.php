@@ -318,6 +318,7 @@ class ImportController extends Controller
             'actief', 'active' => GarageCompanyStatus::Actief->value,
             'proefperiode', 'demo', 'demo_gepland', 'trial' => GarageCompanyStatus::Proefperiode->value,
             'demo_aangevraagd', 'lead' => GarageCompanyStatus::DemoAangevraagd->value,
+            'gepauzeerd', 'pauze', 'paused' => GarageCompanyStatus::Gepauzeerd->value,
             'opgezegd' => GarageCompanyStatus::Opgezegd->value,
             'verloren' => GarageCompanyStatus::Verloren->value,
             default => $key,
@@ -452,6 +453,10 @@ class ImportController extends Controller
             GarageCompanyStatus::Verloren->value => $companyData['verloren_op'] = $start,
             default => null,
         };
+
+        if ($status === GarageCompanyStatus::Gepauzeerd->value && GarageCompany::hasPauseColumns()) {
+            $companyData['gepauzeerd_op'] = ($start ?? now())->toDateString();
+        }
 
         if ($status === GarageCompanyStatus::Proefperiode->value) {
             $proefStart = $start ?? now();

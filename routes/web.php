@@ -51,6 +51,8 @@ Route::middleware(['auth', 'active', 'admin.2fa'])->group(function () {
     Route::patch('/garagebedrijven/{garageCompany}/demo/dates', [GarageCompaniesController::class, 'saveDemoDates'])->name('crm.garage_companies.demo.dates');
     Route::post('/garagebedrijven/{garageCompany}/demo/extend', [GarageCompaniesController::class, 'extendDemo'])->name('crm.garage_companies.demo.extend');
     Route::patch('/garagebedrijven/{garageCompany}/demo/status', [GarageCompaniesController::class, 'setDemoStatus'])->name('crm.garage_companies.demo.status');
+    Route::post('/garagebedrijven/{garageCompany}/pauze', [GarageCompaniesController::class, 'pause'])->name('crm.garage_companies.pause');
+    Route::post('/garagebedrijven/{garageCompany}/hervat', [GarageCompaniesController::class, 'resume'])->name('crm.garage_companies.resume');
     Route::post('/garagebedrijven/{garageCompany}/incasso', [GarageCompaniesController::class, 'saveMandate'])->name('crm.garage_companies.mandates.save');
     Route::post('/garagebedrijven/{garageCompany}/incasso-instellingen', [GarageCompaniesController::class, 'updateIncassoSettings'])->name('crm.garage_companies.incasso.settings');
     Route::patch('/garagebedrijven/{garageCompany}/incasso/{mandate}', [GarageCompaniesController::class, 'setMandateStatus'])->name('crm.garage_companies.mandates.status');

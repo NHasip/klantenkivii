@@ -3,6 +3,7 @@ import { Button, Card, CardHeader, Field, cx, inputClasses } from '../../../../c
 import StatusBadge from '../../../../components/StatusBadge';
 import { Icon } from '../../../../components/icons';
 import { FormActions, FormField, Notice, formatDate, toDateOnly } from './showUtils';
+import PauseForm from './PauseForm';
 
 function lifecycleSteps(company, status) {
     const requested = { key: 'demo_aangevraagd', label: 'Demo aangevraagd', date: company.demo_aangevraagd_op, dateLabel: 'Aangevraagd' };
@@ -17,6 +18,17 @@ function lifecycleSteps(company, status) {
     if (status === 'verloren') {
         return { steps: [requested, demo, { key: 'verloren', label: 'Verloren', date: company.verloren_op, dateLabel: 'Op', tone: 'neutral' }], current: 2 };
     }
+    if (status === 'gepauzeerd') {
+        const paused = {
+            key: 'gepauzeerd',
+            label: 'Gepauzeerd',
+            date: company.gepauzeerd_op,
+            dateLabel: 'Sinds',
+            extra: company.gepauzeerd_tot ? `Tot ${formatDate(company.gepauzeerd_tot)}` : 'Geen einddatum',
+            tone: 'paused',
+        };
+        return { steps: [requested, demo, active, paused], current: 3 };
+    }
     if (status === 'opgezegd') {
         return { steps: [requested, demo, active, { key: 'opgezegd', label: 'Opgezegd', date: company.opgezegd_op, dateLabel: 'Op', tone: 'danger' }], current: 3 };
     }
@@ -28,6 +40,7 @@ const STEP_CURRENT = {
     brand: 'bg-indigo-600 text-white ring-4 ring-indigo-100',
     danger: 'bg-rose-600 text-white ring-4 ring-rose-100',
     neutral: 'bg-zinc-600 text-white ring-4 ring-zinc-200',
+    paused: 'bg-violet-700 text-white ring-4 ring-violet-100',
 };
 
 function LifecycleStepper({ company, status }) {
@@ -85,6 +98,11 @@ export default function DemoStatusTab({
     onSubmitStatus,
     onSetStatus,
     onActivate,
+    pauseForm,
+    onSubmitPause,
+    showPauseForm = false,
+    setShowPauseForm,
+    onResume,
     statusBusy,
     hasActiveMandate,
     demoInfo,
@@ -128,6 +146,31 @@ export default function DemoStatusTab({
                                 </Button>
                             ))}
                         </div>
+                        {status === 'actief' && pauseForm && (
+                            <div className="mt-4">
+                                {!showPauseForm ? (
+                                    <Button variant="secondary" size="sm" icon="clock" onClick={() => setShowPauseForm?.(true)} disabled={statusBusy}>
+                                        Pauzeren
+                                    </Button>
+                                ) : (
+                                    <PauseForm idBase="status-pause" form={pauseForm} onSubmit={onSubmitPause} onCancel={() => setShowPauseForm?.(false)} />
+                                )}
+                                <p className="mt-1.5 text-xs text-zinc-500">Tijdelijk gestopt: telt niet mee voor MRR en wordt niet meegenomen in de incasso.</p>
+                            </div>
+                        )}
+                        {status === 'gepauzeerd' && (
+                            <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 p-3">
+                                <p className="text-sm font-semibold text-violet-900">
+                                    Gepauzeerd{company.gepauzeerd_tot ? ` tot ${formatDate(company.gepauzeerd_tot)}` : ', geen einddatum'}
+                                </p>
+                                {company.gepauzeerd_reden ? <p className="mt-0.5 text-sm text-violet-900">Reden: {company.gepauzeerd_reden}</p> : null}
+                                {onResume ? (
+                                    <Button size="sm" icon="check-circle" className="mt-2" onClick={onResume} loading={statusBusy}>
+                                        Hervatten
+                                    </Button>
+                                ) : null}
+                            </div>
+                        )}
                         {!hasActiveMandate && (
                             <p className="mt-3 flex items-center gap-1.5 text-xs font-medium text-amber-800">
                                 <Icon name="alert-triangle" className="h-3.5 w-3.5" />

@@ -7,6 +7,7 @@ export const CUSTOMER_STATUS_LABELS = {
     demo_gepland: 'Demo',
     proefperiode: 'Demo',
     actief: 'Actief',
+    gepauzeerd: 'Gepauzeerd',
     opgezegd: 'Opgezegd',
     verloren: 'Verloren',
 };
@@ -16,6 +17,8 @@ const STATUS_CLASSES = {
     demo_aangevraagd: 'bg-sky-50 text-sky-800 ring-sky-200',
     proefperiode: 'bg-amber-50 text-amber-800 ring-amber-200',
     actief: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
+    // violet-800 op violet-50: contrast ca. 8:1.
+    gepauzeerd: 'bg-violet-50 text-violet-800 ring-violet-200',
     opgezegd: 'bg-rose-50 text-rose-800 ring-rose-200',
     verloren: 'bg-zinc-100 text-zinc-700 ring-zinc-300',
 };
@@ -31,7 +34,7 @@ export function customerStatusLabel(value, labels = {}) {
     return labels?.[normalized] || CUSTOMER_STATUS_LABELS[normalized] || CUSTOMER_STATUS_LABELS[value] || value || '-';
 }
 
-const RAW_STATUS_PATTERN = /\b(lead|demo_aangevraagd|demo_gepland|proefperiode|actief|opgezegd|verloren)\b/g;
+const RAW_STATUS_PATTERN = /\b(lead|demo_aangevraagd|demo_gepland|proefperiode|actief|gepauzeerd|opgezegd|verloren)\b/g;
 
 // Translates raw status values in stored texts (e.g. "proefperiode -> actief") to Dutch labels at display time.
 export function translateStatusText(text, labels = {}) {

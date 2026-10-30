@@ -50,7 +50,7 @@ class GarageCompaniesController
 
     private const DEFAULT_DEMO_DAYS = GarageCompany::DEFAULT_DEMO_DAYS;
 
-    private const LIST_STATUS_TABS = ['alle', 'demo_aangevraagd', 'proefperiode', 'actief', 'opgezegd', 'verloren'];
+    private const LIST_STATUS_TABS = ['alle', 'demo_aangevraagd', 'proefperiode', 'actief', 'gepauzeerd', 'opgezegd', 'verloren'];
 
     private const LIST_SORT_FIELDS = ['naam', 'status', 'plaats', 'omzet', 'demo_eind', 'volgende_actie', 'bijgewerkt', 'actief_vanaf'];
 
@@ -434,6 +434,10 @@ class GarageCompaniesController
 
             if (Schema::hasColumn('garage_companies', 'login_password')) {
                 $companyData['login_password'] = $data['login_password'] ?? null;
+            }
+
+            if ($data['status'] === GarageCompanyStatus::Gepauzeerd->value && GarageCompany::hasPauseColumns()) {
+                $companyData['gepauzeerd_op'] = now()->toDateString();
             }
 
             $company = GarageCompany::create($companyData);
@@ -1160,6 +1164,9 @@ class GarageCompaniesController
                 'opzegreden' => $garageCompany->opzegreden,
                 'verloren_op' => $this->formatDateTime($garageCompany->verloren_op),
                 'verloren_reden' => $garageCompany->verloren_reden,
+                'gepauzeerd_op' => GarageCompany::hasPauseColumns() ? $garageCompany->gepauzeerd_op?->toDateString() : null,
+                'gepauzeerd_tot' => GarageCompany::hasPauseColumns() ? $garageCompany->gepauzeerd_tot?->toDateString() : null,
+                'gepauzeerd_reden' => GarageCompany::hasPauseColumns() ? $garageCompany->gepauzeerd_reden : null,
                 'actieve_seats' => $garageCompany->active_seats_count ?? 0,
                 'active_mrr_excl' => (float) $garageCompany->active_mrr_excl,
                 'active_mrr_incl' => (float) $garageCompany->active_mrr_incl,
@@ -1226,6 +1233,8 @@ class GarageCompaniesController
                 'save_demo_dates' => route('crm.garage_companies.demo.dates', ['garageCompany' => $garageCompany->id]),
                 'extend_demo' => route('crm.garage_companies.demo.extend', ['garageCompany' => $garageCompany->id]),
                 'set_demo_status' => route('crm.garage_companies.demo.status', ['garageCompany' => $garageCompany->id]),
+                'pause' => route('crm.garage_companies.pause', ['garageCompany' => $garageCompany->id]),
+                'resume' => route('crm.garage_companies.resume', ['garageCompany' => $garageCompany->id]),
                 'save_mandate' => route('crm.garage_companies.mandates.save', ['garageCompany' => $garageCompany->id]),
                 'save_incasso_settings' => route('crm.garage_companies.incasso.settings', ['garageCompany' => $garageCompany->id]),
                 'export_incasso_batch' => route('crm.incasso.export'),
@@ -1385,6 +1394,13 @@ class GarageCompaniesController
             } elseif (empty($data['login_email'])) {
                 $garageCompany->login_password = null;
             }
+        }
+        $newStatus = $garageCompany->status->value;
+        if ($newStatus === GarageCompanyStatus::Gepauzeerd->value && $oldStatus !== $newStatus && GarageCompany::hasPauseColumns()) {
+            $garageCompany->gepauzeerd_op = now()->toDateString();
+        }
+        if ($oldStatus === GarageCompanyStatus::Gepauzeerd->value && $newStatus !== $oldStatus) {
+            $this->clearPauseFields($garageCompany);
         }
         $garageCompany->save();
 
@@ -1791,6 +1807,13 @@ class GarageCompaniesController
             $garageCompany->verloren_op = now();
         }
 
+        if ($to === GarageCompanyStatus::Gepauzeerd->value && $from !== $to && GarageCompany::hasPauseColumns()) {
+            $garageCompany->gepauzeerd_op = now()->toDateString();
+        }
+        if ($from === GarageCompanyStatus::Gepauzeerd->value && $to !== $from) {
+            $this->clearPauseFields($garageCompany);
+        }
+
         $garageCompany->status = GarageCompanyStatus::from($to);
         $garageCompany->save();
 
@@ -1805,6 +1828,87 @@ class GarageCompaniesController
         }
 
         return back()->with('status', 'Status bijgewerkt.');
+    }
+
+    /** Klant tijdelijk stoppen: telt niet mee voor MRR, incasso en mandaat-taken. */
+    public function pause(Request $request, GarageCompany $garageCompany): RedirectResponse
+    {
+        $data = $request->validate([
+            'tot' => ['nullable', 'date', 'after_or_equal:today'],
+            'reden' => ['nullable', 'string', 'max:255'],
+        ], [
+            'tot.after_or_equal' => 'De einddatum van de pauze mag niet in het verleden liggen.',
+        ]);
+
+        if ($garageCompany->status !== GarageCompanyStatus::Actief) {
+            return back()->with('status', 'Alleen actieve klanten kunnen worden gepauzeerd.');
+        }
+        if (! GarageCompany::hasPauseColumns()) {
+            return back()->with('status', 'Pauzeren is nog niet beschikbaar: de database-migratie voor gepauzeerd is nog niet uitgevoerd.');
+        }
+
+        $from = $garageCompany->status->value;
+        $tot = ! empty($data['tot']) ? Carbon::parse((string) $data['tot'])->startOfDay() : null;
+        $reden = trim((string) ($data['reden'] ?? ''));
+
+        $garageCompany->status = GarageCompanyStatus::Gepauzeerd;
+        if (GarageCompany::hasPauseColumns()) {
+            $garageCompany->gepauzeerd_op = now()->toDateString();
+            $garageCompany->gepauzeerd_tot = $tot?->toDateString();
+            $garageCompany->gepauzeerd_reden = $reden !== '' ? $reden : null;
+        }
+        $garageCompany->save();
+
+        $titel = 'Gepauzeerd'.($tot ? ' tot '.$tot->format('d-m-Y') : '');
+        if ($reden !== '') {
+            $titel .= ', reden: '.$reden;
+        }
+
+        Activity::create([
+            'garage_company_id' => $garageCompany->id,
+            'type' => ActivityType::StatusWijziging,
+            'titel' => 'Status gewijzigd: '.$this->statusLabel($from).' -> '.$this->statusLabel(GarageCompanyStatus::Gepauzeerd->value),
+            'inhoud' => $titel,
+            'created_by' => auth()->id(),
+        ]);
+
+        return back()->with('status', 'Klant gepauzeerd.');
+    }
+
+    /** Pauze beeindigen: status terug naar actief en pauzevelden leegmaken. */
+    public function resume(GarageCompany $garageCompany): RedirectResponse
+    {
+        if ($garageCompany->status !== GarageCompanyStatus::Gepauzeerd) {
+            return back()->with('status', 'Deze klant is niet gepauzeerd.');
+        }
+
+        $garageCompany->status = GarageCompanyStatus::Actief;
+        if (! $garageCompany->actief_vanaf) {
+            $garageCompany->actief_vanaf = now();
+        }
+        $this->clearPauseFields($garageCompany);
+        $garageCompany->save();
+
+        Activity::create([
+            'garage_company_id' => $garageCompany->id,
+            'type' => ActivityType::StatusWijziging,
+            'titel' => 'Status gewijzigd: '.$this->statusLabel(GarageCompanyStatus::Gepauzeerd->value).' -> '.$this->statusLabel(GarageCompanyStatus::Actief->value),
+            'inhoud' => 'Hervat',
+            'created_by' => auth()->id(),
+        ]);
+
+        return back()->with('status', 'Klant hervat.');
+    }
+
+    private function clearPauseFields(GarageCompany $garageCompany): void
+    {
+        if (! GarageCompany::hasPauseColumns()) {
+            return;
+        }
+
+        $garageCompany->gepauzeerd_op = null;
+        $garageCompany->gepauzeerd_tot = null;
+        $garageCompany->gepauzeerd_reden = null;
     }
 
 
@@ -2775,6 +2879,21 @@ class GarageCompaniesController
 
         /** @var GarageCompany $company */
         foreach ($companies as $company) {
+            if ($company->status === GarageCompanyStatus::Gepauzeerd) {
+                $pausedUntil = GarageCompany::hasPauseColumns() ? $company->gepauzeerd_tot : null;
+                $missing[] = [
+                    'company_id' => $company->id,
+                    'company_name' => (string) $company->bedrijfsnaam,
+                    'missing_fields' => [
+                        $pausedUntil
+                            ? 'Klant is gepauzeerd (tot '.$pausedUntil->format('d-m-Y').')'
+                            : 'Klant is gepauzeerd',
+                    ],
+                    'url' => route('crm.garage_companies.show', ['garageCompany' => $company->id]),
+                ];
+                continue;
+            }
+
             $activeMandate = $company->mandates->first(
                 fn (SepaMandate $mandate) => $mandate->status === SepaMandateStatus::Actief
             );

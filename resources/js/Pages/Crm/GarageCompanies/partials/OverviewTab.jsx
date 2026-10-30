@@ -61,6 +61,11 @@ function OverviewReadOnly({ company, status, onEdit }) {
             ) : null,
         },
     ];
+    if (status === 'gepauzeerd') {
+        items.push({ label: 'Gepauzeerd sinds', value: company.gepauzeerd_op ? formatDate(company.gepauzeerd_op) : null });
+        items.push({ label: 'Gepauzeerd tot', value: company.gepauzeerd_tot ? formatDate(company.gepauzeerd_tot) : 'Geen einddatum' });
+        items.push({ label: 'Reden pauze', value: company.gepauzeerd_reden });
+    }
     if (status === 'opgezegd') {
         items.push({ label: 'Opgezegd op', value: company.opgezegd_op ? formatDate(company.opgezegd_op) : null });
         items.push({ label: 'Opzegreden', value: company.opzegreden });

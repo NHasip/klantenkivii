@@ -32,6 +32,7 @@
             'demo_aangevraagd' => ['label' => 'Demo aangevraagd', 'icon' => 'inbox', 'bar' => 'bg-sky-400'],
             'proefperiode' => ['label' => 'Demo', 'icon' => 'sparkles', 'bar' => 'bg-amber-400'],
             'actief' => ['label' => 'Actief', 'icon' => 'check-circle', 'bar' => 'bg-emerald-500'],
+            'gepauzeerd' => ['label' => 'Gepauzeerd', 'icon' => 'clock', 'bar' => 'bg-violet-400'],
             'opgezegd' => ['label' => 'Opgezegd', 'icon' => 'log-out', 'bar' => 'bg-rose-400'],
             'verloren' => ['label' => 'Verloren', 'icon' => 'x-circle', 'bar' => 'bg-zinc-400'],
         ];

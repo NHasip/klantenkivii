@@ -117,7 +117,7 @@ export default function Index({ maxRows = 200, fields = [], urls }) {
                     <CardHeader title="Hulp" icon="info" />
                     <div className="space-y-3 text-sm text-zinc-600">
                         <p>
-                            Verplicht: <code>bedrijfsnaam</code> en <code>status</code> (actief, proefperiode, demo_aangevraagd, opgezegd of verloren).
+                            Verplicht: <code>bedrijfsnaam</code> en <code>status</code> (actief, gepauzeerd, proefperiode, demo_aangevraagd, opgezegd of verloren).
                             De rest is optioneel.
                         </p>
                         <p>Velden: {fields.map((f, i) => <React.Fragment key={f}>{i > 0 ? ', ' : ''}<code>{f}</code></React.Fragment>)}.</p>

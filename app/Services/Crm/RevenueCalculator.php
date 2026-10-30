@@ -167,6 +167,10 @@ class RevenueCalculator
         if ($hasAantal) {
             $select[] = 'garage_company_modules.aantal';
         }
+        $hasPause = GarageCompany::hasPauseColumns();
+        if ($hasPause) {
+            $select[] = 'garage_companies.gepauzeerd_op';
+        }
 
         $rows = GarageCompanyModule::query()
             ->join('garage_companies', 'garage_companies.id', '=', 'garage_company_modules.garage_company_id')
@@ -177,7 +181,7 @@ class RevenueCalculator
                     ->orWhereNotNull('garage_company_modules.einddatum');
             })
             ->get($select)
-            ->map(function ($row) use ($tz, $hasAantal) {
+            ->map(function ($row) use ($tz, $hasAantal, $hasPause) {
                 $date = fn ($value) => $value ? CarbonImmutable::parse($value, $tz)->toDateString() : null;
                 $status = (string) $row->company_status;
                 $since = $date($row->actief_vanaf);
@@ -192,6 +196,7 @@ class RevenueCalculator
                     'since' => $since,
                     'opgezegd' => $date($row->opgezegd_op),
                     'verloren' => $date($row->verloren_op),
+                    'gepauzeerd' => $hasPause ? $date($row->gepauzeerd_op) : null,
                     'status' => $status,
                 ];
             });
@@ -218,11 +223,12 @@ class RevenueCalculator
             $sum = 0.0;
             foreach ($rows as $row) {
                 $isActief = $row['status'] === GarageCompanyStatus::Actief->value;
-                $isGestopt = in_array($row['status'], [GarageCompanyStatus::Opgezegd->value, GarageCompanyStatus::Verloren->value], true);
+                // Gepauzeerd telt als (tijdelijk) gestopt vanaf gepauzeerd_op.
+                $isGestopt = in_array($row['status'], [GarageCompanyStatus::Opgezegd->value, GarageCompanyStatus::Verloren->value, GarageCompanyStatus::Gepauzeerd->value], true);
                 if (! $isActief && ! $isGestopt) {
                     continue;
                 }
-                if ($isGestopt && $row['opgezegd'] === null && $row['verloren'] === null) {
+                if ($isGestopt && $row['opgezegd'] === null && $row['verloren'] === null && $row['gepauzeerd'] === null) {
                     continue;
                 }
                 if ($row['start'] !== null && $row['start'] > $peil) {
@@ -234,7 +240,7 @@ class RevenueCalculator
                 if ($row['since'] === null || $row['since'] > $peil) {
                     continue;
                 }
-                foreach (['opgezegd', 'verloren'] as $stop) {
+                foreach (['opgezegd', 'verloren', 'gepauzeerd'] as $stop) {
                     if ($row[$stop] !== null && $row[$stop] <= $peil && $row[$stop] >= $row['since']) {
                         continue 2;
                     }

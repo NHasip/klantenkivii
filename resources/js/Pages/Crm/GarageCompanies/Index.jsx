@@ -35,6 +35,7 @@ const STATUS_TABS = [
     { value: 'demo_aangevraagd', label: 'Demo aangevraagd', tone: 'info' },
     { value: 'proefperiode', label: 'Demo', tone: 'warning' },
     { value: 'actief', label: 'Actief', tone: 'success' },
+    { value: 'gepauzeerd', label: 'Gepauzeerd', tone: 'brand' },
     { value: 'opgezegd', label: 'Opgezegd', tone: 'danger' },
     { value: 'verloren', label: 'Verloren', tone: 'neutral' },
 ];

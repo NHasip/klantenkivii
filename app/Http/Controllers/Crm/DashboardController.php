@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Crm;
 
 use App\Enums\ActivityType;
+use App\Enums\GarageCompanyStatus;
 use App\Enums\TaskStatus;
 use App\Models\Activity;
 use App\Models\GarageCompany;
@@ -270,6 +271,27 @@ class DashboardController
 
         $activeSepaIssues = SepaChecklist::activeCompaniesWithIssues();
 
+        // Gepauzeerde klanten; pauzes waarvan de einddatum voorbij is vragen om actie (hervatten?).
+        $companiesPaused = GarageCompany::query()->where('status', GarageCompanyStatus::Gepauzeerd->value)->count();
+        $pauseExpired = collect();
+        if ($companiesPaused > 0 && GarageCompany::hasPauseColumns()) {
+            $pauseExpired = GarageCompany::query()
+                ->where('status', GarageCompanyStatus::Gepauzeerd->value)
+                ->whereNotNull('gepauzeerd_tot')
+                ->whereDate('gepauzeerd_tot', '<', $todayStart->toDateString())
+                ->orderBy('gepauzeerd_tot')
+                ->limit(50)
+                ->get(['id', 'bedrijfsnaam', 'gepauzeerd_tot', 'gepauzeerd_reden'])
+                ->map(fn (GarageCompany $company) => [
+                    'id' => $company->id,
+                    'bedrijfsnaam' => $company->bedrijfsnaam,
+                    'gepauzeerd_tot' => $company->gepauzeerd_tot?->toDateString(),
+                    'reden' => $company->gepauzeerd_reden,
+                    'url' => route('crm.garage_companies.show', ['garageCompany' => $company->id, 'tab' => 'demo_status']),
+                ])
+                ->values();
+        }
+
         // Laatste tijdlijnregels over alle klanten heen (alleen-lezen feed).
         $recentActivity = Activity::query()
             ->with(['garageCompany:id,bedrijfsnaam', 'creator:id,name'])
@@ -319,6 +341,8 @@ class DashboardController
                 'demo_avg_days' => (int) round((float) ($demoDurationRows->avg('days') ?? 0)),
                 'active_avg_days' => (int) round((float) ($activeDurationRows->avg('days') ?? 0)),
                 'active_missing_sepa' => $activeSepaIssues->count(),
+                'companies_paused' => $companiesPaused,
+                'pause_expired' => $pauseExpired->count(),
             ],
             'lists' => [
                 'tasks' => $taskItems,
@@ -338,6 +362,7 @@ class DashboardController
                     'active' => $activeDurationRows->sortByDesc('days')->take(12)->values(),
                 ],
                 'active_missing_sepa' => $activeSepaIssues->take(50)->values(),
+                'pause_expired' => $pauseExpired,
                 'today' => [
                     'tasks' => $myTasksToday,
                     'customer' => $customerToday,

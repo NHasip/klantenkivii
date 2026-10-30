@@ -37,6 +37,7 @@ const STATUS_META = {
     proefperiode: { icon: 'sparkles', text: 'Demo loopt, met start- en einddatum' },
     demo_gepland: { icon: 'sparkles', text: 'Demo loopt, met start- en einddatum' },
     actief: { icon: 'check-circle', text: 'Betalende klant' },
+    gepauzeerd: { icon: 'clock', text: 'Tijdelijk gestopt, geen incasso' },
     opgezegd: { icon: 'x-circle', text: 'Heeft het abonnement opgezegd' },
     verloren: { icon: 'archive', text: 'Is geen klant geworden' },
 };
@@ -279,7 +280,7 @@ export default function Create({ statusOptions: rawStatusOptions, statusLabels, 
     // Bij een demo-aanvraag zijn alleen bedrijfsnaam, naam en e-mail verplicht.
     const isLead = data.status === 'demo_aangevraagd' || data.status === 'lead';
     const isDemo = data.status === 'proefperiode';
-    const showActiefVanaf = data.status === 'actief' || data.status === 'opgezegd';
+    const showActiefVanaf = data.status === 'actief' || data.status === 'gepauzeerd' || data.status === 'opgezegd';
     const isOpgezegd = data.status === 'opgezegd';
     const required = !isLead;
     const hasIban = data.iban.trim() !== '';

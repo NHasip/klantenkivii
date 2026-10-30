@@ -400,6 +400,9 @@ export default function Dashboard({ kpis = {}, urls = {}, meta = {}, lists = {} 
     const demoDurationItems = lists?.status_duration?.demo ?? [];
     const activeDurationItems = lists?.status_duration?.active ?? [];
     const activeMissingSepaItems = lists?.active_missing_sepa ?? [];
+    const pauseExpiredItems = lists?.pause_expired ?? [];
+    const pauseExpired = Number(kpis.pause_expired) || 0;
+    const companiesPaused = Number(kpis.companies_paused) || 0;
     const recentActivity = lists?.recent_activity ?? [];
 
     const customersUrl = (status) => `${urls.customers}?status=${encodeURIComponent(status)}`;
@@ -447,6 +450,7 @@ export default function Dashboard({ kpis = {}, urls = {}, meta = {}, lists = {} 
                         { key: 'demo-expired', count: demosExpired, label: demosExpired === 1 ? 'demo verlopen' : "demo's verlopen", tone: 'danger', href: '#demos' },
                         { key: 'appointments', count: appointmentsOverdue, label: appointmentsOverdue === 1 ? 'verlopen afspraak open' : 'verlopen afspraken open', tone: 'warning', href: '#vandaag' },
                         { key: 'sepa', count: missingSepa, label: 'actief zonder complete SEPA', tone: 'warning', href: '#sepa' },
+                        { key: 'pause', count: pauseExpired, label: pauseExpired === 1 ? 'pauze verlopen' : 'pauzes verlopen', tone: 'warning', href: '#pauze' },
                     ]}
                 />
 
@@ -469,7 +473,7 @@ export default function Dashboard({ kpis = {}, urls = {}, meta = {}, lists = {} 
                             icon="users"
                             tone="brand"
                             trend={countTrend(kpis.active_new_last_30, kpis.active_new_prev_30)}
-                            sub={`${formatInt(kpis.active_new_last_30)} nieuw in 30 dagen, gem. ${plural(kpis.active_avg_days, 'dag', 'dagen')} actief`}
+                            sub={`${formatInt(kpis.active_new_last_30)} nieuw in 30 dagen, gem. ${plural(kpis.active_avg_days, 'dag', 'dagen')} actief${companiesPaused > 0 ? `, ${formatInt(companiesPaused)} gepauzeerd` : ''}`}
                             href={customersUrl('actief')}
                         />
                         <Stat
@@ -712,6 +716,45 @@ export default function Dashboard({ kpis = {}, urls = {}, meta = {}, lists = {} 
                         </Card>
                     </div>
                 </div>
+
+                {/* Verlopen pauzes */}
+                {pauseExpired > 0 ? (
+                    <section id="pauze" className="card scroll-mt-20 overflow-hidden border-violet-200" aria-labelledby="pauze-heading">
+                        <div className="flex flex-wrap items-start justify-between gap-3 bg-violet-50/60 px-5 py-4 sm:px-6">
+                            <div className="flex min-w-0 items-start gap-3">
+                                <IconTile icon="clock" tone="brand" size="sm" />
+                                <div className="min-w-0">
+                                    <h2 id="pauze-heading" className="section-heading flex flex-wrap items-center gap-2">
+                                        Pauze verlopen: hervatten?
+                                        <Badge tone="brand">{formatInt(pauseExpired)}</Badge>
+                                    </h2>
+                                    <p className="section-description">De pauze van deze klanten is voorbij. Hervat de klant of pas de pauze aan.</p>
+                                </div>
+                            </div>
+                            <a href={customersUrl('gepauzeerd')} className={buttonClasses({ variant: 'secondary', size: 'sm' })}>
+                                Gepauzeerde klanten
+                            </a>
+                        </div>
+                        <div className="px-5 pb-4 pt-2 sm:px-6">
+                            <RowList>
+                                {pauseExpiredItems.map((item) => (
+                                    <Row
+                                        key={item.id}
+                                        leading={<Avatar name={item.bedrijfsnaam} size="sm" />}
+                                        href={item.url}
+                                        title={item.bedrijfsnaam}
+                                        meta={`Gepauzeerd tot ${formatDate(item.gepauzeerd_tot)}${item.reden ? `, reden: ${item.reden}` : ''}`}
+                                        aside={
+                                            <a href={item.url} className={buttonClasses({ variant: 'secondary', size: 'xs' })}>
+                                                Hervatten
+                                            </a>
+                                        }
+                                    />
+                                ))}
+                            </RowList>
+                        </div>
+                    </section>
+                ) : null}
 
                 {/* SEPA-signalering */}
                 {missingSepa > 0 ? (

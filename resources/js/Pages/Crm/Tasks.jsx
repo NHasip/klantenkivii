@@ -101,6 +101,7 @@ function customerStatusTone(value) {
             demo_gepland: 'info',
             demo_aangevraagd: 'brand',
             lead: 'brand',
+            gepauzeerd: 'brand',
             opgezegd: 'warning',
             verloren: 'neutral',
         }[value] ?? 'neutral'

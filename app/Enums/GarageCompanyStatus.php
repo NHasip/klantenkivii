@@ -9,6 +9,7 @@ enum GarageCompanyStatus: string
     case DemoGepland = 'demo_gepland';
     case Proefperiode = 'proefperiode';
     case Actief = 'actief';
+    case Gepauzeerd = 'gepauzeerd';
     case Opgezegd = 'opgezegd';
     case Verloren = 'verloren';
 
@@ -21,6 +22,7 @@ enum GarageCompanyStatus: string
             self::DemoAangevraagd,
             self::Proefperiode,
             self::Actief,
+            self::Gepauzeerd,
             self::Opgezegd,
             self::Verloren,
         ];
@@ -56,12 +58,22 @@ enum GarageCompanyStatus: string
         };
     }
 
+    /**
+     * Statussen die als 'tijdelijk gestopt' gelden: niet actief, geen MRR,
+     * geen incasso en geen mandaat-taken.
+     */
+    public function isPaused(): bool
+    {
+        return $this === self::Gepauzeerd;
+    }
+
     public function label(): string
     {
         return match ($this) {
             self::DemoAangevraagd => 'Demo aangevraagd',
             self::Proefperiode => 'Demo',
             self::Actief => 'Actief',
+            self::Gepauzeerd => 'Gepauzeerd',
             self::Opgezegd => 'Opgezegd',
             self::Verloren => 'Verloren',
             self::Lead => 'Lead (oud)',

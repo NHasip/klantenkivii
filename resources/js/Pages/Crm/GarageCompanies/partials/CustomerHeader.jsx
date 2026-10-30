@@ -4,6 +4,7 @@ import StatusBadge from '../../../../components/StatusBadge';
 import { Icon } from '../../../../components/icons';
 import { Avatar, Button, ProgressBar, Tabs, buttonClasses, cx, inputClasses } from '../../../../components/ui';
 import { formatDate, formatDateTime, formatEuro, startOfDay, telHref } from './showUtils';
+import PauseForm from './PauseForm';
 
 const QUICK = buttonClasses({ variant: 'secondary', size: 'sm' });
 
@@ -28,6 +29,13 @@ function demoProgress(company) {
 
 function lifecycleCell(company, status) {
     if (status === 'actief') return { label: 'Actief sinds', value: company.actief_vanaf ? formatDate(company.actief_vanaf) : 'Datum onbekend', icon: 'check-circle' };
+    if (status === 'gepauzeerd') {
+        return {
+            label: company.gepauzeerd_tot ? 'Gepauzeerd tot' : 'Gepauzeerd sinds',
+            value: company.gepauzeerd_tot ? formatDate(company.gepauzeerd_tot) : company.gepauzeerd_op ? formatDate(company.gepauzeerd_op) : 'Geen einddatum',
+            icon: 'clock',
+        };
+    }
     if (status === 'opgezegd') return { label: 'Opgezegd op', value: company.opgezegd_op ? formatDate(company.opgezegd_op) : 'Datum onbekend', icon: 'x-circle' };
     if (status === 'verloren') return { label: 'Verloren op', value: company.verloren_op ? formatDate(company.verloren_op) : 'Datum onbekend', icon: 'archive' };
     if (company.demo_gepland_op) return { label: 'Demo gepland op', value: formatDateTime(company.demo_gepland_op), icon: 'calendar' };
@@ -70,6 +78,9 @@ export default function CustomerHeader({
     onSubmitExtend,
     noteForm,
     onSubmitNote,
+    pauseForm,
+    onSubmitPause,
+    onResume,
 }) {
     const panelRef = useRef(null);
 
@@ -154,6 +165,17 @@ export default function CustomerHeader({
                                 <Icon name="message-square" className="h-4 w-4 text-zinc-500" />
                                 Notitie
                             </button>
+                            {status === 'actief' && pauseForm && (
+                                <button type="button" className={QUICK} onClick={() => togglePanel('pause')} aria-expanded={panel === 'pause'} aria-controls="header-panel-pause-form">
+                                    <Icon name="clock" className="h-4 w-4 text-zinc-500" />
+                                    Pauzeren
+                                </button>
+                            )}
+                            {status === 'gepauzeerd' && onResume && (
+                                <Button size="sm" icon="check-circle" onClick={onResume} loading={activateBusy}>
+                                    Hervatten
+                                </Button>
+                            )}
                             {isDemo && (
                                 <>
                                     <button type="button" className={QUICK} onClick={() => togglePanel('extend')} aria-expanded={panel === 'extend'} aria-controls="header-panel-extend">
@@ -211,6 +233,10 @@ export default function CustomerHeader({
                                 </Button>
                             </div>
                         </form>
+                    )}
+
+                    {panel === 'pause' && status === 'actief' && pauseForm && (
+                        <PauseForm ref={panelRef} idBase="header-panel-pause" form={pauseForm} onSubmit={onSubmitPause} onCancel={() => setPanel(null)} className="mt-5" />
                     )}
 
                     {panel === 'extend' && isDemo && (

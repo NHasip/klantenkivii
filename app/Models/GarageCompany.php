@@ -21,6 +21,8 @@ class GarageCompany extends Model
 
     protected static ?bool $hasDeletedAtColumn = null;
 
+    protected static ?bool $hasPauseColumns = null;
+
     protected $fillable = [
         'bedrijfsnaam',
         'kvk_nummer',
@@ -51,6 +53,9 @@ class GarageCompany extends Model
         'opzegreden',
         'verloren_op',
         'verloren_reden',
+        'gepauzeerd_op',
+        'gepauzeerd_tot',
+        'gepauzeerd_reden',
         'eigenaar_user_id',
         'created_by',
     ];
@@ -72,6 +77,8 @@ class GarageCompany extends Model
             'actief_vanaf' => 'datetime',
             'opgezegd_op' => 'datetime',
             'verloren_op' => 'datetime',
+            'gepauzeerd_op' => 'date',
+            'gepauzeerd_tot' => 'date',
             'login_password' => 'encrypted',
             'incasso_formulier_uploaded_at' => 'datetime',
             'deleted_at' => 'datetime',
@@ -102,6 +109,22 @@ class GarageCompany extends Model
         }
 
         return static::$hasDeletedAtColumn;
+    }
+
+    /** Of de migratie voor gepauzeerd_op/_tot/_reden al gedraaid is. */
+    public static function hasPauseColumns(): bool
+    {
+        if (static::$hasPauseColumns !== null) {
+            return static::$hasPauseColumns;
+        }
+
+        try {
+            static::$hasPauseColumns = Schema::hasColumn((new static())->getTable(), 'gepauzeerd_tot');
+        } catch (\Throwable) {
+            static::$hasPauseColumns = false;
+        }
+
+        return static::$hasPauseColumns;
     }
 
     public function scopeOnlyDeleted(Builder $query): Builder
