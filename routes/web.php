@@ -3,6 +3,7 @@
 use App\Http\Controllers\Crm\DashboardController;
 use App\Http\Controllers\Crm\EmailTemplatesController;
 use App\Http\Controllers\Crm\GarageCompaniesController;
+use App\Http\Controllers\Crm\ImportController;
 use App\Http\Controllers\Crm\SearchController;
 use App\Http\Controllers\Crm\TasksController;
 use App\Http\Controllers\Crm\UsersController;
@@ -88,6 +89,16 @@ Route::middleware(['auth', 'active', 'admin.2fa'])->group(function () {
     Route::get('/modules', \App\Livewire\Crm\Modules\Index::class)
         ->middleware('admin')
         ->name('crm.modules.index');
+
+    Route::get('/importeren', [ImportController::class, 'index'])
+        ->middleware('admin')
+        ->name('crm.import.index');
+    Route::post('/importeren/controleren', [ImportController::class, 'preview'])
+        ->middleware(['admin', 'throttle:30,1'])
+        ->name('crm.import.preview');
+    Route::post('/importeren', [ImportController::class, 'store'])
+        ->middleware(['admin', 'throttle:10,1'])
+        ->name('crm.import.store');
 
     Route::get('/email-templates', [EmailTemplatesController::class, 'index'])
         ->middleware('admin')
