@@ -16,9 +16,287 @@
         scroll-padding-top: 5rem;
     }
 
+    body {
+        @apply bg-canvas text-zinc-900;
+        font-feature-settings: 'cv11', 'ss01';
+        text-rendering: optimizeLegibility;
+    }
+
+    h1,
+    h2,
+    h3 {
+        @apply tracking-snug;
+    }
+
     /* Ruimte voor de scrollbalk altijd reserveren: geen horizontale verspringing tussen pagina's. */
     html {
         scrollbar-gutter: stable;
+    }
+}
+
+/*
+ * Kivii design foundation (componentklassen).
+ * Gedeeld door Blade (Livewire/Jetstream) en React (resources/js/components/ui.jsx).
+ * Utilities winnen altijd van deze klassen, dus "btn btn-primary w-full" werkt zoals verwacht.
+ *
+ * Shell:      .app-shell (inhoudskolom naast de zijbalk), .app-container (paginabreedte en padding, zit al op <main>)
+ * Breedtes:   .content-narrow (formulieren), .content-medium (detail met smalle kolom)
+ * Typografie: .page-title, .page-description, .section-heading, .section-description, .text-muted, .link
+ * Kaarten:    .card, .card-body, .card-header, .card-footer, .card-interactive
+ * Knoppen:    .btn + .btn-primary | .btn-secondary | .btn-ghost | .btn-danger | .btn-danger-ghost, maten .btn-xs/.btn-sm/.btn-lg, .btn-icon
+ * Formulier:  .input (ook voor select/textarea), .label, .field-hint, .field-error, .checkbox
+ * Badges:     .badge + .badge-neutral | .badge-brand | .badge-success | .badge-warning | .badge-danger | .badge-info
+ * Tabellen:   .table-wrap > table.table-base > thead.table-head th.table-th + tbody.divide-y.divide-zinc-100 tr.table-row td.table-td
+ * Overig:     .kbd, .divider, .menu-panel, .menu-item, .icon-tile, .skeleton, .focus-ring
+ */
+@layer components {
+    /* Shell */
+    .app-shell {
+        @apply min-h-screen lg:pl-sidebar;
+    }
+
+    .app-container {
+        @apply mx-auto w-full max-w-content px-4 py-6 sm:px-6 sm:py-8 lg:px-10;
+    }
+
+    .content-narrow {
+        @apply mx-auto w-full max-w-3xl;
+    }
+
+    .content-medium {
+        @apply mx-auto w-full max-w-5xl;
+    }
+
+    .focus-ring {
+        @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+    }
+
+    /* Typografie */
+    .page-title {
+        @apply text-2xl font-semibold tracking-display text-zinc-900 sm:text-[1.75rem] sm:leading-9;
+    }
+
+    .page-description {
+        @apply mt-1 max-w-2xl text-sm leading-6 text-zinc-500;
+    }
+
+    .section-heading {
+        @apply text-base font-semibold tracking-snug text-zinc-900;
+    }
+
+    .section-description {
+        @apply mt-0.5 text-sm leading-6 text-zinc-500;
+    }
+
+    .text-muted {
+        @apply text-zinc-500;
+    }
+
+    .link {
+        @apply rounded font-medium text-indigo-700 underline-offset-2 hover:text-indigo-900 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600;
+    }
+
+    /* Kaarten */
+    .card {
+        @apply min-w-0 rounded-2xl border border-hairline bg-white shadow-card;
+    }
+
+    .card-body {
+        @apply p-5 sm:p-6;
+    }
+
+    .card-header {
+        @apply flex flex-wrap items-start justify-between gap-3 border-b border-zinc-100 px-5 py-4 sm:px-6;
+    }
+
+    .card-footer {
+        @apply flex flex-wrap items-center justify-end gap-2 rounded-b-2xl border-t border-zinc-100 bg-zinc-50/60 px-5 py-3 sm:px-6;
+    }
+
+    .card-interactive {
+        @apply transition-[box-shadow,border-color] duration-150 hover:border-zinc-300 hover:shadow-card-hover;
+    }
+
+    /* Knoppen */
+    .btn {
+        @apply inline-flex h-9 select-none items-center justify-center gap-2 whitespace-nowrap rounded-xl px-3.5 text-sm font-semibold transition-colors duration-150;
+        @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+        @apply disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50;
+    }
+
+    .btn-xs {
+        @apply h-7 gap-1 rounded-lg px-2 text-xs;
+    }
+
+    .btn-sm {
+        @apply h-8 gap-1.5 rounded-lg px-3;
+    }
+
+    .btn-lg {
+        @apply h-11 px-5;
+    }
+
+    .btn-icon {
+        @apply w-9 px-0;
+    }
+
+    .btn-icon.btn-sm {
+        @apply w-8;
+    }
+
+    .btn-icon.btn-xs {
+        @apply w-7;
+    }
+
+    .btn-primary {
+        @apply bg-indigo-600 text-white shadow-sm shadow-indigo-900/10 hover:bg-indigo-700 active:bg-indigo-800;
+    }
+
+    .btn-secondary {
+        @apply bg-white text-zinc-800 shadow-sm ring-1 ring-inset ring-zinc-200 hover:bg-zinc-50 hover:ring-zinc-300 active:bg-zinc-100;
+    }
+
+    .btn-ghost {
+        @apply text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 active:bg-zinc-200/70;
+    }
+
+    .btn-danger {
+        @apply bg-rose-600 text-white shadow-sm hover:bg-rose-700 focus-visible:ring-rose-600 active:bg-rose-800;
+    }
+
+    .btn-danger-ghost {
+        @apply text-rose-700 hover:bg-rose-50 focus-visible:ring-rose-600;
+    }
+
+    /* Formulieren */
+    .input {
+        @apply block w-full rounded-xl border-zinc-300 bg-white text-sm text-zinc-900 shadow-sm transition-colors placeholder:text-zinc-400;
+        @apply hover:border-zinc-400 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600;
+        @apply disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-50 disabled:text-zinc-500;
+    }
+
+    .input[aria-invalid='true'] {
+        @apply border-rose-400 focus:border-rose-600 focus:ring-rose-600;
+    }
+
+    .label {
+        @apply block text-sm font-medium text-zinc-800;
+    }
+
+    .field-hint {
+        @apply mt-1.5 text-xs leading-5 text-zinc-500;
+    }
+
+    .field-error {
+        @apply mt-1.5 text-xs font-medium text-rose-700;
+    }
+
+    .checkbox {
+        @apply h-4 w-4 rounded border-zinc-300 text-indigo-600 shadow-sm focus:ring-indigo-600 disabled:opacity-50;
+    }
+
+    /* Badges */
+    .badge {
+        @apply inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset;
+    }
+
+    .badge-neutral {
+        @apply bg-zinc-100 text-zinc-700 ring-zinc-200;
+    }
+
+    .badge-brand {
+        @apply bg-indigo-50 text-indigo-800 ring-indigo-200;
+    }
+
+    .badge-success {
+        @apply bg-emerald-50 text-emerald-800 ring-emerald-200;
+    }
+
+    .badge-warning {
+        @apply bg-amber-50 text-amber-800 ring-amber-200;
+    }
+
+    .badge-danger {
+        @apply bg-rose-50 text-rose-800 ring-rose-200;
+    }
+
+    .badge-info {
+        @apply bg-sky-50 text-sky-800 ring-sky-200;
+    }
+
+    /* Tabellen */
+    .table-wrap {
+        @apply min-w-0 overflow-x-auto rounded-2xl border border-hairline bg-white shadow-card;
+    }
+
+    .table-base {
+        @apply min-w-full text-sm;
+    }
+
+    .table-head {
+        @apply border-b border-zinc-200/80 bg-zinc-50/70;
+    }
+
+    .table-th {
+        @apply whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-zinc-500 first:pl-5 last:pr-5;
+    }
+
+    /* Scheidingslijnen komen van <tbody class="divide-y divide-zinc-100">. */
+    .table-row {
+        @apply transition-colors hover:bg-zinc-50/70;
+    }
+
+    .table-td {
+        @apply px-4 py-3.5 align-middle text-zinc-700 first:pl-5 last:pr-5;
+    }
+
+    /* Menu's en dropdowns */
+    .menu-panel {
+        @apply overflow-hidden rounded-xl border border-zinc-200/80 bg-white p-1 shadow-pop;
+    }
+
+    .menu-item {
+        @apply flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-900;
+        @apply focus:outline-none focus-visible:bg-zinc-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-600;
+    }
+
+    /* Overig */
+    .kbd {
+        @apply inline-flex h-5 min-w-5 items-center justify-center rounded-md border border-zinc-200 bg-zinc-50 px-1.5 font-sans text-2xs font-medium text-zinc-500 shadow-[inset_0_-1px_0_rgb(24_24_27/0.06)];
+    }
+
+    .divider {
+        @apply h-px w-full border-0 bg-zinc-200/80;
+    }
+
+    .icon-tile {
+        @apply inline-flex shrink-0 items-center justify-center rounded-xl;
+    }
+
+    .skeleton {
+        @apply animate-pulse rounded-md bg-zinc-200/70;
+    }
+
+    /* Zijbalknavigatie (layouts/partials/header.blade.php) */
+    .nav-item {
+        @apply flex h-9 items-center gap-3 rounded-xl px-3 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900;
+        @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600;
+    }
+
+    .nav-item[aria-current='page'] {
+        @apply bg-indigo-100/60 text-zinc-900 shadow-inset-hairline;
+    }
+
+    .nav-item svg {
+        @apply h-[1.125rem] w-[1.125rem] shrink-0 text-zinc-400 transition-colors;
+    }
+
+    .nav-item:hover svg {
+        @apply text-zinc-600;
+    }
+
+    .nav-item[aria-current='page'] svg {
+        @apply text-indigo-600;
     }
 }
 

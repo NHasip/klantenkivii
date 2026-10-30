@@ -7,7 +7,7 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         @livewireStyles
     </head>
-    <body class="min-h-full bg-zinc-50 font-sans text-zinc-900 antialiased">
+    <body class="min-h-full bg-canvas font-sans text-zinc-900 antialiased">
         {{ $slot }}
 
         @livewireScripts

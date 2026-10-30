@@ -28,10 +28,10 @@ $maxWidth = [
                     x-transition:leave="ease-in duration-150"
                     x-transition:leave-start="opacity-100"
                     x-transition:leave-end="opacity-0">
-        <div class="absolute inset-0 bg-zinc-950/40 backdrop-blur-sm"></div>
+        <div class="absolute inset-0 bg-zinc-900/40 backdrop-blur-[2px]"></div>
     </div>
 
-    <div x-show="show" class="relative w-full transform overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xl transition-all sm:mx-auto {{ $maxWidth }}"
+    <div x-show="show" class="relative w-full transform overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-pop transition-all sm:mx-auto {{ $maxWidth }}"
                     role="dialog" aria-modal="true"
                     x-trap.inert.noscroll="show"
                     x-transition:enter="ease-out duration-200"

@@ -43,6 +43,40 @@ export default {
                     900: '#383e11',
                 },
             },
+            // Designtokens (fase 1 design foundation). Gebruik bij voorkeur de componentklassen in resources/css/app.css.
+            // canvas = paginaachtergrond (zinc met een vleug merkgroen), surface = kaarten/panelen.
+            backgroundColor: {
+                canvas: '#f5f6f1',
+                surface: '#ffffff',
+            },
+            borderColor: {
+                hairline: 'rgb(228 228 231 / 0.8)',
+            },
+            boxShadow: {
+                card: '0 1px 2px 0 rgb(24 24 27 / 0.04), 0 1px 3px 0 rgb(24 24 27 / 0.03)',
+                'card-hover': '0 2px 4px -1px rgb(24 24 27 / 0.05), 0 6px 16px -4px rgb(24 24 27 / 0.08)',
+                pop: '0 4px 6px -2px rgb(24 24 27 / 0.05), 0 16px 32px -8px rgb(24 24 27 / 0.14)',
+                'inset-hairline': 'inset 0 0 0 1px rgb(24 24 27 / 0.06)',
+            },
+            borderRadius: {
+                '4xl': '2rem',
+            },
+            fontSize: {
+                '2xs': ['0.6875rem', { lineHeight: '1rem' }],
+            },
+            letterSpacing: {
+                snug: '-0.011em',
+                display: '-0.022em',
+            },
+            width: {
+                sidebar: '16rem',
+            },
+            padding: {
+                sidebar: '16rem',
+            },
+            maxWidth: {
+                content: '88rem',
+            },
             // Systeemlettertype: geen externe fonts laden, overal dezelfde rustige stack.
             fontFamily: {
                 sans: [

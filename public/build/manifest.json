@@ -1,14 +1,14 @@
 {
-  "_CopyButton-DhMjvbKD.js": {
-    "file": "assets/CopyButton-DhMjvbKD.js",
+  "_CopyButton-DzviHh_E.js": {
+    "file": "assets/CopyButton-DzviHh_E.js",
     "name": "CopyButton",
     "imports": [
       "_chunk-Dk7t3yRR.js",
       "resources/js/app.jsx"
     ]
   },
-  "_StatusBadge-DsB3-jX7.js": {
-    "file": "assets/StatusBadge-DsB3-jX7.js",
+  "_StatusBadge-DAwkqG9Q.js": {
+    "file": "assets/StatusBadge-DAwkqG9Q.js",
     "name": "StatusBadge",
     "imports": [
       "_chunk-Dk7t3yRR.js",
@@ -33,23 +33,23 @@
     "file": "assets/chunk-Dk7t3yRR.js",
     "name": "chunk"
   },
-  "_dist-1JcgZf_l.js": {
-    "file": "assets/dist-1JcgZf_l.js",
-    "name": "dist",
-    "imports": [
-      "_dist-DTrjL2tf.js"
-    ]
-  },
-  "_dist-DTrjL2tf.js": {
-    "file": "assets/dist-DTrjL2tf.js",
+  "_dist-Df34pjp3.js": {
+    "file": "assets/dist-Df34pjp3.js",
     "name": "dist",
     "imports": [
       "_chunk-Dk7t3yRR.js",
       "resources/js/app.jsx"
     ]
   },
-  "_ui-Bc2azlPr.js": {
-    "file": "assets/ui-Bc2azlPr.js",
+  "_dist-Dxb7Cmyn.js": {
+    "file": "assets/dist-Dxb7Cmyn.js",
+    "name": "dist",
+    "imports": [
+      "_dist-Df34pjp3.js"
+    ]
+  },
+  "_ui-CjKQT1hc.js": {
+    "file": "assets/ui-CjKQT1hc.js",
     "name": "ui",
     "imports": [
       "_chunk-Dk7t3yRR.js",
@@ -57,7 +57,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-DW4u4XlM.css",
+    "file": "assets/app-BZLS4Kwo.css",
     "name": "app",
     "names": [
       "app.css"
@@ -66,63 +66,63 @@
     "isEntry": true
   },
   "resources/js/Pages/Crm/Dashboard.jsx": {
-    "file": "assets/Dashboard-B-wmAdhO.js",
+    "file": "assets/Dashboard-EbCDxCE8.js",
     "name": "Dashboard",
     "src": "resources/js/Pages/Crm/Dashboard.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_chunk-Dk7t3yRR.js",
       "resources/js/app.jsx",
-      "_ui-Bc2azlPr.js"
+      "_ui-CjKQT1hc.js"
     ]
   },
   "resources/js/Pages/Crm/EmailTemplates/Index.jsx": {
-    "file": "assets/Index-CtEpfN1S.js",
+    "file": "assets/Index-CjlJV1Yu.js",
     "name": "Index",
     "src": "resources/js/Pages/Crm/EmailTemplates/Index.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_chunk-Dk7t3yRR.js",
       "resources/js/app.jsx",
-      "_dist-DTrjL2tf.js",
-      "_dist-1JcgZf_l.js",
-      "_ui-Bc2azlPr.js"
+      "_dist-Df34pjp3.js",
+      "_dist-Dxb7Cmyn.js",
+      "_ui-CjKQT1hc.js"
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/Create.jsx": {
-    "file": "assets/Create-szOa7VYu.js",
+    "file": "assets/Create-B4oCoDy4.js",
     "name": "Create",
     "src": "resources/js/Pages/Crm/GarageCompanies/Create.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_chunk-Dk7t3yRR.js",
       "resources/js/app.jsx",
-      "_StatusBadge-DsB3-jX7.js",
-      "_ui-Bc2azlPr.js"
+      "_StatusBadge-DAwkqG9Q.js",
+      "_ui-CjKQT1hc.js"
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/Index.jsx": {
-    "file": "assets/Index-COJU2xId.js",
+    "file": "assets/Index-Dd2CQ5lb.js",
     "name": "Index",
     "src": "resources/js/Pages/Crm/GarageCompanies/Index.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_chunk-Dk7t3yRR.js",
       "resources/js/app.jsx",
-      "_StatusBadge-DsB3-jX7.js",
-      "_ui-Bc2azlPr.js"
+      "_StatusBadge-DAwkqG9Q.js",
+      "_ui-CjKQT1hc.js"
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/Show.jsx": {
-    "file": "assets/Show-BYiQXqsM.js",
+    "file": "assets/Show-CC4gGKjh.js",
     "name": "Show",
     "src": "resources/js/Pages/Crm/GarageCompanies/Show.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_chunk-Dk7t3yRR.js",
       "resources/js/app.jsx",
-      "_dist-DTrjL2tf.js",
-      "_dist-1JcgZf_l.js",
+      "_dist-Df34pjp3.js",
+      "_dist-Dxb7Cmyn.js",
       "resources/js/Pages/Crm/GarageCompanies/partials/ActivityTab.jsx",
       "resources/js/Pages/Crm/GarageCompanies/partials/ContactTab.jsx",
       "resources/js/Pages/Crm/GarageCompanies/partials/CustomerHeader.jsx",
@@ -131,12 +131,12 @@
       "resources/js/Pages/Crm/GarageCompanies/partials/SubscriptionTab.jsx",
       "resources/js/Pages/Crm/GarageCompanies/partials/WelcomeTab.jsx",
       "resources/js/Pages/Crm/GarageCompanies/partials/showUtils.jsx",
-      "_StatusBadge-DsB3-jX7.js",
-      "_ui-Bc2azlPr.js"
+      "_StatusBadge-DAwkqG9Q.js",
+      "_ui-CjKQT1hc.js"
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/partials/ActivityTab.jsx": {
-    "file": "assets/ActivityTab-BrdVCxXt.js",
+    "file": "assets/ActivityTab-C9YUdDc4.js",
     "name": "ActivityTab",
     "src": "resources/js/Pages/Crm/GarageCompanies/partials/ActivityTab.jsx",
     "isDynamicEntry": true,
@@ -144,12 +144,12 @@
       "_chunk-Dk7t3yRR.js",
       "resources/js/app.jsx",
       "resources/js/Pages/Crm/GarageCompanies/partials/showUtils.jsx",
-      "_StatusBadge-DsB3-jX7.js",
-      "_ui-Bc2azlPr.js"
+      "_StatusBadge-DAwkqG9Q.js",
+      "_ui-CjKQT1hc.js"
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/partials/ContactTab.jsx": {
-    "file": "assets/ContactTab-C-9yj4Ss.js",
+    "file": "assets/ContactTab-BU7dyHyu.js",
     "name": "ContactTab",
     "src": "resources/js/Pages/Crm/GarageCompanies/partials/ContactTab.jsx",
     "isDynamicEntry": true,
@@ -157,23 +157,23 @@
       "_chunk-Dk7t3yRR.js",
       "resources/js/app.jsx",
       "resources/js/Pages/Crm/GarageCompanies/partials/showUtils.jsx",
-      "_ui-Bc2azlPr.js"
+      "_ui-CjKQT1hc.js"
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/partials/CustomerHeader.jsx": {
-    "file": "assets/CustomerHeader-Bk9Kytzo.js",
+    "file": "assets/CustomerHeader-DZgJ2Wy_.js",
     "name": "CustomerHeader",
     "src": "resources/js/Pages/Crm/GarageCompanies/partials/CustomerHeader.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_chunk-Dk7t3yRR.js",
       "resources/js/app.jsx",
-      "_StatusBadge-DsB3-jX7.js",
-      "_ui-Bc2azlPr.js"
+      "_StatusBadge-DAwkqG9Q.js",
+      "_ui-CjKQT1hc.js"
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/partials/DemoStatusTab.jsx": {
-    "file": "assets/DemoStatusTab-BxHWU8lO.js",
+    "file": "assets/DemoStatusTab-CMQPdtjw.js",
     "name": "DemoStatusTab",
     "src": "resources/js/Pages/Crm/GarageCompanies/partials/DemoStatusTab.jsx",
     "isDynamicEntry": true,
@@ -181,12 +181,12 @@
       "_chunk-Dk7t3yRR.js",
       "resources/js/app.jsx",
       "resources/js/Pages/Crm/GarageCompanies/partials/showUtils.jsx",
-      "_StatusBadge-DsB3-jX7.js",
-      "_ui-Bc2azlPr.js"
+      "_StatusBadge-DAwkqG9Q.js",
+      "_ui-CjKQT1hc.js"
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/partials/OverviewTab.jsx": {
-    "file": "assets/OverviewTab-CyOBYbT7.js",
+    "file": "assets/OverviewTab-zrYq_oFd.js",
     "name": "OverviewTab",
     "src": "resources/js/Pages/Crm/GarageCompanies/partials/OverviewTab.jsx",
     "isDynamicEntry": true,
@@ -194,48 +194,48 @@
       "_chunk-Dk7t3yRR.js",
       "resources/js/app.jsx",
       "resources/js/Pages/Crm/GarageCompanies/partials/showUtils.jsx",
-      "_ui-Bc2azlPr.js"
+      "_ui-CjKQT1hc.js"
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/partials/SubscriptionTab.jsx": {
-    "file": "assets/SubscriptionTab-kL8Jx7AQ.js",
+    "file": "assets/SubscriptionTab-ByAJgn0Q.js",
     "name": "SubscriptionTab",
     "src": "resources/js/Pages/Crm/GarageCompanies/partials/SubscriptionTab.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_chunk-Dk7t3yRR.js",
       "resources/js/app.jsx",
-      "_CopyButton-DhMjvbKD.js",
+      "_CopyButton-DzviHh_E.js",
       "resources/js/Pages/Crm/GarageCompanies/partials/showUtils.jsx",
-      "_ui-Bc2azlPr.js"
+      "_ui-CjKQT1hc.js"
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/partials/WelcomeTab.jsx": {
-    "file": "assets/WelcomeTab-CJC-cfWg.js",
+    "file": "assets/WelcomeTab-BMqv4RGN.js",
     "name": "WelcomeTab",
     "src": "resources/js/Pages/Crm/GarageCompanies/partials/WelcomeTab.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_chunk-Dk7t3yRR.js",
       "resources/js/app.jsx",
-      "_dist-DTrjL2tf.js",
+      "_dist-Df34pjp3.js",
       "resources/js/Pages/Crm/GarageCompanies/partials/showUtils.jsx",
-      "_ui-Bc2azlPr.js"
+      "_ui-CjKQT1hc.js"
     ]
   },
   "resources/js/Pages/Crm/GarageCompanies/partials/showUtils.jsx": {
-    "file": "assets/showUtils-B7zBAALl.js",
+    "file": "assets/showUtils-Dnvmxbg3.js",
     "name": "showUtils",
     "src": "resources/js/Pages/Crm/GarageCompanies/partials/showUtils.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_chunk-Dk7t3yRR.js",
       "resources/js/app.jsx",
-      "_ui-Bc2azlPr.js"
+      "_ui-CjKQT1hc.js"
     ]
   },
   "resources/js/Pages/Crm/Tasks.jsx": {
-    "file": "assets/Tasks-BDmsDcDr.js",
+    "file": "assets/Tasks-D_5A_a6S.js",
     "name": "Tasks",
     "src": "resources/js/Pages/Crm/Tasks.jsx",
     "isDynamicEntry": true,
@@ -243,7 +243,7 @@
       "_chunk-Dk7t3yRR.js",
       "resources/js/app.jsx",
       "_axios-BZIRBdnS.js",
-      "_ui-Bc2azlPr.js"
+      "_ui-CjKQT1hc.js"
     ]
   },
   "resources/js/app.js": {
@@ -256,7 +256,7 @@
     ]
   },
   "resources/js/app.jsx": {
-    "file": "assets/app-C0Pm00m2.js",
+    "file": "assets/app-QQXy5gc9.js",
     "name": "app",
     "src": "resources/js/app.jsx",
     "isEntry": true,
@@ -273,7 +273,7 @@
       "resources/js/Pages/Crm/GarageCompanies/Show.jsx",
       "resources/js/Pages/Crm/GarageCompanies/partials/ActivityTab.jsx",
       "resources/js/Pages/Crm/GarageCompanies/partials/ContactTab.jsx",
-      "_CopyButton-DhMjvbKD.js",
+      "_CopyButton-DzviHh_E.js",
       "resources/js/Pages/Crm/GarageCompanies/partials/CustomerHeader.jsx",
       "resources/js/Pages/Crm/GarageCompanies/partials/DemoStatusTab.jsx",
       "resources/js/Pages/Crm/GarageCompanies/partials/OverviewTab.jsx",

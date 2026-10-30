@@ -2,29 +2,31 @@
     $kiviiUser = auth()->user();
     $kiviiIsAdmin = (bool) $kiviiUser?->isAdmin();
     $kiviiNavItems = [
-        ['route' => 'dashboard', 'match' => 'dashboard', 'label' => 'Dashboard'],
-        ['route' => 'crm.garage_companies.index', 'match' => 'crm.garage_companies.*', 'label' => 'Klanten'],
-        ['route' => 'crm.tasks.index', 'match' => 'crm.tasks.*', 'label' => 'Taken'],
-        ['route' => 'crm.reports.index', 'match' => 'crm.reports.*', 'label' => 'Rapportages'],
+        ['route' => 'dashboard', 'match' => 'dashboard', 'label' => 'Dashboard', 'icon' => 'home'],
+        ['route' => 'crm.garage_companies.index', 'match' => 'crm.garage_companies.*', 'label' => 'Klanten', 'icon' => 'building'],
+        ['route' => 'crm.tasks.index', 'match' => 'crm.tasks.*', 'label' => 'Taken', 'icon' => 'check-square'],
+        ['route' => 'crm.reports.index', 'match' => 'crm.reports.*', 'label' => 'Rapportages', 'icon' => 'bar-chart'],
     ];
     $kiviiSettingsItems = $kiviiIsAdmin ? [
-        ['route' => 'crm.users.index', 'match' => 'crm.users.*', 'label' => 'Gebruikers'],
-        ['route' => 'crm.modules.index', 'match' => 'crm.modules.*', 'label' => 'Modules'],
-        ['route' => 'crm.email_templates.index', 'match' => 'crm.email_templates.*', 'label' => 'E-mail templates'],
+        ['route' => 'crm.users.index', 'match' => 'crm.users.*', 'label' => 'Gebruikers', 'icon' => 'users'],
+        ['route' => 'crm.modules.index', 'match' => 'crm.modules.*', 'label' => 'Modules', 'icon' => 'package'],
+        ['route' => 'crm.email_templates.index', 'match' => 'crm.email_templates.*', 'label' => 'E-mail templates', 'icon' => 'mail'],
     ] : [];
-    $kiviiSettingsActive = collect($kiviiSettingsItems)->contains(fn ($item) => request()->routeIs($item['match']));
     $kiviiNeeds2fa = $kiviiIsAdmin && ! \App\Http\Middleware\RequireTwoFactorForAdmin::userHasTwoFactor($kiviiUser);
     $kiviiFocus = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1';
-    $kiviiInitials = collect(preg_split('/\s+/', trim((string) ($kiviiUser->name ?? ''))) ?: [])
-        ->filter()
-        ->take(2)
-        ->map(fn ($part) => mb_strtoupper(mb_substr($part, 0, 1)))
-        ->implode('') ?: '?';
+    $kiviiProfileActive = request()->routeIs('profile.show');
 @endphp
-{{-- Gedeelde kopbalk voor de Inertia-, Livewire- en Jetstream-layouts (één root-element, ook bruikbaar als Livewire-view). --}}
-<header x-data="{ mobileOpen: false }" class="sticky top-0 z-30 border-b border-zinc-200 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/80"
-        @kivii-menu-open.window="if ($event.detail !== 'mobile') mobileOpen = false"
-        @keydown.escape.window="if (mobileOpen) { mobileOpen = false; $refs.mobileButton.focus() }">
+{{--
+    Gedeelde app-shell voor de Inertia-, Livewire- en Jetstream-layouts. Eén root-element (ook bruikbaar als Livewire-view).
+    - Root is sticky (top-0) en bevat: 2FA-banner, slanke topbalk (zoeken, meldingen, hamburger) en de zijbalk.
+    - Zijbalk: vanaf lg vast links (w-sidebar = 16rem); daaronder een off-canvas drawer via de hamburger.
+    - De layout zet de inhoudskolom in <div class="app-shell"> (lg:pl-sidebar) en <main class="app-container">.
+    - Menu-exclusiviteit: elk menu stuurt 'kivii-menu-open' met zijn naam (mobile, search, bell, user) en sluit bij een ander.
+--}}
+<div x-data="{ mobileOpen: false }" class="sticky top-0 z-30"
+     @kivii-menu-open.window="if ($event.detail !== 'mobile') mobileOpen = false"
+     @keydown.escape.window="if (mobileOpen) { mobileOpen = false; $refs.mobileButton.focus() }"
+     @resize.window.debounce.150ms="if (mobileOpen && window.innerWidth >= 1024) mobileOpen = false">
     <script>
         window.kiviiSearch = window.kiviiSearch || function (endpoint) {
             return {
@@ -127,80 +129,49 @@
     </script>
 
     @if ($kiviiNeeds2fa)
-        <div class="border-b border-amber-300 bg-amber-100 text-amber-950" role="alert">
-            <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm sm:px-6 lg:px-8">
-                <span><strong class="font-semibold">Beveilig je admin-account.</strong> Tweestapsverificatie (2FA) staat nog niet aan.</span>
+        <div class="border-b border-amber-200 bg-amber-50 text-amber-950" role="alert">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm sm:px-6 lg:px-10">
+                <span class="flex items-center gap-2"><x-icon name="shield" class="h-4 w-4 text-amber-700" /><span><strong class="font-semibold">Beveilig je admin-account.</strong> Tweestapsverificatie (2FA) staat nog niet aan.</span></span>
                 <a href="{{ route('profile.show') }}#two-factor" class="inline-flex h-8 items-center rounded-lg bg-amber-900 px-3 text-xs font-semibold text-white hover:bg-amber-950 {{ $kiviiFocus }}">2FA instellen</a>
             </div>
         </div>
     @endif
 
-    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div class="flex h-14 items-center justify-between gap-4">
-            <div class="flex items-center gap-3">
-                <button type="button" x-ref="mobileButton" class="-ml-2 inline-flex h-10 w-10 items-center justify-center rounded-lg text-zinc-700 hover:bg-zinc-100 md:hidden {{ $kiviiFocus }}"
-                        @click="mobileOpen = !mobileOpen; if (mobileOpen) $dispatch('kivii-menu-open', 'mobile')"
-                        :aria-expanded="mobileOpen.toString()" aria-controls="mobile-nav" :aria-label="mobileOpen ? 'Menu sluiten' : 'Menu openen'">
-                    <svg x-show="!mobileOpen" class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
-                    <svg x-cloak x-show="mobileOpen" class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+    {{-- Topbalk in de inhoudskolom --}}
+    <header class="border-b border-zinc-200/70 bg-canvas/85 backdrop-blur supports-[backdrop-filter]:bg-canvas/75">
+        <div class="flex h-14 items-center gap-2 px-4 sm:gap-3 sm:px-6 lg:px-10">
+            <button type="button" x-ref="mobileButton" class="-ml-2 inline-flex h-10 w-10 items-center justify-center rounded-xl text-zinc-700 hover:bg-zinc-200/60 lg:hidden {{ $kiviiFocus }}"
+                    @click="mobileOpen = true; $dispatch('kivii-menu-open', 'mobile')"
+                    :aria-expanded="mobileOpen.toString()" aria-controls="app-sidebar" aria-label="Menu openen">
+                <x-icon name="menu" class="h-6 w-6" />
+            </button>
+            <a href="{{ route('dashboard') }}" class="mr-1 flex shrink-0 items-center gap-2 rounded-lg lg:hidden {{ $kiviiFocus }}">
+                <img src="{{ asset('brand/kivii-mark.png') }}" alt="Kivii CRM" class="h-8 w-8 rounded-lg bg-white" />
+            </a>
+
+            <div class="min-w-0 flex-1" x-data="kiviiSearch(@js(route('crm.search')))" @keydown.window="onKey($event)"
+                 @kivii-menu-open.window="if ($event.detail !== 'search' && open) open = false">
+                <button type="button" x-ref="searchTrigger" @click="show()"
+                        class="group flex h-9 w-full max-w-md items-center gap-2.5 rounded-xl border border-zinc-200/80 bg-white px-3 text-sm text-zinc-500 shadow-sm transition-colors hover:border-zinc-300 hover:text-zinc-700 {{ $kiviiFocus }}"
+                        aria-label="Zoeken (Ctrl+K of /)" aria-haspopup="dialog">
+                    <x-icon name="search" class="h-4 w-4 text-zinc-400 group-hover:text-zinc-500" />
+                    <span class="flex-1 truncate text-left"><span class="sm:hidden">Zoeken</span><span class="hidden sm:inline">Zoek klant, taak, e-mail of KVK</span></span>
+                    <span class="hidden items-center gap-1 sm:flex" aria-hidden="true"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">K</kbd></span>
                 </button>
-                <a href="{{ route('dashboard') }}" class="flex items-center gap-2 rounded-md font-semibold tracking-tight {{ $kiviiFocus }}">
-                    <img src="{{ asset('brand/kivii-mark.png') }}" alt="Kivii" class="h-8 w-8 rounded-lg bg-white" />
-                    <span class="hidden text-zinc-900 lg:block">Kivii <span class="font-medium text-zinc-500">CRM</span></span>
-                </a>
-                <nav class="hidden md:flex items-center gap-1" aria-label="Hoofdmenu">
-                    @foreach ($kiviiNavItems as $item)
-                        @php($isActive = request()->routeIs($item['match']))
-                        <a href="{{ route($item['route']) }}" @class(['whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors', $kiviiFocus, 'bg-zinc-100 text-zinc-900' => $isActive, 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900' => ! $isActive]) @if ($isActive) aria-current="page" @endif>{{ $item['label'] }}</a>
-                    @endforeach
-
-                    @if ($kiviiSettingsItems !== [])
-                        <div x-data="{ open: false }" class="relative"
-                             @kivii-menu-open.window="if ($event.detail !== 'settings') open = false"
-                             @keydown.escape.window="if (open) { open = false; $refs.settingsButton.focus() }"
-                             @click.outside="open = false">
-                            <button type="button" x-ref="settingsButton"
-                                    @class(['flex items-center gap-1 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors', $kiviiFocus, 'bg-zinc-100 text-zinc-900' => $kiviiSettingsActive, 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900' => ! $kiviiSettingsActive])
-                                    @click="open = !open; if (open) $dispatch('kivii-menu-open', 'settings')"
-                                    :aria-expanded="open.toString()" aria-haspopup="true" aria-controls="settings-menu">
-                                Instellingen
-                                <svg class="h-4 w-4 text-zinc-400 transition-transform" :class="open && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clip-rule="evenodd" /></svg>
-                            </button>
-                            <div id="settings-menu" x-cloak x-show="open" x-transition.opacity.duration.100ms class="absolute left-0 z-40 mt-2 w-56 overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 shadow-lg">
-                                @foreach ($kiviiSettingsItems as $item)
-                                    @php($isActive = request()->routeIs($item['match']))
-                                    <a href="{{ route($item['route']) }}" @class(['block rounded-lg px-3 py-2 text-sm hover:bg-zinc-100 focus:outline-none focus-visible:bg-zinc-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-600', 'bg-zinc-100 font-semibold text-zinc-900' => $isActive, 'text-zinc-700' => ! $isActive]) @if ($isActive) aria-current="page" @endif>{{ $item['label'] }}</a>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endif
-                </nav>
-            </div>
-
-            <div class="flex items-center gap-1.5 sm:gap-2">
-                <div x-data="kiviiSearch(@js(route('crm.search')))" @keydown.window="onKey($event)"
-                     @kivii-menu-open.window="if ($event.detail !== 'search' && open) open = false">
-                    <button type="button" x-ref="searchTrigger" @click="show()"
-                            class="flex h-9 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-2.5 text-sm text-zinc-500 shadow-sm transition-colors hover:border-zinc-300 hover:bg-zinc-50 sm:w-56 sm:px-3 {{ $kiviiFocus }}"
-                            aria-label="Zoeken (Ctrl+K of /)" aria-haspopup="dialog">
-                        <svg class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.45 4.39l3.08 3.08a.75.75 0 11-1.06 1.06l-3.08-3.08A7 7 0 012 9z" clip-rule="evenodd" /></svg>
-                        <span class="hidden flex-1 text-left sm:inline">Zoeken...</span>
-                        <kbd class="hidden rounded border border-zinc-200 bg-zinc-50 px-1.5 font-sans text-[11px] font-medium text-zinc-500 sm:inline">Ctrl K</kbd>
-                    </button>
 
                     <template x-teleport="body">
-                        <div x-cloak x-show="open" x-ref="searchOverlay" class="fixed inset-0 z-50 flex items-start justify-center bg-zinc-900/40 px-4 pt-[10vh]"
+                        <div x-cloak x-show="open" x-ref="searchOverlay" class="fixed inset-0 z-50 flex items-start justify-center bg-zinc-900/30 px-4 pt-[10vh] backdrop-blur-[2px]"
                              @click.self="close()" @keydown.escape.prevent.stop="close()">
-                            <div class="w-full max-w-xl overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xl" role="dialog" aria-modal="true" aria-label="Zoeken in Kivii CRM" x-trap.noscroll.noautofocus="open">
+                            <div class="w-full max-w-xl overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-pop" role="dialog" aria-modal="true" aria-label="Zoeken in Kivii CRM" x-trap.noscroll.noautofocus="open">
                                 <div class="flex items-center gap-2 border-b border-zinc-200 px-4">
-                                    <svg class="h-5 w-5 shrink-0 text-zinc-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.45 4.39l3.08 3.08a.75.75 0 11-1.06 1.06l-3.08-3.08A7 7 0 012 9z" clip-rule="evenodd" /></svg>
+                                    <x-icon name="search" class="h-5 w-5 text-zinc-400" />
                                     <input x-ref="searchInput" type="search" x-model="q" @input="queue()"
                                            @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)" @keydown.enter.prevent="go()"
                                            class="h-12 w-full border-0 bg-transparent text-sm focus:ring-0"
                                            placeholder="Zoek klant, e-mail, telefoon, plaats, KVK, IBAN of taak"
                                            role="combobox" aria-controls="kivii-search-results" :aria-expanded="(flat.length > 0).toString()"
                                            :aria-activedescendant="flat.length ? 'kivii-search-item-' + active : null" autocomplete="off" />
-                                    <button type="button" @click="close()" class="shrink-0 rounded border border-zinc-200 bg-zinc-50 px-1.5 text-[11px] font-medium text-zinc-500 hover:bg-zinc-100 {{ $kiviiFocus }}" aria-label="Zoeken sluiten">Esc</button>
+                                    <button type="button" @click="close()" class="kbd shrink-0 hover:bg-zinc-100 {{ $kiviiFocus }}" aria-label="Zoeken sluiten">Esc</button>
                                 </div>
                                 <div id="kivii-search-results" class="max-h-[60vh] overflow-y-auto py-2" role="listbox" aria-label="Zoekresultaten">
                                     <template x-if="error"><div class="px-4 py-3 text-sm text-rose-700" role="alert" x-text="error"></div></template>
@@ -208,7 +179,7 @@
                                     <template x-if="!error && q.trim().length >= 2 && !loading && flat.length === 0"><div class="px-4 py-6 text-center text-sm text-zinc-500">Geen resultaten voor "<span class="font-medium text-zinc-700" x-text="q.trim()"></span>".</div></template>
                                     <template x-for="group in groups" :key="group.key">
                                         <div class="py-1">
-                                            <div class="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500" x-text="group.label"></div>
+                                            <div class="px-4 pb-1 pt-2 text-xs font-medium text-zinc-500" x-text="group.label"></div>
                                             <template x-for="item in group.items" :key="group.key + '-' + item.id">
                                                 <a :href="item.url" :id="'kivii-search-item-' + indexOf(item)" role="option" :aria-selected="(indexOf(item) === active).toString()"
                                                    @mouseenter="active = indexOf(item)"
@@ -225,57 +196,99 @@
                             </div>
                         </div>
                     </template>
-                </div>
+            </div>
 
+            <div class="flex shrink-0 items-center gap-1">
                 @livewire('crm.reminders.bell')
+            </div>
+        </div>
+    </header>
 
-                <div x-data="{ open: false }" class="relative"
-                     @kivii-menu-open.window="if ($event.detail !== 'user') open = false"
-                     @keydown.escape.window="if (open) { open = false; $refs.userButton.focus() }"
-                     @click.outside="open = false">
-                    <button type="button" x-ref="userButton" class="flex h-9 items-center gap-2 rounded-lg pl-1 pr-1.5 hover:bg-zinc-100 sm:pr-2 {{ $kiviiFocus }}"
-                            @click="open = !open; if (open) $dispatch('kivii-menu-open', 'user')"
-                            :aria-expanded="open.toString()" aria-haspopup="true" aria-controls="user-menu"
-                            aria-label="Gebruikersmenu van {{ $kiviiUser->name ?? 'account' }}">
-                        <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-800" aria-hidden="true">{{ $kiviiInitials }}</span>
-                        <span class="hidden max-w-[10rem] truncate text-sm font-medium text-zinc-800 lg:inline" aria-hidden="true">{{ $kiviiUser->name ?? 'Account' }}</span>
-                        <svg class="h-4 w-4 text-zinc-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clip-rule="evenodd" /></svg>
-                    </button>
-                    <div id="user-menu" x-cloak x-show="open" x-transition.opacity.duration.100ms class="absolute right-0 z-40 mt-2 w-64 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-lg">
-                        <div class="px-4 py-3">
-                            <div class="truncate text-sm font-semibold text-zinc-900">{{ $kiviiUser->name }}</div>
-                            <div class="truncate text-xs text-zinc-500">{{ $kiviiUser->email }}</div>
-                        </div>
-                        <div class="border-t border-zinc-100 p-1">
-                            <a href="{{ route('profile.show') }}" @class(['block rounded-lg px-3 py-2 text-sm hover:bg-zinc-100 focus:outline-none focus-visible:bg-zinc-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-600', 'bg-zinc-100 font-semibold text-zinc-900' => request()->routeIs('profile.show'), 'text-zinc-700' => ! request()->routeIs('profile.show')]) @if (request()->routeIs('profile.show')) aria-current="page" @endif>Profiel en beveiliging</a>
-                            <form method="POST" action="{{ route('logout') }}">
-                                @csrf
-                                <button type="submit" class="block w-full rounded-lg px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-100 focus:outline-none focus-visible:bg-zinc-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-600">Uitloggen</button>
-                            </form>
-                        </div>
-                    </div>
+    {{-- Achtergrond van de mobiele drawer --}}
+    <div x-cloak x-show="mobileOpen" x-transition.opacity.duration.150ms class="fixed inset-0 z-30 bg-zinc-900/30 backdrop-blur-[2px] lg:hidden" @click="mobileOpen = false" aria-hidden="true"></div>
+
+    {{-- Zijbalk: vast vanaf lg, drawer op kleinere schermen --}}
+    <aside id="app-sidebar"
+           class="fixed inset-y-0 left-0 z-40 flex w-[17.5rem] max-w-[85vw] flex-col border-r border-zinc-200/70 bg-white transition-[transform,visibility] duration-200 ease-out max-lg:invisible max-lg:-translate-x-full lg:w-sidebar lg:bg-white/70"
+           :class="mobileOpen && '!visible !translate-x-0 shadow-pop'"
+           x-trap.noscroll="mobileOpen"
+           :role="mobileOpen ? 'dialog' : null" :aria-modal="mobileOpen ? 'true' : null"
+           aria-label="Zijbalk">
+        <div class="flex h-14 shrink-0 items-center justify-between gap-2 px-4 lg:h-16 lg:px-5">
+            <a href="{{ route('dashboard') }}" class="flex items-center gap-2.5 rounded-lg {{ $kiviiFocus }}">
+                <img src="{{ asset('brand/kivii-mark.png') }}" alt="" class="h-8 w-8 rounded-lg bg-white shadow-sm ring-1 ring-black/5" />
+                <span class="text-[15px] font-semibold tracking-snug text-zinc-900">Kivii <span class="font-medium text-zinc-400">CRM</span></span>
+            </a>
+            <button type="button" class="-mr-1 inline-flex h-9 w-9 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 lg:hidden {{ $kiviiFocus }}"
+                    @click="mobileOpen = false; $refs.mobileButton.focus()" aria-label="Menu sluiten">
+                <x-icon name="x" class="h-5 w-5" />
+            </button>
+        </div>
+
+        <nav class="flex-1 overflow-y-auto px-3 pb-4 pt-2 lg:px-4" aria-label="Hoofdmenu">
+            <ul class="space-y-0.5">
+                @foreach ($kiviiNavItems as $item)
+                    <li>
+                        @php($isActive = request()->routeIs($item['match']))
+                        <a href="{{ route($item['route']) }}" class="nav-item" @if ($isActive) aria-current="page" @endif>
+                            <x-icon :name="$item['icon']" />
+                            <span class="truncate">{{ $item['label'] }}</span>
+                        </a>
+                    </li>
+                @endforeach
+            </ul>
+
+            @if ($kiviiSettingsItems !== [])
+                <div class="mt-7">
+                    <p id="sidebar-settings-title" class="mb-1.5 px-3 text-xs font-medium text-zinc-400">Instellingen</p>
+                    <ul class="space-y-0.5" aria-labelledby="sidebar-settings-title">
+                        @foreach ($kiviiSettingsItems as $item)
+                            <li>
+                                @php($isActive = request()->routeIs($item['match']))
+                                <a href="{{ route($item['route']) }}" class="nav-item" @if ($isActive) aria-current="page" @endif>
+                                    <x-icon :name="$item['icon']" />
+                                    <span class="truncate">{{ $item['label'] }}</span>
+                                </a>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+        </nav>
+
+        {{-- Gebruikerskaart met menu (opent naar boven) --}}
+        <div class="shrink-0 border-t border-zinc-200/70 p-3 lg:px-4">
+            <div x-data="{ open: false }" class="relative"
+                 @kivii-menu-open.window="if ($event.detail !== 'user') open = false"
+                 @keydown.escape.window="if (open) { open = false; $refs.userButton.focus() }"
+                 @click.outside="open = false">
+                <button type="button" x-ref="userButton"
+                        class="flex w-full items-center gap-3 rounded-xl p-2 text-left transition-colors hover:bg-zinc-100 {{ $kiviiFocus }}"
+                        :class="open && 'bg-zinc-100'"
+                        @click="open = !open; if (open) $dispatch('kivii-menu-open', 'user')"
+                        :aria-expanded="open.toString()" aria-haspopup="true" aria-controls="user-menu"
+                        aria-label="Gebruikersmenu van {{ $kiviiUser->name ?? 'account' }}">
+                    <x-avatar :name="$kiviiUser->name ?? ''" size="sm" />
+                    <span class="min-w-0 flex-1" aria-hidden="true">
+                        <span class="block truncate text-sm font-semibold text-zinc-900">{{ $kiviiUser->name ?? 'Account' }}</span>
+                        <span class="block truncate text-xs text-zinc-500">{{ $kiviiUser->email ?? '' }}</span>
+                    </span>
+                    <x-icon name="chevrons-up-down" class="h-4 w-4 text-zinc-400" />
+                </button>
+                <div id="user-menu" x-cloak x-show="open" x-transition.opacity.duration.100ms class="menu-panel absolute inset-x-0 bottom-full z-40 mb-2">
+                    <a href="{{ route('profile.show') }}" class="menu-item {{ $kiviiProfileActive ? 'bg-zinc-100 font-semibold text-zinc-900' : '' }}" @if ($kiviiProfileActive) aria-current="page" @endif>
+                        <x-icon name="user" class="h-4 w-4 text-zinc-400" />
+                        Profiel en beveiliging
+                    </a>
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf
+                        <button type="submit" class="menu-item">
+                            <x-icon name="log-out" class="h-4 w-4 text-zinc-400" />
+                            Uitloggen
+                        </button>
+                    </form>
                 </div>
             </div>
         </div>
-    </div>
-
-    <nav id="mobile-nav" class="md:hidden" x-cloak x-show="mobileOpen" x-transition.opacity.duration.100ms aria-label="Hoofdmenu mobiel">
-        <div class="max-h-[calc(100vh-3.5rem)] overflow-y-auto border-t border-zinc-200 bg-white shadow-sm">
-            <div class="mx-auto max-w-7xl space-y-0.5 px-4 py-3">
-                @foreach ($kiviiNavItems as $item)
-                    @php($isActive = request()->routeIs($item['match']))
-                    <a href="{{ route($item['route']) }}" @class(['block rounded-lg px-3 py-2.5 text-sm font-medium', $kiviiFocus, 'bg-zinc-100 text-zinc-900' => $isActive, 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900' => ! $isActive]) @if ($isActive) aria-current="page" @endif>{{ $item['label'] }}</a>
-                @endforeach
-                @if ($kiviiSettingsItems !== [])
-                    <div class="mt-2 border-t border-zinc-100 pt-2">
-                        <div class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Instellingen</div>
-                        @foreach ($kiviiSettingsItems as $item)
-                            @php($isActive = request()->routeIs($item['match']))
-                            <a href="{{ route($item['route']) }}" @class(['block rounded-lg px-3 py-2.5 pl-5 text-sm font-medium', $kiviiFocus, 'bg-zinc-100 text-zinc-900' => $isActive, 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900' => ! $isActive]) @if ($isActive) aria-current="page" @endif>{{ $item['label'] }}</a>
-                        @endforeach
-                    </div>
-                @endif
-            </div>
-        </div>
-    </nav>
-</header>
+    </aside>
+</div>

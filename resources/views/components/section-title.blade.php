@@ -1,9 +1,9 @@
 <div class="flex min-w-0 items-start justify-between gap-3">
     <div class="min-w-0">
-        <h2 class="text-base font-semibold text-zinc-900">{{ $title }}</h2>
+        <h2 class="section-heading">{{ $title }}</h2>
 
         @if (isset($description) && trim((string) $description) !== '')
-            <p class="mt-0.5 text-sm text-zinc-500">
+            <p class="section-description">
                 {{ $description }}
             </p>
         @endif

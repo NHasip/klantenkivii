@@ -6,12 +6,12 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 </head>
-<body class="min-h-full bg-zinc-50 font-sans text-zinc-900 antialiased">
+<body class="min-h-full bg-canvas font-sans text-zinc-900 antialiased">
     <a href="#hoofdinhoud" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[80] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:shadow-lg focus:ring-2 focus:ring-indigo-600">Naar inhoud</a>
-    <div class="min-h-screen">
+    <div class="app-shell">
         @include('layouts.partials.header')
 
-        <main id="hoofdinhoud" tabindex="-1" class="mx-auto max-w-7xl px-4 py-6 focus:outline-none sm:px-6 sm:py-8 lg:px-8">
+        <main id="hoofdinhoud" tabindex="-1" class="app-container focus:outline-none">
             @include('layouts.partials.status', ['statusClass' => 'mb-6'])
 
             {{ $slot }}

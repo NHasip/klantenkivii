@@ -2,7 +2,7 @@
 
 <x-modal :id="$id" :maxWidth="$maxWidth" {{ $attributes }}>
     <div class="px-5 pb-4 pt-5 sm:px-6">
-        <h2 class="text-base font-semibold text-zinc-900">
+        <h2 class="section-heading">
             {{ $title }}
         </h2>
 
@@ -11,7 +11,7 @@
         </div>
     </div>
 
-    <div class="flex flex-wrap items-center justify-end gap-2 border-t border-zinc-100 bg-zinc-50/70 px-5 py-3 sm:px-6">
+    <div class="flex flex-wrap items-center justify-end gap-2 border-t border-zinc-100 bg-zinc-50/60 px-5 py-3 sm:px-6">
         {{ $footer }}
     </div>
 </x-modal>

@@ -42,7 +42,7 @@
 
         <div class="my-6 flex items-center gap-3" aria-hidden="true">
             <div class="h-px flex-1 bg-zinc-200"></div>
-            <span class="text-xs font-medium uppercase tracking-wide text-zinc-400">of</span>
+            <span class="text-xs font-medium text-zinc-400">of</span>
             <div class="h-px flex-1 bg-zinc-200"></div>
         </div>
 
