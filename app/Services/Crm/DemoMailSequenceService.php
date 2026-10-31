@@ -159,10 +159,10 @@ class DemoMailSequenceService
     public static function dueAt(Carbon $startedAt, int $offset, bool $testMode = false): Carbon
     {
         if ($testMode) {
-            return $startedAt->copy()->addMinutes($offset)->utc();
+            return $startedAt->copy()->addMinutes($offset);
         }
 
-        return $startedAt->copy()->timezone('Europe/Amsterdam')->startOfDay()->addDays($offset)->setTime(8, 45)->utc();
+        return $startedAt->copy()->timezone('Europe/Amsterdam')->startOfDay()->addDays($offset)->setTime(8, 45);
     }
 
     /** Stopt de actieve reeks van de klant. Geeft true terug als er iets gestopt is. */
