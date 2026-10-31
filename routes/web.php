@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Crm\DashboardController;
+use App\Http\Controllers\Crm\DemoMailSequenceController;
 use App\Http\Controllers\Crm\EmailTemplatesController;
 use App\Http\Controllers\Crm\GarageCompaniesController;
 use App\Http\Controllers\Crm\ImportController;
@@ -135,6 +136,13 @@ Route::middleware(['auth', 'active', 'admin.2fa'])->group(function () {
     Route::post('/machtigingen/{mandateRequest}/overnemen', [MandateRequestsController::class, 'adopt'])
         ->middleware(['admin', 'throttle:30,1'])
         ->name('crm.mandate_requests.adopt');
+
+    Route::post('/garagebedrijven/{garageCompany}/demo-mailreeks/stoppen', [DemoMailSequenceController::class, 'stop'])
+        ->middleware('admin')
+        ->name('crm.demo_sequence.stop');
+    Route::post('/garagebedrijven/{garageCompany}/demo-mailreeks/starten', [DemoMailSequenceController::class, 'restart'])
+        ->middleware(['admin', 'throttle:10,1'])
+        ->name('crm.demo_sequence.restart');
 
     Route::get('/email-templates', [EmailTemplatesController::class, 'index'])
         ->middleware('admin')

@@ -14,3 +14,5 @@ Schedule::command('crm:daily-checks')->dailyAt('08:00')->timezone('Europe/Amster
     ->when(fn () => (bool) config('crm.schedule.daily_checks'));
 Schedule::command('leads:import-imap')->everyFiveMinutes()->withoutOverlapping()
     ->when(fn () => (bool) config('crm.schedule.leads_import'));
+Schedule::command('crm:demo-sequence')->hourly()->withoutOverlapping()
+    ->when(fn () => (bool) config('crm.schedule.demo_sequence'));

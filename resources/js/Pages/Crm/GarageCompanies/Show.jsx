@@ -15,6 +15,7 @@ import ActivityTab from './partials/ActivityTab';
 import DemoStatusTab from './partials/DemoStatusTab';
 import WelcomeTab from './partials/WelcomeTab';
 import { MandateRequestDialog } from './partials/MandateRequests';
+import DemoMailSequenceCard from './partials/DemoMailSequenceCard';
 import {
     CURRENT_DRAFT,
     DATE_ONLY_FIELDS,
@@ -70,6 +71,7 @@ export default function Show({
     smtpConfigured,
     incasso,
     mandateRequests,
+    demoMailSequence,
     urls,
 }) {
     const persons = asList(personsProp);
@@ -1233,6 +1235,9 @@ export default function Show({
                         extendForm={extendForm}
                         onSubmitExtend={submitExtend}
                     />
+                    <div className="mt-6">
+                        <DemoMailSequenceCard data={demoMailSequence} />
+                    </div>
             </TabPanel>
 
             <TabPanel idBase={tabsIdBase} value="welkomst" active={activeTab === 'welkomst'}>

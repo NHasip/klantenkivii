@@ -9,6 +9,8 @@ return [
         'leads_import' => (bool) env('CRM_SCHEDULE_LEADS_IMPORT', true),
         'reminders' => (bool) env('CRM_SCHEDULE_REMINDERS', false),
         'daily_checks' => (bool) env('CRM_SCHEDULE_DAILY_CHECKS', false),
+        // Automatische demo-mailreeks (dag 2, 5, 13) via Microsoft Graph.
+        'demo_sequence' => (bool) env('CRM_SCHEDULE_DEMO_SEQUENCE', true),
     ],
 
     // SEPA-machtiging via het Elementor-formulier op kivii.nl.

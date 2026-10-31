@@ -49,6 +49,49 @@ class EmailTemplateRenderer
             'machtigingslink' => self::mandateLink('VOORBEELDREF', 'KIVII-7KQ4M9TX', 'Voorbeeld Garagebedrijf'),
             'kenmerk' => 'KIVII-7KQ4M9TX',
             'geldig_tot' => now()->addDays((int) config('crm.mandate_valid_days', 30))->format('d-m-Y'),
+            'modules' => 'Basis, Planning, Rapportages',
+        ];
+    }
+
+    /**
+     * Standaardteksten voor de automatische demo-mailreeks (dag 2, 5 en 13).
+     * Worden als systeemtemplate aangemaakt en zijn daarna bewerkbaar via E-mailtemplates.
+     *
+     * @return array<string, array{name:string,subject:string,body_html:string}>
+     */
+    public static function defaultDemoTemplates(): array
+    {
+        $groet = '<p>Met vriendelijke groet,<br>Team Kivii<br><a href="mailto:info@kivii.nl">info@kivii.nl</a></p>';
+
+        return [
+            'demo_dag_2' => [
+                'name' => 'Demo dag 2: lukt het inloggen?',
+                'subject' => 'Lukt het inloggen bij Kivii?',
+                'body_html' => '<p>Hoi {{ naam }},</p>'
+                    .'<p>Sinds kort kun je Kivii uitproberen voor {{ bedrijfsnaam }}. We zijn benieuwd: lukt het inloggen?</p>'
+                    .'<p>Je logt in via <a href="{{ weblink }}">{{ weblink }}</a> met <strong>{{ loginnaam }}</strong>.</p>'
+                    .'<p>Loop je ergens tegenaan? Beantwoord gerust deze e-mail of mail naar info@kivii.nl, dan helpen we je snel op weg.</p>'
+                    .$groet,
+            ],
+            'demo_dag_5' => [
+                'name' => 'Demo dag 5: ontdek de modules',
+                'subject' => 'Haal meer uit je Kivii-demo',
+                'body_html' => '<p>Hoi {{ naam }},</p>'
+                    .'<p>Je bent nu een paar dagen met Kivii aan de slag. Tijd om te laten zien wat er nog meer kan.</p>'
+                    .'<p>In Kivii werk je onder andere met deze modules: {{ modules }}.</p>'
+                    .'<p>Tip: probeer elke module een keer uit met een echte klus uit je eigen werkplaats. Zo zie je het snelst wat Kivii voor {{ bedrijfsnaam }} kan betekenen.</p>'
+                    .'<p>Wil je een module samen met ons doorlopen? Beantwoord deze e-mail, dan plannen we een kort moment in.</p>'
+                    .$groet,
+            ],
+            'demo_dag_13' => [
+                'name' => 'Demo dag 13: hoe bevalt Kivii?',
+                'subject' => 'Hoe bevalt Kivii?',
+                'body_html' => '<p>Hoi {{ naam }},</p>'
+                    .'<p>Je werkt nu bijna twee weken met Kivii. Hoe bevalt het tot nu toe?</p>'
+                    .'<p>We horen graag wat je ervan vindt. Heb je nog vragen of wil je even bellen? Beantwoord deze e-mail en we nemen contact met je op.</p>'
+                    .'<p>Wil je na de demo verder met Kivii voor {{ bedrijfsnaam }}? Laat het ons weten, dan zetten we je account om naar een vast abonnement en regelen we samen de laatste stappen.</p>'
+                    .$groet,
+            ],
         ];
     }
 

@@ -64,7 +64,7 @@ class Bell extends Component
         $userId = (int) auth()->id();
 
         try {
-            return Cache::remember('crm-bell-signals:v3:'.$userId, 60, fn () => $this->buildSignals($userId));
+            return Cache::remember('crm-bell-signals:v4:'.$userId, 60, fn () => $this->buildSignals($userId));
         } catch (Throwable $e) {
             report($e);
 
@@ -234,7 +234,34 @@ class Bell extends Component
             }
         }
 
+        // 6. Demo-mailreeks: mails die wachten op de Microsoft-koppeling of definitief mislukt zijn.
+        if (\App\Services\Crm\DemoMailSequenceService::available()) {
+            $waiting = \App\Services\Crm\DemoMailSequenceService::waitingForGraphCount();
+            if ($waiting > 0) {
+                $signals[] = [
+                    'key' => 'demo_mail_graph',
+                    'title' => 'Demo-mails niet verstuurd: Microsoft-koppeling ontbreekt',
+                    'count' => $waiting,
+                    'link' => null,
+                    'linkLabel' => null,
+                    'summary' => ($waiting === 1 ? 'klant wacht' : 'klanten wachten').' op een demo-mail. Stel Microsoft Graph voor '.\App\Services\Mail\MicrosoftGraphMailer::sender().' in.',
+                    'items' => [],
+                ];
+            }
+            $failed = \App\Services\Crm\DemoMailSequenceService::failedCount();
+            if ($failed > 0) {
+                $signals[] = [
+                    'key' => 'demo_mail_failed',
+                    'title' => 'Demo-mail mislukt',
+                    'count' => $failed,
+                    'link' => null,
+                    'linkLabel' => null,
+                    'summary' => $failed === 1 ? 'demo-mail kon niet worden verstuurd (afgelopen 7 dagen)' : 'demo-mails konden niet worden verstuurd (afgelopen 7 dagen)',
+                    'items' => [],
+                ];
+            }
+        }
+
         return $signals;
     }
 }
-

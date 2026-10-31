@@ -1218,6 +1218,7 @@ class GarageCompaniesController
             'reminderChannels' => collect(ReminderChannel::cases())->map(fn ($c) => $c->value)->values(),
             'hasActiveMandate' => $activeMandate !== null,
             'mandateRequests' => MandateRequestsController::forCompany($garageCompany),
+            'demoMailSequence' => \App\Services\Crm\DemoMailSequenceService::forCompany($garageCompany),
             'statusErrors' => $this->statusErrors($garageCompany),
             'urls' => [
                 'index' => route('crm.garage_companies.index'),
@@ -2622,6 +2623,7 @@ class GarageCompaniesController
             'reset_link' => $passwordSetupLink,
             'activatielink' => $passwordSetupLink,
             'weblink' => 'https://web.kivii.nl/',
+            'modules' => \App\Services\Crm\DemoMailSequenceService::moduleNames($garageCompany),
         ];
     }
 

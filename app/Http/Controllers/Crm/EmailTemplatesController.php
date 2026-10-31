@@ -20,6 +20,9 @@ class EmailTemplatesController
         'general',
         'announcement',
         'sepa_machtiging',
+        'demo_dag_2',
+        'demo_dag_5',
+        'demo_dag_13',
     ];
 
     public function index(): Response
@@ -108,6 +111,7 @@ class EmailTemplatesController
             'machtigingslink' => EmailTemplateRenderer::mandateLink('VOORBEELDREF', 'KIVII-VOORBEELD', (string) $company->bedrijfsnaam),
             'kenmerk' => 'KIVII-VOORBEELD',
             'geldig_tot' => now()->addDays((int) config('crm.mandate_valid_days', 30))->format('d-m-Y'),
+            'modules' => \App\Services\Crm\DemoMailSequenceService::moduleNames($company),
         ];
         $escaped = array_map(fn ($value) => e($value), $values);
 
@@ -241,6 +245,7 @@ class EmailTemplatesController
         ];
         $mandate = \App\Services\EmailTemplateRenderer::defaultMandateTemplate();
         $defaults[$mandate['key']] = ['name' => $mandate['name'], 'subject' => $mandate['subject'], 'body_html' => $mandate['body_html']];
+        $defaults += \App\Services\EmailTemplateRenderer::defaultDemoTemplates();
 
         foreach ($defaults as $key => $payload) {
             $create = [
