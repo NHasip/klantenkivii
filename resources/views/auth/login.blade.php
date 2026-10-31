@@ -22,7 +22,7 @@
                 <div class="flex items-center justify-between gap-3">
                     <x-label for="password" value="Wachtwoord" />
                     @if (Route::has('password.request'))
-                        <a class="rounded text-sm font-medium text-indigo-700 hover:text-indigo-900 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600" href="{{ route('password.request') }}">
+                        <a class="tap-link rounded text-sm font-medium text-indigo-700 hover:text-indigo-900 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600" href="{{ route('password.request') }}">
                             Wachtwoord vergeten?
                         </a>
                     @endif

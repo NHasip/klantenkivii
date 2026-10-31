@@ -190,7 +190,7 @@ function Timeline({ activities, filter, setFilter, statusLabels }) {
                             aria-pressed={active}
                             onClick={() => setFilter(item.key)}
                             className={cx(
-                                'inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold ring-1 ring-inset transition-colors focus-ring',
+                                'tap-target inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold ring-1 ring-inset transition-colors focus-ring',
                                 active ? 'bg-zinc-900 text-white ring-zinc-900' : 'bg-white text-zinc-700 ring-zinc-200 hover:bg-zinc-50'
                             )}
                         >

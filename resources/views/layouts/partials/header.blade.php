@@ -168,7 +168,7 @@
                 </button>
 
                     <template x-teleport="body">
-                        <div x-cloak x-show="open" x-ref="searchOverlay" class="fixed inset-0 z-50 flex items-start justify-center bg-zinc-900/30 px-4 pt-[10vh] backdrop-blur-[2px]"
+                        <div x-cloak x-show="open" x-ref="searchOverlay" class="fixed inset-0 z-[60] flex items-start justify-center bg-zinc-900/30 px-4 pt-[10vh] backdrop-blur-[2px]"
                              @click.self="close()" @keydown.escape.prevent.stop="close()">
                             <div class="w-full max-w-xl overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-pop" role="dialog" aria-modal="true" aria-label="Zoeken in Kivii CRM" x-trap.noscroll.noautofocus="open">
                                 <div class="flex items-center gap-2 border-b border-zinc-200 px-4">
@@ -179,11 +179,13 @@
                                            placeholder="Zoek klant, e-mail, telefoon, plaats, KVK, IBAN of taak"
                                            role="combobox" aria-controls="kivii-search-results" :aria-expanded="(flat.length > 0).toString()"
                                            :aria-activedescendant="flat.length ? 'kivii-search-item-' + active : null" autocomplete="off" />
-                                    <button type="button" @click="close()" class="kbd shrink-0 hover:bg-zinc-100 {{ $kiviiFocus }}" aria-label="Zoeken sluiten">Esc</button>
+                                    {{-- Onder sm een gewone sluitknop (44px); vanaf sm de Esc-toetshint, op touch met onzichtbaar 44px tikvlak. --}}
+                                    <button type="button" @click="close()" class="tap-target-icon -mr-2 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 sm:hidden {{ $kiviiFocus }}" aria-label="Zoeken sluiten"><x-icon name="x" class="h-5 w-5" /></button>
+                                    <button type="button" @click="close()" class="kbd tap-area hidden shrink-0 hover:bg-zinc-100 sm:inline-flex {{ $kiviiFocus }}" aria-label="Zoeken sluiten">Esc</button>
                                 </div>
-                                <div id="kivii-search-results" class="max-h-[60vh] overflow-y-auto py-2" role="listbox" aria-label="Zoekresultaten">
+                                <div id="kivii-search-results" class="max-h-dvh-60 overflow-y-auto overscroll-contain py-2" role="listbox" aria-label="Zoekresultaten">
                                     <template x-if="error"><div class="px-4 py-3 text-sm text-rose-700" role="alert" x-text="error"></div></template>
-                                    <template x-if="!error && q.trim().length < 2"><div class="px-4 py-3 text-sm text-zinc-500">Typ minimaal 2 tekens. Navigeer met de pijltjestoetsen en open met Enter.</div></template>
+                                    <template x-if="!error && q.trim().length < 2"><div class="px-4 py-3 text-sm text-zinc-500"><span class="sm:hidden">Typ minimaal 2 tekens en tik op een resultaat om het te openen.</span><span class="hidden sm:inline">Typ minimaal 2 tekens. Navigeer met de pijltjestoetsen en open met Enter.</span></div></template>
                                     <template x-if="!error && q.trim().length >= 2 && !loading && flat.length === 0"><div class="px-4 py-6 text-center text-sm text-zinc-500">Geen resultaten voor "<span class="font-medium text-zinc-700" x-text="q.trim()"></span>".</div></template>
                                     <template x-for="group in groups" :key="group.key">
                                         <div class="py-1">

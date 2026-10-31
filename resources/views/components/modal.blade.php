@@ -18,7 +18,7 @@ $maxWidth = [
     x-on:keydown.escape.window="show = false"
     x-show="show"
     id="{{ $id }}"
-    class="jetstream-modal fixed inset-0 z-50 flex items-end justify-center overflow-y-auto px-4 py-6 sm:items-center sm:px-0"
+    class="jetstream-modal fixed inset-0 z-[60] flex items-end justify-center overflow-y-auto px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:items-center sm:px-0"
     style="display: none;"
 >
     <div x-show="show" class="fixed inset-0 transform transition-all" x-on:click="show = false"

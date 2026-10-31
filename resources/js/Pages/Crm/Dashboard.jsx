@@ -253,7 +253,7 @@ function AttentionBar({ items }) {
                     key={item.key}
                     href={item.href}
                     className={cx(
-                        'inline-flex items-center gap-2 rounded-full py-1.5 pl-2 pr-3 text-sm font-medium ring-1 ring-inset transition-colors',
+                        'tap-target inline-flex items-center gap-2 rounded-full py-1.5 pl-2 pr-3 text-sm font-medium ring-1 ring-inset transition-colors',
                         item.tone === 'danger' ? 'bg-rose-50 text-rose-800 ring-rose-200 hover:bg-rose-100' : 'bg-amber-50 text-amber-900 ring-amber-200 hover:bg-amber-100',
                         LINK_FOCUS,
                     )}

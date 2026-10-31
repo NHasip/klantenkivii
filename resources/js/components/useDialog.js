@@ -6,6 +6,7 @@ const FOCUSABLE =
 /**
  * Basis toegankelijkheid voor modals/drawers: Escape sluit, focus gaat naar
  * het eerste veld, Tab blijft binnen de dialog en focus keert terug na sluiten.
+ * Met data-autofocus="desktop" krijgt dat veld alleen focus bij een muis/trackpad, niet op touch.
  */
 export function useDialog(open, onClose) {
     const ref = useRef(null);
@@ -19,7 +20,12 @@ export function useDialog(open, onClose) {
         const focusFirst = () => {
             const node = ref.current;
             if (!node || node.contains(document.activeElement)) return;
-            const target = node.querySelector('[data-autofocus]') || node.querySelector(FOCUSABLE);
+            let target = node.querySelector('[data-autofocus]') || node.querySelector(FOCUSABLE);
+            // data-autofocus="desktop": op touch-apparaten niet het veld focussen (anders schuift het toetsenbord
+            // direct omhoog), maar de dialog zelf, zodat Tab en Escape gewoon werken.
+            if (target?.getAttribute('data-autofocus') === 'desktop' && window.matchMedia?.('(pointer: coarse)').matches) {
+                target = null;
+            }
             (target || node).focus?.();
         };
         const raf = requestAnimationFrame(focusFirst);
@@ -41,7 +47,7 @@ export function useDialog(open, onClose) {
             }
             const first = items[0];
             const last = items[items.length - 1];
-            if (event.shiftKey && (document.activeElement === first || !node.contains(document.activeElement))) {
+            if (event.shiftKey && (document.activeElement === first || document.activeElement === node || !node.contains(document.activeElement))) {
                 event.preventDefault();
                 last.focus();
             } else if (!event.shiftKey && (document.activeElement === last || !node.contains(document.activeElement))) {

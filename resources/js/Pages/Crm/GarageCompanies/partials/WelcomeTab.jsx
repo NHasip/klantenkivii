@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { EditorContent } from '@tiptap/react';
 import { Badge, Button, Card, Field, IconTile, cx } from '../../../../components/ui';
 import { CURRENT_DRAFT, FormField, Notice, ToolbarButton, WELCOME_STATUS_LABELS, WELCOME_STATUS_TONES, formatDateTime } from './showUtils';
@@ -80,9 +81,9 @@ function TemplateDialog({ pendingSend, toEmail, draftSubject, templates, selecte
 
     const confirmDisabled = pendingSend ? !toEmail || (!selectedTemplate && selectedTemplateId !== CURRENT_DRAFT) || sending : !selectedTemplate;
 
-    return (
+    return createPortal(
         <div
-            className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-950/40 p-0 sm:items-center sm:p-4"
+            className="fixed inset-0 z-[60] flex items-end justify-center bg-zinc-950/40 p-0 sm:items-center sm:p-4"
             onClick={(event) => {
                 if (event.target === event.currentTarget) onClose();
             }}
@@ -93,7 +94,7 @@ function TemplateDialog({ pendingSend, toEmail, draftSubject, templates, selecte
                 aria-modal="true"
                 aria-labelledby="template-picker-title"
                 aria-describedby="template-picker-description"
-                className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl"
+                className="flex max-h-dvh-90 w-full max-w-lg flex-col rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl"
             >
                 <div className="border-b border-zinc-100 px-5 py-4">
                     <h2 id="template-picker-title" className="text-base font-semibold text-zinc-900">
@@ -127,7 +128,8 @@ function TemplateDialog({ pendingSend, toEmail, draftSubject, templates, selecte
                         />
                     ))}
                 </div>
-                <div className="border-t border-zinc-100 px-5 py-4">
+                {/* Voettekst valt buiten het scrollgebied en blijft dus altijd zichtbaar; onderaan ruimte voor de home-indicator. */}
+                <div className="shrink-0 border-t border-zinc-100 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:pb-4">
                     {selectedTemplate ? (
                         <div className="rounded-lg bg-zinc-50 px-3 py-2 text-xs text-zinc-700">
                             <p className="font-semibold">{selectedTemplate.subject || 'Geen onderwerp'}</p>
@@ -148,7 +150,8 @@ function TemplateDialog({ pendingSend, toEmail, draftSubject, templates, selecte
                     </div>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body,
     );
 }
 

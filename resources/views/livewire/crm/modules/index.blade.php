@@ -334,7 +334,7 @@
         x-cloak
         x-show="confirmOpen"
         x-transition.opacity.duration.150ms
-        class="fixed inset-0 z-50 flex items-end justify-center bg-zinc-950/40 px-4 py-6 backdrop-blur-sm sm:items-center"
+        class="fixed inset-0 z-[60] flex items-end justify-center bg-zinc-950/40 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 backdrop-blur-sm sm:items-center"
         @click.self="closeConfirm()"
         style="display: none;"
     >

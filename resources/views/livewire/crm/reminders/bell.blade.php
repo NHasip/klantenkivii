@@ -42,7 +42,7 @@
          x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
          x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
          role="region" aria-label="Meldingen"
-         class="fixed inset-x-2 top-16 z-40 flex max-h-[80vh] flex-col overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-pop motion-reduce:transition-none sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-[25rem]">
+         class="bell-panel fixed inset-x-2 top-16 z-40 flex max-h-dvh-80 flex-col overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-pop motion-reduce:transition-none sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-[25rem]">
         <div class="flex items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3">
             <div class="flex items-center gap-2">
                 <h2 class="text-sm font-semibold text-zinc-900">Meldingen</h2>

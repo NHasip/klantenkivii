@@ -29,7 +29,7 @@
         <ul class="flex gap-2 whitespace-nowrap">
             @foreach ($profileNav as $item)
                 <li>
-                    <a href="#{{ $item['id'] }}" class="focus-ring inline-flex h-9 items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50">
+                    <a href="#{{ $item['id'] }}" class="tap-target focus-ring inline-flex h-9 items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50">
                         <x-icon :name="$item['icon']" class="h-4 w-4 text-zinc-400" />
                         {{ $item['label'] }}
                         @if (! empty($item['badge']))<x-badge :tone="$item['tone']">{{ $item['badge'] }}</x-badge>@endif
@@ -38,7 +38,7 @@
             @endforeach
             @if ($profileIsAdmin)
                 <li>
-                    <a href="#admin-mail" class="focus-ring inline-flex h-9 items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50"><x-icon name="mail" class="h-4 w-4 text-zinc-400" />E-mailinstellingen</a>
+                    <a href="#admin-mail" class="tap-target focus-ring inline-flex h-9 items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50"><x-icon name="mail" class="h-4 w-4 text-zinc-400" />E-mailinstellingen</a>
                 </li>
             @endif
         </ul>

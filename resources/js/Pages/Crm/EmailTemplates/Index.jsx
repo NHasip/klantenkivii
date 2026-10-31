@@ -226,6 +226,22 @@ export default function Index({ templates = [], variables, urls, previewCustomer
         setFlash(null);
         setSavedAt(null);
         setSelectedId(id);
+        revealEditor();
+    };
+
+    // Onder lg staat de editor onder de lijst: na kiezen (of Nieuwe template) de editor in beeld schuiven.
+    const editorRef = useRef(null);
+    const revealEditor = () => {
+        if (typeof window === 'undefined') return;
+        requestAnimationFrame(() => {
+            const node = editorRef.current;
+            if (!node) return;
+            const belowLg = window.matchMedia('(max-width: 1023.98px)').matches;
+            const belowFold = node.getBoundingClientRect().top > window.innerHeight * 0.75;
+            if (!belowLg && !belowFold) return;
+            const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            node.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+        });
     };
 
     const submitTemplate = (method, url, options = {}) => {
@@ -500,7 +516,7 @@ export default function Index({ templates = [], variables, urls, previewCustomer
                                 }
                             />
                         ) : (
-                            <ul className="max-h-[60vh] space-y-1 overflow-y-auto p-2 lg:max-h-[calc(100vh-14rem)]">
+                            <ul className="max-h-dvh-60 space-y-1 overflow-y-auto p-2 lg:max-h-[calc(100vh-14rem)]">
                                 {isNew ? (
                                     <li>
                                         <div className="flex items-center gap-3 rounded-xl bg-indigo-50 px-2.5 py-2.5 ring-1 ring-inset ring-indigo-200" aria-current="true">
@@ -563,7 +579,7 @@ export default function Index({ templates = [], variables, urls, previewCustomer
 
                 {/* Rechterpaneel: editor en live voorbeeld */}
                 <div className="min-w-0 space-y-6 lg:col-span-8 xl:col-span-9">
-                    <form onSubmit={saveTemplate} noValidate className="card">
+                    <form ref={editorRef} onSubmit={saveTemplate} noValidate className="card">
                         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-5 py-4 sm:px-6">
                             <div className="flex min-w-0 items-center gap-3">
                                 <IconTile icon={isNew ? 'edit' : 'mail'} tone="brand" />

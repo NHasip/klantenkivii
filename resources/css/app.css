@@ -337,6 +337,79 @@
         -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
         mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
     }
+
+    /*
+     * Max. hoogte voor dialogs en panelen. dvh volgt op iOS de echt zichtbare viewport (in- en uitschuivende
+     * adresbalk), waar vh daar te hoog uitvalt; vh blijft de fallback voor browsers zonder dvh.
+     */
+    .max-h-dvh-60 {
+        max-height: 60vh;
+    }
+
+    .max-h-dvh-80 {
+        max-height: 80vh;
+    }
+
+    .max-h-dvh-90 {
+        max-height: 90vh;
+    }
+
+    .max-h-dvh-92 {
+        max-height: 92vh;
+    }
+
+    @supports (height: 1dvh) {
+        .max-h-dvh-60 {
+            max-height: 60dvh;
+        }
+
+        .max-h-dvh-80 {
+            max-height: 80dvh;
+        }
+
+        .max-h-dvh-90 {
+            max-height: 90dvh;
+        }
+
+        .max-h-dvh-92 {
+            max-height: 92dvh;
+        }
+    }
+}
+
+/*
+ * Overlays (dialogs, drawers, modals, zoeken): z-[60], boven de sticky kopbalk (z-30, met meldingenbadge), de
+ * mobiele drawer (z-40) en de onderbalk; daarboven alleen FlashToast (z-[65]) en ConfirmProvider (z-[70]).
+ * React-dialogs renderen via createPortal in <body>, zodat geen voorouder met eigen stacking context ze insluit.
+ *
+ * .dialog-footer-sticky: actiebalk onderaan een scrollende dialog met p-5 (sm:p-6). Onder sm blijft hij onderaan
+ * in beeld, zodat de primaire knop zonder scrollen bereikbaar is, met ruimte voor de home-indicator.
+ * Vanaf sm een gewone voettekst, dus desktop blijft ongewijzigd.
+ */
+@media (max-width: 639.98px) {
+    .dialog-footer-sticky {
+        position: sticky;
+        bottom: 0;
+        z-index: 10;
+        margin-left: -1.25rem;
+        margin-right: -1.25rem;
+        margin-bottom: -1.25rem;
+        padding-left: 1.25rem;
+        padding-right: 1.25rem;
+        padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+        background-color: #fff;
+    }
+
+    /* Meldingenpaneel: vast onder de kopbalk en nooit achter de mobiele onderbalk. */
+    .bell-panel {
+        max-height: min(80vh, calc(100vh - 4.5rem - env(safe-area-inset-top) - var(--kivii-bottom-offset)));
+    }
+
+    @supports (height: 1dvh) {
+        .bell-panel {
+            max-height: min(80dvh, calc(100dvh - 4.5rem - env(safe-area-inset-top) - var(--kivii-bottom-offset)));
+        }
+    }
 }
 
 [x-cloak] {
@@ -399,6 +472,21 @@
         height: 44px;
         min-width: 44px;
         transform: translateY(-50%);
+    }
+
+    /* Kleine icoonknoppen (chip-kruisje, Esc-hint): onzichtbaar, gecentreerd tikvlak van 44x44px. */
+    .tap-area {
+        position: relative;
+    }
+
+    .tap-area::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 44px;
+        height: 44px;
+        transform: translate(-50%, -50%);
     }
 }
 

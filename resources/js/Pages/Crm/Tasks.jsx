@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
+import { createPortal } from 'react-dom';
 import { Head, router, usePage } from '@inertiajs/react';
 import { DndContext, DragOverlay, PointerSensor, closestCorners, useDroppable, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -2124,14 +2125,14 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                 )}
             </div>
 
-            {showProjectModal ? (
+            {showProjectModal ? createPortal(
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4 backdrop-blur-[2px]"
+                    className="fixed inset-0 z-[60] flex items-center justify-center bg-zinc-900/40 p-4 backdrop-blur-[2px]"
                     onMouseDown={(e) => {
                         if (e.target === e.currentTarget) closeProjectModal();
                     }}
                 >
-                    <div ref={projectDialogRef} role="dialog" aria-modal="true" aria-labelledby="project-modal-title" tabIndex={-1} className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-5 shadow-pop sm:p-6">
+                    <div ref={projectDialogRef} role="dialog" aria-modal="true" aria-labelledby="project-modal-title" tabIndex={-1} className="max-h-dvh-90 w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-5 shadow-pop sm:p-6">
                         <ModalHeader id="project-modal-title" icon="layers" title="Nieuw project" description="Een project wordt een eigen kolom op je bord." onClose={closeProjectModal} />
                         <form className="mt-6 space-y-4" onSubmit={createProject}>
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -2144,7 +2145,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                     </label>
                                     <input
                                         id="tasks-project-naam"
-                                        data-autofocus
+                                        data-autofocus="desktop"
                                         required
                                         maxLength={255}
                                         aria-invalid={projectErrors.naam ? true : undefined}
@@ -2181,7 +2182,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                 </div>
                             </div>
                             <ErrorList errors={projectErrors} exclude={['naam']} />
-                            <div className="flex flex-col-reverse gap-2 border-t border-zinc-100 pt-4 sm:flex-row sm:justify-end">
+                            <div className="dialog-footer-sticky flex flex-col-reverse gap-2 border-t border-zinc-100 pt-4 sm:flex-row sm:justify-end">
                                 <Button variant="secondary" type="button" onClick={closeProjectModal}>
                                     Annuleren
                                 </Button>
@@ -2191,16 +2192,17 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body,
             ) : null}
-            {showTaskModal ? (
+            {showTaskModal ? createPortal(
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4 backdrop-blur-[2px]"
+                    className="fixed inset-0 z-[60] flex items-center justify-center bg-zinc-900/40 p-4 backdrop-blur-[2px]"
                     onMouseDown={(e) => {
                         if (e.target === e.currentTarget) closeTaskModal();
                     }}
                 >
-                    <div ref={taskDialogRef} role="dialog" aria-modal="true" aria-labelledby="task-modal-title" tabIndex={-1} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-pop sm:p-6">
+                    <div ref={taskDialogRef} role="dialog" aria-modal="true" aria-labelledby="task-modal-title" tabIndex={-1} className="max-h-dvh-90 w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-pop sm:p-6">
                         <ModalHeader
                             id="task-modal-title"
                             icon="check-square"
@@ -2219,7 +2221,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                     </label>
                                     <input
                                         id="tasks-task-titel"
-                                        data-autofocus
+                                        data-autofocus="desktop"
                                         required
                                         maxLength={255}
                                         aria-invalid={taskErrors.titel ? true : undefined}
@@ -2352,7 +2354,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                 </div>
                             </div>
                             <ErrorList errors={taskErrors} exclude={['titel']} />
-                            <div className="flex flex-col-reverse gap-2 border-t border-zinc-100 pt-4 sm:flex-row sm:justify-end">
+                            <div className="dialog-footer-sticky flex flex-col-reverse gap-2 border-t border-zinc-100 pt-4 sm:flex-row sm:justify-end">
                                 <Button variant="secondary" type="button" onClick={closeTaskModal}>
                                     Annuleren
                                 </Button>
@@ -2362,11 +2364,12 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body,
             ) : null}
-            {selectedTaskId ? (
+            {selectedTaskId ? createPortal(
                 <div
-                    className="fixed inset-0 z-50 flex justify-end bg-zinc-900/40 backdrop-blur-[2px]"
+                    className="fixed inset-0 z-[60] flex justify-end bg-zinc-900/40 backdrop-blur-[2px]"
                     onMouseDown={(e) => {
                         if (e.target === e.currentTarget) closeTask();
                     }}
@@ -2682,7 +2685,8 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                             </div>
                         )}
                     </div>
-                </div>
+                </div>,
+                document.body,
             ) : null}
         </>
     );

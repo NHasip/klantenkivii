@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { router } from '@inertiajs/react';
 import axios from 'axios';
+import { createPortal } from 'react-dom';
 import { useConfirm } from '../../../../components/ConfirmProvider';
 import { useDialog } from '../../../../components/useDialog';
 import { Badge, Button, Card, CardHeader, EmptyState, Field, IconTile, cx, inputClasses } from '../../../../components/ui';
@@ -168,14 +169,14 @@ export function MandateRequestDialog({ open, onClose, company, config, urls, tem
         );
     };
 
-    return (
+    return createPortal(
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4 backdrop-blur-[2px]"
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-zinc-900/40 p-4 backdrop-blur-[2px]"
             onMouseDown={(e) => {
                 if (e.target === e.currentTarget && !busy) onClose();
             }}
         >
-            <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="machtiging-dialog-title" tabIndex={-1} className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-pop sm:p-6">
+            <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="machtiging-dialog-title" tabIndex={-1} className="max-h-dvh-92 w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-pop sm:p-6">
                 <div className="flex items-start justify-between gap-4">
                     <div className="flex min-w-0 items-start gap-3">
                         <IconTile icon="mail" tone="brand" />
@@ -208,7 +209,7 @@ export function MandateRequestDialog({ open, onClose, company, config, urls, tem
                                 <CopyButton value={result.link} label="Link kopiëren" />
                             </div>
                         </Field>
-                        <div className="flex justify-end">
+                        <div className="dialog-footer-sticky flex justify-end max-sm:pt-3">
                             <Button onClick={onClose}>Sluiten</Button>
                         </div>
                     </div>
@@ -247,12 +248,12 @@ export function MandateRequestDialog({ open, onClose, company, config, urls, tem
                                 <p className="text-xs text-zinc-500">Van: {config.sender}{email ? ` · Aan: ${email}` : ''}</p>
                                 <p className="mt-0.5 font-semibold text-zinc-900">{subject || '(geen onderwerp)'}</p>
                             </div>
-                            <iframe title="Voorbeeld machtigingsmail" sandbox="" srcDoc={`<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:system-ui,sans-serif;font-size:14px;line-height:1.5;color:#18181b;margin:16px}a{color:#4f46e5}</style></head><body>${html}</body></html>`} className="h-72 w-full bg-white" />
+                            <iframe title="Voorbeeld machtigingsmail" sandbox="" srcDoc={`<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:system-ui,sans-serif;font-size:14px;line-height:1.5;color:#18181b;margin:16px}a{color:#4f46e5}</style></head><body>${html}</body></html>`} className="h-40 w-full bg-white sm:h-72" />
                         </div>
 
                         {error && <Notice tone="danger">{error}</Notice>}
 
-                        <div className="flex flex-col-reverse gap-2 border-t border-zinc-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="dialog-footer-sticky flex flex-col-reverse gap-2 border-t border-zinc-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                                 {templateId === DEFAULT_KEY && !savedDefault && (
                                     <Button variant="ghost" size="sm" icon="plus" onClick={saveAsTemplate} loading={busy === 'template'} disabled={Boolean(busy)}>
@@ -282,7 +283,8 @@ export function MandateRequestDialog({ open, onClose, company, config, urls, tem
                     </div>
                 )}
             </div>
-        </div>
+        </div>,
+        document.body,
     );
 }
 

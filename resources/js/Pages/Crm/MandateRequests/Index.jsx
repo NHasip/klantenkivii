@@ -130,7 +130,7 @@ export default function Index({ available = true, requests = [], customers = [],
                                 onClick={() => setFilter(f.key)}
                                 aria-pressed={filter === f.key}
                                 className={cx(
-                                    'rounded-full px-3 py-1 text-sm font-medium ring-1 ring-inset transition-colors focus-ring',
+                                    'tap-target rounded-full px-3 py-1 text-sm font-medium ring-1 ring-inset transition-colors focus-ring',
                                     filter === f.key ? 'bg-indigo-600 text-white ring-indigo-600' : 'bg-white text-zinc-700 ring-zinc-200 hover:bg-zinc-50',
                                 )}
                             >

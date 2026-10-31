@@ -470,7 +470,43 @@
             </div>
         @endif
 
-        <div class="overflow-x-auto">
+        {{-- Onder md: kaarten in plaats van de brede tabel. --}}
+        <ul class="divide-y divide-zinc-100 md:hidden" aria-label="Modules prestaties">
+            @forelse($modulesOverview as $row)
+                @php
+                    $btwMin = (float) $row->btw_min;
+                    $btwMax = (float) $row->btw_max;
+                    $pct = (int) round(((float) $row->mrr_excl / $mrrTotal) * 100);
+                @endphp
+                <li wire:key="module-card-{{ $row->id ?? $loop->index }}" class="px-5 py-4">
+                    <div class="flex items-baseline justify-between gap-3">
+                        <span class="min-w-0 truncate text-sm font-semibold text-zinc-900">{{ $row->naam }}</span>
+                        <span class="shrink-0 whitespace-nowrap text-sm font-semibold tabular-nums text-zinc-900">{{ $money($row->mrr_excl) }}</span>
+                    </div>
+                    <dl class="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500">
+                        <div class="flex gap-1"><dt>Klanten</dt><dd class="font-medium tabular-nums text-zinc-800">{{ $nf($row->active_customers) }}</dd></div>
+                        <div class="flex gap-1"><dt>Aantal</dt><dd class="font-medium tabular-nums text-zinc-800">{{ $nf($row->total_aantal) }}</dd></div>
+                        <div class="flex gap-1"><dt>BTW</dt><dd class="whitespace-nowrap font-medium tabular-nums text-zinc-800">{{ abs($btwMin - $btwMax) < 0.001 ? $nf($btwMin) : $nf($btwMin).'–'.$nf($btwMax) }}%</dd></div>
+                    </dl>
+                    <div class="mt-2.5 flex items-center gap-2">
+                        <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-100" aria-hidden="true">
+                            <div class="h-full rounded-full bg-sky-400" style="width: {{ min(100, max(0, $pct)) }}%"></div>
+                        </div>
+                        <span class="w-24 shrink-0 whitespace-nowrap text-right text-xs tabular-nums text-zinc-500">{{ $pct }}% van MRR</span>
+                    </div>
+                </li>
+            @empty
+                <li class="px-5 py-10 text-center text-sm text-zinc-500">Nog geen modules. <a href="{{ route('crm.modules.index') }}" class="link">Module toevoegen</a></li>
+            @endforelse
+            @if($modulesOverview->isNotEmpty())
+                <li class="flex items-baseline justify-between gap-3 bg-zinc-50/70 px-5 py-3 text-sm">
+                    <span class="font-semibold text-zinc-900">Totaal <span class="font-normal text-zinc-500">({{ $nf($kpis['modules_total_aantal']) }} stuks)</span></span>
+                    <span class="whitespace-nowrap font-semibold tabular-nums text-zinc-900">{{ $money($kpis['mrr_excl']) }}</span>
+                </li>
+            @endif
+        </ul>
+
+        <div class="hidden overflow-x-auto md:block">
             <table class="table-base">
                 <thead class="table-head">
                     <tr>
@@ -489,17 +525,17 @@
                             $btwMax = (float) $row->btw_max;
                             $share = (int) round(((float) $row->mrr_excl / $moduleMrrMax) * 100);
                         @endphp
-                        <tr class="table-row">
+                        <tr wire:key="module-row-{{ $row->id ?? $loop->index }}" class="table-row">
                             <td class="table-td font-medium text-zinc-900">{{ $row->naam }}</td>
                             <td class="table-td text-right tabular-nums">{{ $nf($row->active_customers) }}</td>
                             <td class="table-td text-right tabular-nums">{{ $nf($row->total_aantal) }}</td>
-                            <td class="table-td text-right font-semibold tabular-nums text-zinc-900">{{ $money($row->mrr_excl) }}</td>
+                            <td class="table-td whitespace-nowrap text-right font-semibold tabular-nums text-zinc-900">{{ $money($row->mrr_excl) }}</td>
                             <td class="table-td hidden sm:table-cell">
                                 <div class="h-1.5 overflow-hidden rounded-full bg-zinc-100" aria-hidden="true">
                                     <div class="h-full rounded-full bg-sky-400" style="width: {{ min(100, max(0, $share)) }}%"></div>
                                 </div>
                             </td>
-                            <td class="table-td text-right tabular-nums text-zinc-600">
+                            <td class="table-td whitespace-nowrap text-right tabular-nums text-zinc-600">
                                 @if(abs($btwMin - $btwMax) < 0.001)
                                     {{ $nf($btwMin) }}
                                 @else
@@ -519,7 +555,7 @@
                             <td class="table-td font-semibold text-zinc-900">Totaal</td>
                             <td class="table-td"></td>
                             <td class="table-td text-right font-semibold tabular-nums text-zinc-900">{{ $nf($kpis['modules_total_aantal']) }}</td>
-                            <td class="table-td text-right font-semibold tabular-nums text-zinc-900">{{ $money($kpis['mrr_excl']) }}</td>
+                            <td class="table-td whitespace-nowrap text-right font-semibold tabular-nums text-zinc-900">{{ $money($kpis['mrr_excl']) }}</td>
                             <td class="table-td hidden sm:table-cell"></td>
                             <td class="table-td"></td>
                         </tr>

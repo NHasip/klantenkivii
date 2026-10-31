@@ -139,19 +139,29 @@ function ModulesSection({ form, totals, extraUsersHint, onToggle, onUpdateRow, o
                 )}
 
                 {rows.length > 0 && (
-                    <div className="flex flex-col-reverse gap-2 rounded-b-2xl border-t border-zinc-200 bg-zinc-50 px-5 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-6">
+                    // Onder md: bij niet opgeslagen wijzigingen een vaste actiebalk boven de mobiele onderbalk (zelfde aanpak als GarageCompanies/Create.jsx).
+                    <div
+                        className={cx(
+                            'flex flex-col gap-2 rounded-b-2xl border-t border-zinc-200 bg-zinc-50 px-5 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-6',
+                            (form.isDirty || form.processing) &&
+                                'max-md:sticky max-md:bottom-[var(--kivii-bottom-offset,0px)] max-md:z-20 max-md:bg-white/95 max-md:shadow-[0_-6px_16px_-8px_rgba(24,24,27,0.18)] max-md:backdrop-blur',
+                        )}
+                    >
                         <p className="text-sm text-zinc-600 sm:mr-auto">
                             Totaal per maand: <span className="font-semibold tabular-nums text-zinc-900">{formatEuro(totals.totaalIncl)}</span> incl. btw
                         </p>
                         {form.hasErrors && !form.processing && (
                             <p role="alert" className="text-sm font-medium text-rose-700">Controleer de gemarkeerde velden.</p>
                         )}
-                        <Button variant="secondary" onClick={() => form.reset()} disabled={!form.isDirty || form.processing}>
-                            Wijzigingen ongedaan maken
-                        </Button>
-                        <Button onClick={onSubmit} loading={form.processing} disabled={!form.isDirty}>
-                            {form.processing ? 'Opslaan...' : 'Modules opslaan'}
-                        </Button>
+                        <div className="flex gap-2">
+                            <Button variant="secondary" className="max-sm:flex-1" onClick={() => form.reset()} disabled={!form.isDirty || form.processing}>
+                                <span className="sm:hidden">Ongedaan maken</span>
+                                <span className="hidden sm:inline">Wijzigingen ongedaan maken</span>
+                            </Button>
+                            <Button className="max-sm:flex-1" onClick={onSubmit} loading={form.processing} disabled={!form.isDirty}>
+                                {form.processing ? 'Opslaan...' : 'Modules opslaan'}
+                            </Button>
+                        </div>
                     </div>
                 )}
             </Card>

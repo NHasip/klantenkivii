@@ -304,7 +304,7 @@ function Pagination({ links, lastPage }) {
                         aria-current={link.active ? 'page' : undefined}
                         preserveScroll={false}
                         className={cx(
-                            'inline-flex h-9 min-w-[2.25rem] items-center justify-center rounded-lg px-3 text-sm font-medium transition-colors',
+                            'tap-target-icon inline-flex h-9 min-w-[2.25rem] items-center justify-center rounded-lg px-3 text-sm font-medium transition-colors',
                             link.active ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-white hover:shadow-card'
                         )}
                         dangerouslySetInnerHTML={{ __html: link.label }}
@@ -313,7 +313,7 @@ function Pagination({ links, lastPage }) {
                     <span
                         key={`${link.label}-${idx}`}
                         aria-disabled="true"
-                        className="inline-flex h-9 min-w-[2.25rem] cursor-not-allowed items-center justify-center rounded-lg px-3 text-sm text-zinc-400"
+                        className="tap-target-icon inline-flex h-9 min-w-[2.25rem] cursor-not-allowed items-center justify-center rounded-lg px-3 text-sm text-zinc-400"
                         dangerouslySetInnerHTML={{ __html: link.label }}
                     />
                 )
@@ -751,7 +751,7 @@ export default function Index({ companies, totals, statusCounts, trashCount, fil
 
     const segmentClass = (active) =>
         cx(
-            'inline-flex h-8 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-colors focus-ring',
+            'tap-target inline-flex h-8 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-colors focus-ring',
             active ? 'bg-white text-zinc-900 shadow-sm ring-1 ring-black/5' : 'text-zinc-600 hover:text-zinc-900'
         );
 
@@ -898,7 +898,7 @@ export default function Index({ companies, totals, statusCounts, trashCount, fil
                                         onClick={() => updateAndRun({ status: tab.value })}
                                         aria-pressed={active}
                                         className={cx(
-                                            'inline-flex h-9 items-center gap-2 rounded-full px-3.5 text-sm font-medium transition-colors focus-ring',
+                                            'tap-target inline-flex h-9 items-center gap-2 rounded-full px-3.5 text-sm font-medium transition-colors focus-ring',
                                             active ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-700 hover:bg-zinc-100'
                                         )}
                                     >
@@ -1268,7 +1268,7 @@ export default function Index({ companies, totals, statusCounts, trashCount, fil
             <div className="flex flex-col-reverse items-center justify-between gap-3 sm:flex-row">
                 <div className="flex items-center gap-2 text-sm text-zinc-500">
                     <label htmlFor="gc-perPage">Per pagina</label>
-                    <select id="gc-perPage" className={cx(inputClasses, 'h-9 w-20 py-1')} value={data.perPage} onChange={(e) => updateAndRun({ perPage: Number(e.target.value) })}>
+                    <select id="gc-perPage" className={cx(inputClasses, 'tap-target h-9 w-20 py-1')} value={data.perPage} onChange={(e) => updateAndRun({ perPage: Number(e.target.value) })}>
                         {[10, 15, 25, 50].map((value) => (
                             <option key={value} value={value}>{value}</option>
                         ))}
