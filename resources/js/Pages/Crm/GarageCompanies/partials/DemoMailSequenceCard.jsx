@@ -69,6 +69,39 @@ export default function DemoMailSequenceCard({ data }) {
         if (ok) post(data.urls.restart);
     };
 
+    const canSendNow = (step) =>
+        data.can_manage && active && data.available && step.send_now_url && (step.status === 'gepland' || step.status === 'mislukt');
+
+    const onSendNow = async (step) => {
+        if (!data.graph_configured) {
+            await confirm({
+                title: 'Microsoft-koppeling ontbreekt',
+                message: `Microsoft Graph is niet ingesteld voor ${data.sender}, dus deze mail kan nu niet verstuurd worden.`,
+                confirmText: 'Sluiten',
+                showCancel: false,
+            });
+            return;
+        }
+        if (!data.recipient) {
+            await confirm({
+                title: 'Geen e-mailadres',
+                message: 'Vul eerst een login-e-mail, hoofd-e-mail of e-mail bij het hoofdcontact in.',
+                confirmText: 'Sluiten',
+                showCancel: false,
+            });
+            return;
+        }
+        const ok = await confirm({
+            title: `${step.name} nu versturen?`,
+            message: `Deze mail gaat nu direct naar de klant op ${data.recipient}, namens ${data.sender}. De geplande datum en het verzendvenster worden genegeerd. De andere mails in de reeks blijven ongewijzigd.`,
+            confirmText: 'Nu versturen',
+            cancelText: 'Annuleren',
+        });
+        if (!ok) return;
+        // De redirect terug levert verse props en de flashmelding (toast) met het resultaat.
+        post(step.send_now_url);
+    };
+
     const seqMeta = sequence ? SEQUENCE_META[sequence.status] || { label: sequence.status, tone: 'neutral' } : null;
     const actions = data.can_manage ? (
         <>
@@ -138,9 +171,16 @@ export default function DemoMailSequenceCard({ data }) {
                                             <p className="text-sm font-medium text-zinc-900">{step.name}</p>
                                             <p className="text-xs text-zinc-500">{stepDetail(step)}</p>
                                         </div>
-                                        <Badge tone={meta.tone} dot className="shrink-0 self-start sm:self-center">
-                                            {meta.label}
-                                        </Badge>
+                                        <div className="flex shrink-0 items-center gap-2 self-start sm:self-center">
+                                            <Badge tone={meta.tone} dot>
+                                                {meta.label}
+                                            </Badge>
+                                            {canSendNow(step) ? (
+                                                <Button variant="secondary" size="xs" onClick={() => onSendNow(step)} loading={busy}>
+                                                    Nu versturen
+                                                </Button>
+                                            ) : null}
+                                        </div>
                                     </li>
                                 );
                             })}

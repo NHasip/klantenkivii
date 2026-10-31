@@ -258,31 +258,84 @@ class DemoMailSequenceService
         $this->finishIfDone($sequence);
     }
 
-    private function sendStep(GarageCompany $company, DemoMailStep $step, array &$stats): void
+    /**
+     * Verstuurt één stap direct (admin, "Nu versturen"). Negeert het verzendvenster en de geplande datum,
+     * raakt andere stappen niet aan en verstuurt nooit een stap die al verstuurd is.
+     *
+     * @return array{ok:bool, message:string}
+     */
+    public function sendNow(GarageCompany $company, DemoMailStep $step, ?int $userId = null): array
     {
+        if (! self::available()) {
+            return ['ok' => false, 'message' => 'De database-migratie voor de demo-mailreeks ontbreekt nog.'];
+        }
+        if ((int) $step->garage_company_id !== (int) $company->id) {
+            return ['ok' => false, 'message' => 'Deze mail hoort niet bij deze klant.'];
+        }
+        $sequence = DemoMailSequence::query()->find($step->demo_mail_sequence_id);
+        if (! $sequence || (int) $sequence->garage_company_id !== (int) $company->id || $sequence->status !== DemoMailSequence::STATUS_ACTIEF) {
+            return ['ok' => false, 'message' => 'De demo-mailreeks van deze klant is niet actief.'];
+        }
+        if (! in_array($step->status, [DemoMailStep::STATUS_GEPLAND, DemoMailStep::STATUS_MISLUKT], true)) {
+            return ['ok' => false, 'message' => $step->status === DemoMailStep::STATUS_VERSTUURD
+                ? 'Deze mail is al verstuurd.'
+                : 'Deze mail kan nu niet verstuurd worden (status: '.$step->status.').'];
+        }
+        if (! MicrosoftGraphMailer::isConfigured()) {
+            return ['ok' => false, 'message' => 'Microsoft Graph is niet ingesteld voor '.MicrosoftGraphMailer::sender().'. De mail is niet verstuurd.'];
+        }
+
+        $company->loadMissing('primaryPerson');
+        $stats = ['sent' => 0, 'skipped' => 0, 'failed' => 0];
+        $result = $this->sendStep($company, $step, $stats, $userId);
+        if ($result['ok']) {
+            $this->finishIfDone($sequence);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Gedeeld verzendpad voor de taakplanner en "Nu versturen" ($manualBy niet null = handmatig).
+     *
+     * @return array{ok:bool, message:string}
+     */
+    private function sendStep(GarageCompany $company, DemoMailStep $step, array &$stats, ?int $manualBy = null): array
+    {
+        $manual = $manualBy !== null;
+        $previous = $step->status;
+
         $to = self::recipient($company);
         if ($to === null) {
+            if ($manual) {
+                return ['ok' => false, 'message' => 'Geen geldig e-mailadres: vul een login-e-mail, hoofd-e-mail of e-mail bij het hoofdcontact in.'];
+            }
             $step->forceFill(['status' => DemoMailStep::STATUS_OVERGESLAGEN, 'reason' => 'Overgeslagen: geen geldig e-mailadres (login, hoofd-e-mail of contactpersoon)'])->save();
             $stats['skipped']++;
 
-            return;
+            return ['ok' => false, 'message' => 'Overgeslagen: geen geldig e-mailadres.'];
         }
 
         $template = $this->template($step->step_key);
         if (! $template) {
+            if ($manual) {
+                return ['ok' => false, 'message' => 'Het e-mailtemplate voor deze mail staat uit of ontbreekt.'];
+            }
             $step->forceFill(['status' => DemoMailStep::STATUS_OVERGESLAGEN, 'reason' => 'Overgeslagen: e-mailtemplate staat uit of ontbreekt'])->save();
             $stats['skipped']++;
 
-            return;
+            return ['ok' => false, 'message' => 'Overgeslagen: e-mailtemplate staat uit of ontbreekt.'];
         }
 
-        // Atomair claimen: alleen het proces dat de rij van 'gepland' naar 'bezig' zet, verstuurt.
+        // Atomair claimen: alleen het proces dat de rij naar 'bezig' zet, verstuurt.
+        // Handmatig mag ook een mislukte stap opnieuw; verstuurde stappen nooit.
+        $claimable = $manual ? [DemoMailStep::STATUS_GEPLAND, DemoMailStep::STATUS_MISLUKT] : [DemoMailStep::STATUS_GEPLAND];
         $claimed = DemoMailStep::query()
             ->whereKey($step->id)
-            ->where('status', DemoMailStep::STATUS_GEPLAND)
+            ->whereIn('status', $claimable)
             ->update(['status' => DemoMailStep::STATUS_BEZIG, 'attempts' => DB::raw('attempts + 1'), 'updated_at' => now()]);
         if ($claimed !== 1) {
-            return;
+            return ['ok' => false, 'message' => 'Deze mail wordt al verstuurd of is al verstuurd.'];
         }
         $step->refresh();
 
@@ -292,22 +345,27 @@ class DemoMailSequenceService
             app(MicrosoftGraphMailer::class)->send($to, $mail['subject'], $mail['html'], MicrosoftGraphMailer::sender());
         } catch (\Throwable $e) {
             $message = $e instanceof \RuntimeException ? $e->getMessage() : 'Versturen via Microsoft 365 mislukt.';
-            $final = $step->attempts >= self::MAX_ATTEMPTS;
+            if ($manual) {
+                // Handmatig: een geplande stap blijft gepland (de taakplanner probeert het later opnieuw), tenzij het maximum bereikt is.
+                $final = $previous === DemoMailStep::STATUS_MISLUKT || $step->attempts >= self::MAX_ATTEMPTS;
+            } else {
+                $final = $step->attempts >= self::MAX_ATTEMPTS;
+            }
             $step->forceFill([
                 'status' => $final ? DemoMailStep::STATUS_MISLUKT : DemoMailStep::STATUS_GEPLAND,
                 'last_error' => mb_substr($message, 0, 1000),
                 'reason' => $final ? 'Mislukt na '.$step->attempts.' pogingen' : null,
             ])->save();
             $stats['failed']++;
-            if ($final) {
-                $this->logOutbound($company, $template, $step, $to, $mail, 'failed', $message);
-                $this->logActivity($company, 'Demo-mail mislukt: '.$template->name, $message, null);
+            if ($final || $manual) {
+                $this->logOutbound($company, $template, $step, $to, $mail, 'failed', $message, $manualBy);
+                $this->logActivity($company, 'Demo-mail mislukt: '.$template->name, ($manual ? 'Handmatig versturen mislukt. ' : '').$message, $manualBy);
             }
 
-            return;
+            return ['ok' => false, 'message' => 'Versturen mislukt: '.$message];
         }
 
-        $outbound = $this->logOutbound($company, $template, $step, $to, $mail, 'sent', null);
+        $outbound = $this->logOutbound($company, $template, $step, $to, $mail, 'sent', null, $manualBy);
         $step->forceFill([
             'status' => DemoMailStep::STATUS_VERSTUURD,
             'sent_at' => now(),
@@ -318,8 +376,11 @@ class DemoMailSequenceService
             'outbound_email_id' => $outbound?->id,
         ])->save();
 
-        $this->logActivity($company, 'Demo-mail verstuurd: '.$template->name, 'Automatisch verstuurd naar '.$to.' namens '.MicrosoftGraphMailer::sender().'. Onderwerp: '.$mail['subject'], null);
+        $how = $manual ? 'Handmatig verstuurd' : 'Automatisch verstuurd';
+        $this->logActivity($company, 'Demo-mail '.($manual ? 'handmatig ' : '').'verstuurd: '.$template->name, $how.' naar '.$to.' namens '.MicrosoftGraphMailer::sender().'. Onderwerp: '.$mail['subject'], $manualBy);
         $stats['sent']++;
+
+        return ['ok' => true, 'message' => $template->name.' is handmatig verstuurd naar '.$to.'.'];
     }
 
     private function finishIfDone(DemoMailSequence $sequence): void
@@ -337,7 +398,7 @@ class DemoMailSequenceService
         }
     }
 
-    private function logOutbound(GarageCompany $company, EmailTemplate $template, DemoMailStep $step, string $to, array $mail, string $status, ?string $error): ?OutboundEmail
+    private function logOutbound(GarageCompany $company, EmailTemplate $template, DemoMailStep $step, string $to, array $mail, string $status, ?string $error, ?int $userId = null): ?OutboundEmail
     {
         if (! Schema::hasTable('outbound_emails')) {
             return null;
@@ -354,7 +415,7 @@ class DemoMailSequenceService
                 'status' => $status,
                 'sent_at' => $status === 'sent' ? now() : null,
                 'last_error' => $error,
-                'created_by' => null,
+                'created_by' => $userId,
             ]);
         } catch (\Throwable $e) {
             report($e);
@@ -548,6 +609,7 @@ class DemoMailSequenceService
             'stopped_by' => $sequence->stopper?->name,
             'finished_at' => $sequence->finished_at?->toIso8601String(),
             'steps' => $sequence->steps->map(fn (DemoMailStep $s) => [
+                'id' => $s->id,
                 'key' => $s->step_key,
                 'name' => (string) ($names[$s->step_key] ?? $s->step_key),
                 'day' => $s->day_offset,
@@ -558,6 +620,7 @@ class DemoMailSequenceService
                 'reason' => $s->reason,
                 'last_error' => $s->last_error,
                 'attempts' => $s->attempts,
+                'send_now_url' => route('crm.demo_sequence.send_now', ['garageCompany' => $company->id, 'step' => $s->id]),
             ])->values(),
         ];
 
