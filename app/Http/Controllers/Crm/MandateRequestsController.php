@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Activity;
 use App\Models\EmailTemplate;
 use App\Models\GarageCompany;
+use App\Models\OutboundEmail;
 use App\Models\SepaMandateRequest;
 use App\Services\EmailTemplateRenderer;
 use App\Services\Mail\MicrosoftGraphMailer;
@@ -15,6 +16,7 @@ use App\Services\Sepa\MandateRequestService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -259,6 +261,31 @@ class MandateRequestsController extends Controller
         return null;
     }
 
+    /** Verzendpoging via Graph vastleggen voor het e-maillog; een logfout mag het versturen nooit beinvloeden. */
+    private function logOutbound(GarageCompany $company, ?int $templateId, string $to, array $mail, string $status, ?string $error): void
+    {
+        try {
+            if (! Schema::hasTable('outbound_emails')) {
+                return;
+            }
+            OutboundEmail::create([
+                'garage_company_id' => $company->id,
+                'template_id' => $templateId,
+                'type' => 'sepa_mandate',
+                'to_email' => mb_substr($to, 0, 255),
+                'subject' => mb_substr((string) ($mail['subject'] ?? ''), 0, 255),
+                'body_html' => $mail['html'] ?? null,
+                'body_text' => $mail['text'] ?? null,
+                'status' => $status,
+                'sent_at' => $status === 'sent' ? now() : null,
+                'last_error' => $error !== null ? mb_substr($error, 0, 1000) : null,
+                'created_by' => auth()->id(),
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
     private function deliver(GarageCompany $company, SepaMandateRequest $mandateRequest, array $data, bool $isNew): JsonResponse
     {
         $mandateRequest->setRelation('garageCompany', $company);
@@ -270,7 +297,9 @@ class MandateRequestsController extends Controller
         if ($via === 'graph') {
             try {
                 app(MicrosoftGraphMailer::class)->send((string) $email, $mail['subject'], $mail['html'], MicrosoftGraphMailer::sender());
+                $this->logOutbound($company, $templateId, (string) $email, $mail, 'sent', null);
             } catch (\Throwable $e) {
+                $this->logOutbound($company, $templateId, (string) $email, $mail, 'failed', $e->getMessage());
                 // Niets verstuurd: een nieuw verzoek weer weghalen, een bestaand verzoek terugzetten is niet nodig (link blijft geldig).
                 if ($isNew) {
                     $mandateRequest->delete();

@@ -64,7 +64,7 @@ class Bell extends Component
         $userId = (int) auth()->id();
 
         try {
-            return Cache::remember('crm-bell-signals:v4:'.$userId, 60, fn () => $this->buildSignals($userId));
+            return Cache::remember('crm-bell-signals:v5:'.$userId, 60, fn () => $this->buildSignals($userId));
         } catch (Throwable $e) {
             report($e);
 
@@ -248,7 +248,8 @@ class Bell extends Component
                     'items' => [],
                 ];
             }
-            $failed = \App\Services\Crm\DemoMailSequenceService::failedCount();
+            // Admins zien mislukte demo-mails in het bredere e-maillogsignaal hieronder.
+            $failed = auth()->user()?->isAdmin() ? 0 : \App\Services\Crm\DemoMailSequenceService::failedCount();
             if ($failed > 0) {
                 $signals[] = [
                     'key' => 'demo_mail_failed',
@@ -257,6 +258,22 @@ class Bell extends Component
                     'link' => null,
                     'linkLabel' => null,
                     'summary' => $failed === 1 ? 'demo-mail kon niet worden verstuurd (afgelopen 7 dagen)' : 'demo-mails konden niet worden verstuurd (afgelopen 7 dagen)',
+                    'items' => [],
+                ];
+            }
+        }
+
+        // 7. E-maillog (admin): mails die de afgelopen 14 dagen niet verstuurd konden worden.
+        if (auth()->user()?->isAdmin()) {
+            $mailFailed = \App\Http\Controllers\Crm\EmailLogController::failedCount(14);
+            if ($mailFailed > 0) {
+                $signals[] = [
+                    'key' => 'mail_failed',
+                    'title' => 'E-mail niet verstuurd',
+                    'count' => $mailFailed,
+                    'link' => route('crm.email_log.index', ['filter' => 'niet_verstuurd']),
+                    'linkLabel' => 'Naar e-maillog',
+                    'summary' => $mailFailed === 1 ? 'mail kon niet worden verstuurd (afgelopen 14 dagen)' : 'mails konden niet worden verstuurd (afgelopen 14 dagen)',
                     'items' => [],
                 ];
             }

@@ -7,6 +7,7 @@
         'mandaten' => ['icon' => 'credit-card', 'tile' => 'bg-violet-50 text-violet-700'],
         'machtiging_ontvangen' => ['icon' => 'file-text', 'tile' => 'bg-emerald-50 text-emerald-700'],
         'machtiging_koppelen' => ['icon' => 'link', 'tile' => 'bg-rose-50 text-rose-700'],
+        'mail_failed' => ['icon' => 'mail', 'tile' => 'bg-rose-50 text-rose-700'],
     ];
     $bellRelative = function ($value) {
         try {

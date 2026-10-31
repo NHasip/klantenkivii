@@ -95,7 +95,7 @@ class DemoMailSequenceService
                     'garage_company_id' => $company->id,
                     'step_key' => $key,
                     'day_offset' => $days,
-                    'due_at' => $startedAt->copy()->addDays($days),
+                    'due_at' => $startedAt->copy()->timezone('Europe/Amsterdam')->startOfDay()->addDays($days)->setTime(8, 45)->utc(),
                     'status' => DemoMailStep::STATUS_GEPLAND,
                 ]);
             }

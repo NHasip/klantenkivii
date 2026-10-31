@@ -5,6 +5,7 @@ use App\Http\Controllers\Crm\DemoMailSequenceController;
 use App\Http\Controllers\Crm\EmailTemplatesController;
 use App\Http\Controllers\Crm\GarageCompaniesController;
 use App\Http\Controllers\Crm\ImportController;
+use App\Http\Controllers\Crm\EmailLogController;
 use App\Http\Controllers\Crm\MandateRequestsController;
 use App\Http\Controllers\Crm\SepaImportController;
 use App\Http\Controllers\Crm\SearchController;
@@ -114,6 +115,10 @@ Route::middleware(['auth', 'active', 'admin.2fa'])->group(function () {
     Route::post('/sepa-importeren', [SepaImportController::class, 'store'])
         ->middleware(['admin', 'throttle:10,1'])
         ->name('crm.sepa_import.store');
+
+    Route::get('/emaillog', [EmailLogController::class, 'index'])
+        ->middleware('admin')
+        ->name('crm.email_log.index');
 
     Route::get('/machtigingen', [MandateRequestsController::class, 'index'])
         ->middleware('admin')
