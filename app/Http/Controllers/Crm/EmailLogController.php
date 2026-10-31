@@ -95,17 +95,24 @@ class EmailLogController extends Controller
         return $count;
     }
 
+    /** Tabellen hebben verschillende collaties (general_ci vs unicode_ci); op MySQL gelijktrekken. */
+    private static function c(string $expr): string
+    {
+        return DB::getDriverName() === 'mysql' ? "({$expr}) collate utf8mb4_unicode_ci" : $expr;
+    }
+
     private function union(): ?Builder
     {
         $parts = [];
+        $c = fn (string $e) => self::c($e);
 
         if (Schema::hasTable('outbound_emails')) {
             $parts[] = DB::table('outbound_emails as o')
                 ->leftJoin('garage_companies as g', 'g.id', '=', 'o.garage_company_id')
                 ->where('o.status', '!=', 'draft')
-                ->selectRaw("'o' as src, o.id as row_id, (o.id * 2) as uid, o.garage_company_id, g.bedrijfsnaam as company_name, o.type, o.to_email, o.subject,
-                    case when o.status = 'sent' then 'sent' else 'failed' end as state, o.status as raw_status,
-                    null as reason, o.last_error, coalesce(o.sent_at, o.updated_at) as at, 0 as attempts");
+                ->selectRaw("'o' as src, o.id as row_id, (o.id * 2) as uid, o.garage_company_id, {$c('g.bedrijfsnaam')} as company_name, {$c('o.type')} as type, {$c('o.to_email')} as to_email, {$c('o.subject')} as subject,
+                    {$c("case when o.status = 'sent' then 'sent' else 'failed' end")} as state, {$c('o.status')} as raw_status,
+                    {$c("cast(null as char)")} as reason, {$c('o.last_error')} as last_error, coalesce(o.sent_at, o.updated_at) as at, 0 as attempts");
         }
 
         if (DemoMailSequenceService::available()) {
@@ -118,9 +125,9 @@ class EmailLogController extends Controller
                         // Verstuurd zonder outbound-regel (loggen mislukte): anders zou de mail ontbreken.
                         ->orWhere(fn ($q) => $q->where('s.status', DemoMailStep::STATUS_VERSTUURD)->whereNull('s.outbound_email_id'));
                 })
-                ->selectRaw("'s' as src, s.id as row_id, (s.id * 2 + 1) as uid, s.garage_company_id, g.bedrijfsnaam as company_name, s.step_key as type, s.recipient_email as to_email, s.subject,
-                    case when s.status in ('gepland', 'bezig') then 'planned' when s.status = 'verstuurd' then 'sent' when s.status = 'mislukt' then 'failed' else 'skipped' end as state, s.status as raw_status,
-                    s.reason, s.last_error, case when s.status in ('gepland', 'bezig') then s.due_at when s.status = 'verstuurd' then coalesce(s.sent_at, s.updated_at) else s.updated_at end as at, s.attempts");
+                ->selectRaw("'s' as src, s.id as row_id, (s.id * 2 + 1) as uid, s.garage_company_id, {$c('g.bedrijfsnaam')} as company_name, {$c('s.step_key')} as type, {$c('s.recipient_email')} as to_email, {$c('s.subject')} as subject,
+                    {$c("case when s.status in ('gepland', 'bezig') then 'planned' when s.status = 'verstuurd' then 'sent' when s.status = 'mislukt' then 'failed' else 'skipped' end")} as state, {$c('s.status')} as raw_status,
+                    {$c('s.reason')} as reason, {$c('s.last_error')} as last_error, case when s.status in ('gepland', 'bezig') then s.due_at when s.status = 'verstuurd' then coalesce(s.sent_at, s.updated_at) else s.updated_at end as at, s.attempts");
         }
 
         if ($parts === []) {
@@ -143,7 +150,7 @@ class EmailLogController extends Controller
         }
         $q->selectRaw('1')->from('outbound_emails as ox')
             ->whereColumn('ox.garage_company_id', 's.garage_company_id')
-            ->whereColumn('ox.type', 's.step_key')
+            ->whereRaw(self::c('ox.type').' = '.self::c('s.step_key'))
             ->where('ox.status', 'failed');
     }
 
