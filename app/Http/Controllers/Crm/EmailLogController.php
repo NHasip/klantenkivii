@@ -208,7 +208,11 @@ class EmailLogController extends Controller
             : 'Overgeslagen.';
     }
 
-    /** Vertaalt veelvoorkomende technische fouten (Graph, SMTP) naar een duidelijke Nederlandse zin. */
+    /**
+     * Vertaalt veelvoorkomende technische fouten naar een duidelijke Nederlandse zin. Alle mail gaat via
+     * Microsoft Graph (MicrosoftGraphMailer en de msgraph-mailtransport); de SMTP-regels blijven alleen
+     * voor oudere logregels van voor de overstap.
+     */
     public static function humanError(?string $error): ?string
     {
         if ($error === null || trim($error) === '') {
@@ -219,10 +223,14 @@ class EmailLogController extends Controller
 
         return match (true) {
             str_contains($e, 'nog niet ingesteld') || str_contains($e, 'not configured') => 'De Microsoft-koppeling voor '.$sender.' is niet ingesteld, dus de mail kon niet worden verstuurd.',
+            str_contains($e, 'microsoft 365 is niet bereikbaar') || str_contains($e, 'mislukt: geen verbinding') => 'Microsoft 365 was niet bereikbaar. Later opnieuw proberen.',
             str_contains($e, 'weigert de aanmelding') || str_contains($e, 'aanmelden bij microsoft 365') || preg_match('/\b401\b|unauthori[sz]ed|invalid_client/', $e) === 1 => 'Aanmelden bij Microsoft 365 mislukt. Controleer de app-registratie en het client secret (mogelijk verlopen).',
             str_contains($e, 'geen toestemming') || preg_match('/\b403\b|erroraccessdenied|access ?denied|forbidden/', $e) === 1 => 'Geen toestemming om te versturen namens '.$sender.'. Controleer de Mail.Send-machtiging in Microsoft 365.',
             str_contains($e, 'niet gevonden in microsoft') || preg_match('/\b404\b|errorinvaliduser|mailboxnotenabled/', $e) === 1 => 'De afzendermailbox '.$sender.' is niet gevonden in Microsoft 365.',
             str_contains($e, 'beperkt tijdelijk') || preg_match('/\b429\b|too many requests/', $e) === 1 => 'Microsoft 365 liet tijdelijk geen mails meer toe. Later opnieuw proberen.',
+            str_contains($e, 'te groot') || preg_match('/\b413\b|too large/', $e) === 1 => 'De e-mail of de bijlagen waren te groot om via Microsoft 365 te versturen.',
+            str_contains($e, 'geen ontvanger') => 'De e-mail had geen ontvanger en is niet verstuurd.',
+            str_contains($e, 'berichtformaat') => 'De e-mail had een formaat dat Microsoft 365 niet aanneemt.',
             preg_match('/rfc ?2822|rfc ?5322|does not comply|invalid (e-?mail|address|recipient)|ongeldig/', $e) === 1 => 'Het e-mailadres van de ontvanger is ongeldig.',
             preg_match('/\b55[0-4]\b|user unknown|mailbox unavailable|recipient (address )?rejected|no such user/', $e) === 1 => 'De mailserver weigerde het adres van de ontvanger (bestaat mogelijk niet).',
             str_contains($e, 'e-mail geweigerd') || str_contains($e, 'http 400') => 'Microsoft 365 weigerde de mail. Controleer het e-mailadres van de ontvanger.',

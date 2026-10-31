@@ -164,7 +164,8 @@ export default function WelcomeTab({
     form,
     editor,
     templates,
-    smtpConfigured,
+    mailConfigured,
+    mailSender = 'info@kivii.nl',
     onRefresh,
     onSave,
     onOpenPicker,
@@ -258,9 +259,9 @@ export default function WelcomeTab({
                         </div>
 
                         <aside className="space-y-4 lg:col-span-4">
-                            {!smtpConfigured && (
-                                <Notice tone="warning" title="SMTP ontbreekt">
-                                    Versturen kan pas na het instellen van SMTP via profiel &gt; systeem-instellingen.
+                            {!mailConfigured && (
+                                <Notice tone="warning" title="Microsoft 365 niet gekoppeld">
+                                    Mails gaan alleen via {mailSender}. Versturen kan pas als een beheerder de Microsoft 365-koppeling heeft ingesteld.
                                 </Notice>
                             )}
                             <div className="rounded-lg border border-zinc-200 bg-zinc-50/70 p-4">

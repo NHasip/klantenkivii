@@ -94,7 +94,7 @@ export function MultiSelectChips({ id, options = [], value = [], onChange, place
             }}
         >
             <div
-                className="flex min-h-[36px] w-full cursor-text flex-wrap items-center gap-1 rounded-lg border border-zinc-300 bg-white px-2 py-1 shadow-sm focus-within:border-indigo-600 focus-within:ring-1 focus-within:ring-indigo-600"
+                className="flex min-h-[36px] w-full cursor-text [@media(pointer:coarse)]:min-h-[44px] flex-wrap items-center gap-1 rounded-lg border border-zinc-300 bg-white px-2 py-1 shadow-sm focus-within:border-indigo-600 focus-within:ring-1 focus-within:ring-indigo-600"
                 onClick={() => inputRef.current?.focus()}
             >
                 {selected.map((o) => (

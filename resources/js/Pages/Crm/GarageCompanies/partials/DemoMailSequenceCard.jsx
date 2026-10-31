@@ -227,7 +227,7 @@ export default function DemoMailSequenceCard({ data }) {
 
                 {data.can_manage ? (
                     <p className="text-xs text-zinc-500">
-                        De teksten pas je aan bij <a className="font-medium text-indigo-700 hover:underline" href={data.urls.templates}>E-mailtemplates</a>.
+                        De teksten pas je aan bij <a className="tap-link rounded font-medium text-indigo-700 hover:underline focus-ring" href={data.urls.templates}>E-mailtemplates</a>.
                     </p>
                 ) : null}
             </div>

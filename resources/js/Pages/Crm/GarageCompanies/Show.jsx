@@ -68,7 +68,8 @@ export default function Show({
     statusErrors,
     welcomeEmail,
     emailTemplates,
-    smtpConfigured,
+    mailConfigured,
+    mailSender = 'info@kivii.nl',
     incasso,
     mandateRequests,
     demoMailSequence,
@@ -889,10 +890,10 @@ export default function Show({
         welcomeForm.post(urls.update_welcome_email, { preserveScroll: true });
     };
 
-    const showSmtpMissing = () =>
+    const showMailMissing = () =>
         confirm({
-            title: 'SMTP ontbreekt',
-            message: 'SMTP instellingen ontbreken. Voeg deze toe via profiel > systeem-instellingen.',
+            title: 'Microsoft 365 niet gekoppeld',
+            message: `Mails gaan alleen via ${mailSender} (Microsoft 365). Die koppeling is nog niet ingesteld; vraag een beheerder dit te regelen.`,
             confirmText: 'Sluiten',
             showCancel: false,
             tone: 'primary',
@@ -900,8 +901,8 @@ export default function Show({
 
     const confirmSendWelcome = async (draftOverride = null, { skipConfirm = false } = {}) => {
         if (!welcomeEmail || sendingWelcome) return;
-        if (!smtpConfigured) {
-            await showSmtpMissing();
+        if (!mailConfigured) {
+            await showMailMissing();
             return;
         }
         const payload = draftOverride || {
@@ -988,8 +989,8 @@ export default function Show({
 
     // Versturen: een dialoog met templatekeuze, ontvanger en Versturen/Annuleren.
     const openTemplatePicker = (sendAfter = false) => {
-        if (sendAfter && !smtpConfigured) {
-            showSmtpMissing();
+        if (sendAfter && !mailConfigured) {
+            showMailMissing();
             return;
         }
         if (!templates.length) {
@@ -1272,7 +1273,8 @@ export default function Show({
                         form={welcomeForm}
                         editor={welcomeEditor}
                         templates={templates}
-                        smtpConfigured={smtpConfigured}
+                        mailConfigured={mailConfigured}
+                        mailSender={mailSender}
                         onRefresh={refreshWelcome}
                         onSave={saveWelcome}
                         onOpenPicker={openTemplatePicker}

@@ -14,7 +14,9 @@ return [
     |
     */
 
-    'default' => env('MAIL_MAILER', 'log'),
+    // Alle uitgaande mail gaat via Microsoft 365 (info@kivii.nl). MAIL_MAILER wordt bewust genegeerd;
+    // AppServiceProvider dwingt dit ook af. Zie docs/MAIL_MICROSOFT365.md.
+    'default' => 'msgraph',
 
     /*
     |--------------------------------------------------------------------------
@@ -25,46 +27,20 @@ return [
     | their respective settings. Several examples have been configured for
     | you and you are free to add your own as your application requires.
     |
-    | Laravel supports a variety of mail "transport" drivers that can be used
-    | when delivering an email. You may specify which one you're using for
-    | your mailers below. You may also add additional mailers if needed.
-    |
-    | Supported: "smtp", "sendmail", "mailgun", "ses", "ses-v2",
-    |            "postmark", "log", "array", "failover", "roundrobin"
+    | Kivii verstuurt alleen via de "msgraph"-transport (Microsoft Graph).
+    | SMTP en sendmail zijn verwijderd; de standaardmailers die het framework
+    | meebrengt worden in AppServiceProvider ook naar Graph omgeleid.
     |
     */
 
     'mailers' => [
 
-        'smtp' => [
-            'transport' => 'smtp',
-            'url' => env('MAIL_URL'),
-            'host' => env('MAIL_HOST', '127.0.0.1'),
-            'port' => env('MAIL_PORT', 2525),
-            'encryption' => env('MAIL_ENCRYPTION', 'tls'),
-            'username' => env('MAIL_USERNAME'),
-            'password' => env('MAIL_PASSWORD'),
-            'timeout' => null,
-            'local_domain' => env('MAIL_EHLO_DOMAIN'),
+        // Enige verzendroute: Microsoft Graph vanuit de mailbox uit services.msgraph.sender.
+        'msgraph' => [
+            'transport' => 'msgraph',
         ],
 
-        'ses' => [
-            'transport' => 'ses',
-        ],
-
-        'postmark' => [
-            'transport' => 'postmark',
-            // 'message_stream_id' => env('POSTMARK_MESSAGE_STREAM_ID'),
-            // 'client' => [
-            //     'timeout' => 5,
-            // ],
-        ],
-
-        'sendmail' => [
-            'transport' => 'sendmail',
-            'path' => env('MAIL_SENDMAIL_PATH', '/usr/sbin/sendmail -bs -i'),
-        ],
-
+        // Alleen voor tests en lokale debug; deze versturen niets.
         'log' => [
             'transport' => 'log',
             'channel' => env('MAIL_LOG_CHANNEL'),
@@ -72,14 +48,6 @@ return [
 
         'array' => [
             'transport' => 'array',
-        ],
-
-        'failover' => [
-            'transport' => 'failover',
-            'mailers' => [
-                'smtp',
-                'log',
-            ],
         ],
 
     ],
@@ -96,8 +64,9 @@ return [
     */
 
     'from' => [
-        'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
-        'name' => env('MAIL_FROM_NAME', 'Example'),
+        // Altijd de Microsoft 365-mailbox; MAIL_FROM_* wordt niet gebruikt.
+        'address' => env('MSGRAPH_SENDER', 'info@kivii.nl'),
+        'name' => 'Kivii',
     ],
 
 ];

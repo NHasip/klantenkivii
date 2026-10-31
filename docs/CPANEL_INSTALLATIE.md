@@ -16,7 +16,7 @@ Aanbevolen:
    - `APP_URL`
    - `APP_KEY` (stap 4)
    - `DB_CONNECTION=mysql` + `DB_*`
-   - `MAIL_*` (SMTP)
+   - `MSGRAPH_*` (Microsoft 365, alle mail gaat via info@kivii.nl; zie `docs/MAIL_MICROSOFT365.md`)
    - `QUEUE_CONNECTION=database`
    - `LEADS_WEBHOOK_TOKEN`
    - Admin seed: `KIVII_ADMIN_*`

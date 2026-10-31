@@ -274,7 +274,7 @@
             <dl class="mt-4 grid grid-cols-1 gap-3 border-t border-zinc-100 pt-4 text-sm sm:grid-cols-3">
                 <div><dt class="text-xs text-zinc-500">Incl. btw</dt><dd class="font-semibold tabular-nums text-zinc-900">{{ $money($kpis['mrr_incl']) }}</dd></div>
                 <div><dt class="text-xs text-zinc-500">BTW-deel</dt><dd class="font-semibold tabular-nums text-zinc-900">{{ $money($kpis['mrr_btw']) }}</dd></div>
-                <div><dt class="text-xs text-zinc-500">Afgenomen modules</dt><dd class="font-semibold tabular-nums text-zinc-900"><a href="#modules" class="link">{{ $nf($kpis['modules_total_aantal']) }}</a></dd></div>
+                <div><dt class="text-xs text-zinc-500">Afgenomen modules</dt><dd class="font-semibold tabular-nums text-zinc-900"><a href="#modules" class="link tap-link">{{ $nf($kpis['modules_total_aantal']) }}</a></dd></div>
             </dl>
         </section>
 
@@ -291,10 +291,10 @@
                     <x-icon name="download" class="h-3.5 w-3.5" /> CSV
                 </button>
             </div>
-            <div class="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-600">
-                <a href="{{ $customersUrl }}?status=actief" class="inline-flex items-center gap-1.5 rounded hover:text-zinc-900 hover:underline focus-ring"><span class="h-2.5 w-2.5 rounded-sm bg-emerald-500" aria-hidden="true"></span>Nieuw actief <span class="font-semibold tabular-nums text-zinc-900">{{ $nf($flowInTotal) }}</span></a>
-                <a href="{{ $customersUrl }}?status=opgezegd" class="inline-flex items-center gap-1.5 rounded hover:text-zinc-900 hover:underline focus-ring"><span class="h-2.5 w-2.5 rounded-sm bg-rose-500" aria-hidden="true"></span>Opgezegd</a>
-                <a href="{{ $customersUrl }}?status=verloren" class="inline-flex items-center gap-1.5 rounded hover:text-zinc-900 hover:underline focus-ring"><span class="h-2.5 w-2.5 rounded-sm bg-rose-300" aria-hidden="true"></span>Verloren</a>
+            <div class="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-600 [@media(pointer:coarse)]:gap-y-3">
+                <a href="{{ $customersUrl }}?status=actief" class="tap-link inline-flex items-center gap-1.5 rounded hover:text-zinc-900 hover:underline focus-ring"><span class="h-2.5 w-2.5 rounded-sm bg-emerald-500" aria-hidden="true"></span>Nieuw actief <span class="font-semibold tabular-nums text-zinc-900">{{ $nf($flowInTotal) }}</span></a>
+                <a href="{{ $customersUrl }}?status=opgezegd" class="tap-link inline-flex items-center gap-1.5 rounded hover:text-zinc-900 hover:underline focus-ring"><span class="h-2.5 w-2.5 rounded-sm bg-rose-500" aria-hidden="true"></span>Opgezegd</a>
+                <a href="{{ $customersUrl }}?status=verloren" class="tap-link inline-flex items-center gap-1.5 rounded hover:text-zinc-900 hover:underline focus-ring"><span class="h-2.5 w-2.5 rounded-sm bg-rose-300" aria-hidden="true"></span>Verloren</a>
                 <span class="text-zinc-500">Uit: <span class="font-semibold tabular-nums text-zinc-900">{{ $nf($flowOutTotal) }}</span></span>
             </div>
             <svg viewBox="0 0 {{ $flowW }} {{ $flowH }}" class="h-auto w-full" role="img" aria-label="Staafgrafiek instroom en uitstroom per maand, laatste 12 maanden">
@@ -387,7 +387,7 @@
             <ul class="-mx-2 divide-y divide-zinc-100">
                 @foreach($periodRows as $row)
                     <li>
-                        <a href="{{ $row['href'] }}" class="group flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
+                        <a href="{{ $row['href'] }}" class="tap-target group flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
                             <x-icon :name="$row['icon']" class="h-4 w-4 text-zinc-400 group-hover:text-zinc-600" />
                             <span class="min-w-0 flex-1 text-sm text-zinc-700">{{ $row['label'] }}</span>
                             <span class="text-sm font-semibold tabular-nums {{ ! empty($row['bad']) && (int) $row['value'] > 0 ? 'text-rose-700' : 'text-zinc-900' }}">{{ $nf($row['value']) }}</span>

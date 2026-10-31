@@ -6,7 +6,7 @@
 --}}
 <div {{ $attributes->class(['mb-6 sm:mb-8']) }}>
     @if ($backHref)
-        <a href="{{ $backHref }}" class="focus-ring mb-3 inline-flex items-center gap-1 rounded-md text-sm font-medium text-zinc-500 hover:text-zinc-900">
+        <a href="{{ $backHref }}" class="tap-link focus-ring mb-3 inline-flex items-center gap-1 rounded-md text-sm font-medium text-zinc-500 hover:text-zinc-900">
             <x-icon name="arrow-left" class="h-4 w-4" />
             {{ $backLabel }}
         </a>

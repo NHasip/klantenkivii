@@ -83,6 +83,23 @@ class User extends Authenticatable
     }
 
     /**
+     * Wachtwoordherstel gaat (zoals alle mail) via Microsoft 365 vanuit info@kivii.nl. Lukt dat niet,
+     * dan een nette melding op het formulier in plaats van een serverfout; de technische fout wordt gelogd.
+     */
+    public function sendPasswordResetNotification($token): void
+    {
+        try {
+            parent::sendPasswordResetNotification($token);
+        } catch (\Throwable $e) {
+            report($e);
+
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                \Laravel\Fortify\Fortify::email() => 'De e-mail voor wachtwoordherstel kon niet worden verstuurd. Probeer het later opnieuw of neem contact op met Kivii.',
+            ]);
+        }
+    }
+
+    /**
      * Klantlogins zijn gebruikers die als eigenaar aan een garagebedrijf hangen
      * (ook als dat bedrijf in de prullenbak staat). Zij horen niet in het CRM.
      * Admins worden nooit als klantlogin gezien.

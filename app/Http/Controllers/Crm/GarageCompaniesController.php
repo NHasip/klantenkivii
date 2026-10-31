@@ -20,12 +20,12 @@ use App\Models\Module;
 use App\Models\OutboundEmail;
 use App\Models\Reminder;
 use App\Models\SepaMandate;
-use App\Models\SmtpSetting;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\Crm\RevenueCalculator;
 use App\Services\EmailTemplateRenderer;
 use App\Services\IncassoProrataCalculator;
+use App\Services\Mail\MicrosoftGraphMailer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -952,9 +952,8 @@ class GarageCompaniesController
         $this->ensureAssignmentsExist($garageCompany->id);
 
         $welcomeEmail = $this->ensureWelcomeDraft($garageCompany);
-        $smtpConfigured = Schema::hasTable('smtp_settings')
-            ? (SmtpSetting::query()->first()?->isComplete() ?? false)
-            : false;
+        // Alle mail gaat via Microsoft 365 (info@kivii.nl); zonder koppeling kan de welkomstmail niet weg.
+        $mailConfigured = MicrosoftGraphMailer::isConfigured();
 
         $moduleRows = $this->moduleRows($garageCompany->id);
         $moduleTotals = $this->moduleTotals($moduleRows);
@@ -1199,7 +1198,8 @@ class GarageCompaniesController
                 'missing_fields' => $incassoMissingFields,
             ],
             'emailTemplates' => $emailTemplates,
-            'smtpConfigured' => $smtpConfigured,
+            'mailConfigured' => $mailConfigured,
+            'mailSender' => MicrosoftGraphMailer::sender(),
             'tab' => $tab,
             'statusOptions' => collect(GarageCompanyStatus::selectableValues())->values(),
             'statusLabels' => GarageCompanyStatus::labelMap(),
@@ -2419,23 +2419,16 @@ class GarageCompaniesController
         if (! $draft) {
             return back()->with('status', 'Welkomstmail is niet beschikbaar (migraties ontbreken).');
         }
-        if (! Schema::hasTable('smtp_settings')) {
-            return back()->with('status', 'SMTP instellingen ontbreken. Voeg ze toe via profiel > systeem-instellingen.');
-        }
-
-        $smtp = SmtpSetting::query()->first();
-
-        if (! $smtp || ! $smtp->isComplete()) {
-            return back()->with('status', 'SMTP instellingen ontbreken. Voeg ze toe via profiel > systeem-instellingen.');
-        }
-
         if (! filled($draft->to_email) || ! filter_var($draft->to_email, FILTER_VALIDATE_EMAIL)) {
             return back()->withErrors(['to_email' => 'Vul een geldig e-mailadres in als ontvanger.']);
         }
 
-        try {
-            $smtp->applyToMailConfig();
+        // Geen SMTP-fallback: zonder Microsoft-koppeling geen verzendpoging (het concept blijft bewaard).
+        if (! MicrosoftGraphMailer::isConfigured()) {
+            return back()->with('status', 'Niet verstuurd: de Microsoft-koppeling voor '.MicrosoftGraphMailer::sender().' is nog niet ingesteld. Vraag een beheerder dit in te stellen.');
+        }
 
+        try {
             $templateData = $this->welcomeTemplateData($garageCompany, true);
             $subject = EmailTemplateRenderer::renderString((string) $draft->subject, $templateData);
             $bodyHtml = EmailTemplateRenderer::renderString((string) ($draft->body_html ?? ''), $templateData);
@@ -2444,13 +2437,8 @@ class GarageCompaniesController
                 $bodyText = $this->htmlToText($bodyHtml);
             }
 
-            Mail::to($draft->to_email)->send(new TemplateMail(
-                $subject,
-                $bodyHtml,
-                $bodyText,
-                $smtp->from_address,
-                $smtp->from_name
-            ));
+            // Verstuurd via de msgraph-mailer: altijd vanuit info@kivii.nl, met kopie in Verzonden items.
+            Mail::to($draft->to_email)->send(new TemplateMail($subject, $bodyHtml, $bodyText));
 
             $draft->update([
                 'status' => 'sent',
@@ -2462,18 +2450,21 @@ class GarageCompaniesController
                 'garage_company_id' => $garageCompany->id,
                 'type' => ActivityType::Systeem,
                 'titel' => 'Welkomstmail verstuurd',
-                'inhoud' => "Verstuurd naar {$draft->to_email}",
+                'inhoud' => "Verstuurd naar {$draft->to_email} namens ".MicrosoftGraphMailer::sender(),
                 'created_by' => auth()->id(),
             ]);
 
             return back()->with('status', 'Welkomstmail verstuurd.');
         } catch (\Throwable $e) {
+            report($e);
             $draft->update([
                 'status' => 'failed',
-                'last_error' => $e->getMessage(),
+                'last_error' => mb_substr($e->getMessage(), 0, 2000),
             ]);
 
-            return back()->with('status', 'Versturen mislukt: '.$e->getMessage());
+            $human = EmailLogController::humanError($e->getMessage()) ?? $e->getMessage();
+
+            return back()->with('status', 'Versturen mislukt: '.$human);
         }
     }
 

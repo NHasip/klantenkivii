@@ -167,7 +167,7 @@ class TasksController
 
         if (! empty($data['assignees'])) {
             $assignees = User::query()->whereIn('id', $data['assignees'])->get();
-            Notification::send($assignees, new TaskAssigned($task));
+            $this->notifySafely($assignees, new TaskAssigned($task));
         }
 
         $task->load(['project:id,naam,kleur', 'assignees:id,name', ...$this->customerRelation()]);
@@ -253,7 +253,7 @@ class TasksController
             $newIds = array_values(array_diff($data['assignees'], $existing));
             if (count($newIds) > 0) {
                 $assignees = User::query()->whereIn('id', $newIds)->get();
-                Notification::send($assignees, new TaskAssigned($task));
+                $this->notifySafely($assignees, new TaskAssigned($task));
             }
         }
 
@@ -352,12 +352,12 @@ class TasksController
         $task->load('assignees');
         $assignees = $task->assignees->where('id', '!=', $request->user()->id);
         if ($assignees->isNotEmpty()) {
-            Notification::send($assignees, new TaskCommented($task, $comment));
+            $this->notifySafely($assignees, new TaskCommented($task, $comment));
         }
 
         $mentioned = $this->extractMentions($data['body'], $this->users());
         if ($mentioned->isNotEmpty()) {
-            Notification::send($mentioned, new TaskMentioned($task, $comment));
+            $this->notifySafely($mentioned, new TaskMentioned($task, $comment));
         }
 
         $comment->load('author:id,name');
@@ -405,6 +405,21 @@ class TasksController
     /**
      * @return array<string, mixed>
      */
+    /**
+     * Stuurt taakmeldingen per gebruiker. Een mislukte e-mail (Microsoft 365) mag de taakactie niet laten
+     * mislukken en niet de meldingen voor andere gebruikers tegenhouden; de fout wordt gelogd.
+     */
+    private function notifySafely(iterable $users, \Illuminate\Notifications\Notification $notification): void
+    {
+        foreach ($users as $user) {
+            try {
+                Notification::send($user, $notification);
+            } catch (Throwable $e) {
+                report($e);
+            }
+        }
+    }
+
     private function buildTasksPayload(Request $request): array
     {
         $tasks = $this->filteredTasks($request);

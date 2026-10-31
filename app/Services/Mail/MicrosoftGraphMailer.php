@@ -8,11 +8,16 @@ use RuntimeException;
 
 /**
  * Verstuurt e-mail via Microsoft Graph (sendMail) namens de ingestelde afzender (standaard info@kivii.nl).
+ * Dit is de enige verzendroute van het CRM: ook Laravel Mail en notificaties lopen hierlangs
+ * via App\Mail\Transport\MicrosoftGraphTransport. Er is geen SMTP-fallback.
  * Alleen de Laravel Http-client; het token wordt gecachet tot kort voor het verloopt.
  * Foutmeldingen zijn Nederlandstalig en bevatten nooit geheimen.
  */
 class MicrosoftGraphMailer
 {
+    /** Weergavenaam van de afzender; alle uitgaande mail gaat als "Kivii <info@kivii.nl>". */
+    public const SENDER_NAME = 'Kivii';
+
     public static function isConfigured(): bool
     {
         $c = (array) config('services.msgraph', []);
@@ -28,27 +33,41 @@ class MicrosoftGraphMailer
 
     public function send(string $to, string $subject, string $html, ?string $replyTo = null): void
     {
+        $sender = self::sender();
+
+        $this->sendMessage([
+            'subject' => $subject,
+            'body' => ['contentType' => 'HTML', 'content' => $html],
+            'toRecipients' => [['emailAddress' => ['address' => $to]]],
+            'replyTo' => [['emailAddress' => ['address' => $replyTo ?: $sender]]],
+        ]);
+    }
+
+    /**
+     * Verstuurt een volledig Graph-bericht (subject, body, ontvangers, bijlagen) vanuit de mailbox van de afzender.
+     * De afzender wordt altijd geforceerd op {@see sender()}; een eventueel meegegeven 'from' wordt overschreven.
+     * Gedeeld door {@see send()} en de Laravel-mailtransport (App\Mail\Transport\MicrosoftGraphTransport).
+     *
+     * @param  array<string, mixed>  $message
+     */
+    public function sendMessage(array $message): void
+    {
         if (! self::isConfigured()) {
             throw new RuntimeException('De Microsoft-koppeling voor '.self::sender().' is nog niet ingesteld.');
         }
 
         $sender = self::sender();
-        $message = [
-            'subject' => $subject,
-            'body' => ['contentType' => 'HTML', 'content' => $html],
-            'toRecipients' => [['emailAddress' => ['address' => $to]]],
-            'replyTo' => [['emailAddress' => ['address' => $replyTo ?: $sender]]],
-        ];
+        $message['from'] = ['emailAddress' => ['address' => $sender, 'name' => self::SENDER_NAME]];
 
         try {
             $response = Http::withToken($this->token())
                 ->acceptJson()
-                ->timeout(20)
+                ->timeout(30)
                 ->post('https://graph.microsoft.com/v1.0/users/'.rawurlencode($sender).'/sendMail', [
                     'message' => $message,
                     'saveToSentItems' => true,
                 ]);
-        } catch (\Illuminate\Http\Client\ConnectionException) {
+        } catch (\Illuminate\Http\Client\ConnectionException|\GuzzleHttp\Exception\TransferException) {
             throw new RuntimeException('Microsoft 365 is niet bereikbaar. Probeer het later opnieuw.');
         }
 
@@ -78,7 +97,7 @@ class MicrosoftGraphMailer
                     'grant_type' => 'client_credentials',
                 ]
             );
-        } catch (\Illuminate\Http\Client\ConnectionException) {
+        } catch (\Illuminate\Http\Client\ConnectionException|\GuzzleHttp\Exception\TransferException) {
             throw new RuntimeException('Aanmelden bij Microsoft 365 mislukt: geen verbinding.');
         }
 
@@ -110,6 +129,7 @@ class MicrosoftGraphMailer
             $status === 403 || $code === 'ErrorAccessDenied' => 'Geen toestemming om te versturen namens '.self::sender().'. Controleer de Mail.Send-machtiging, de beheerderstoestemming en de toegangsbeperking voor deze mailbox.',
             $status === 404 || $code === 'ErrorInvalidUser' || $code === 'MailboxNotEnabledForRESTAPI' => 'Mailbox '.self::sender().' is niet gevonden in Microsoft 365.',
             $status === 429 => 'Microsoft 365 beperkt tijdelijk het aantal verzoeken. Probeer het over een paar minuten opnieuw.',
+            $status === 413 => 'Microsoft 365 heeft de e-mail geweigerd: de e-mail of de bijlagen zijn te groot.',
             $status === 400 => 'Microsoft 365 heeft de e-mail geweigerd. Controleer het e-mailadres van de ontvanger.',
             default => 'Versturen via Microsoft 365 mislukt (HTTP '.$status.').',
         };

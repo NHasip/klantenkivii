@@ -13,7 +13,6 @@ use App\Http\Controllers\Crm\TasksController;
 use App\Http\Controllers\Crm\UsersController;
 use App\Http\Controllers\Auth\PasskeyLoginController;
 use App\Http\Controllers\Profile\PasskeyController;
-use App\Http\Controllers\Profile\SmtpSettingsController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -179,10 +178,6 @@ Route::middleware(['auth', 'active', 'admin.2fa'])->group(function () {
     Route::post('/email-templates/{emailTemplate}/delete', [EmailTemplatesController::class, 'destroy'])
         ->middleware('admin')
         ->name('crm.email_templates.delete_post');
-
-    Route::post('/user/profile/smtp-settings', [SmtpSettingsController::class, 'store'])
-        ->middleware('admin')
-        ->name('profile.smtp.save');
 
     Route::post('/user/profile/passkeys/options', [PasskeyController::class, 'options'])
         ->name('profile.passkeys.options');

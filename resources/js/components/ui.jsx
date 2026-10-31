@@ -115,7 +115,7 @@ export function PageHeader({ title, description, actions, back, children, classN
     return (
         <div className={cx('mb-6 sm:mb-8', className)}>
             {back?.href ? (
-                <a href={back.href} className="mb-3 inline-flex items-center gap-1 rounded-md text-sm font-medium text-zinc-500 hover:text-zinc-900 focus-ring">
+                <a href={back.href} className="tap-link mb-3 inline-flex items-center gap-1 rounded-md text-sm font-medium text-zinc-500 hover:text-zinc-900 focus-ring">
                     <Icon name="arrow-left" className="h-4 w-4" />
                     {back.label ?? 'Terug'}
                 </a>

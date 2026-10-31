@@ -21,6 +21,15 @@
     $kiviiNeeds2fa = $kiviiIsAdmin && ! \App\Http\Middleware\RequireTwoFactorForAdmin::userHasTwoFactor($kiviiUser);
     $kiviiFocus = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1';
     $kiviiProfileActive = request()->routeIs('profile.show');
+    // Actief menu-item na Inertia-navigatie: deze header wordt maar één keer gerenderd. Daarom krijgt elke link
+    // (data-nav-paths) de URI's van alle GET-routes waarvan de naam past op hetzelfde patroon als routeIs($match);
+    // de browser zet die om naar een reguliere expressie en vergelijkt met het nieuwe pad (zie kiviiNav hieronder).
+    $kiviiBasePath = rtrim((string) parse_url(url('/'), PHP_URL_PATH), '/');
+    $kiviiGetRoutes = collect(app('router')->getRoutes()->get('GET'))->filter(fn ($route) => filled($route->getName()));
+    $kiviiNavPaths = fn (string $match): string => json_encode($kiviiGetRoutes
+        ->filter(fn ($route) => \Illuminate\Support\Str::is($match, $route->getName()))
+        ->map(fn ($route) => $kiviiBasePath.'/'.ltrim($route->uri(), '/'))
+        ->unique()->values()->all(), JSON_UNESCAPED_SLASHES);
 @endphp
 {{--
     Gedeelde app-shell voor de Inertia-, Livewire- en Jetstream-layouts. Eén root-element (ook bruikbaar als Livewire-view).
@@ -30,7 +39,11 @@
     - Onder md: vaste onderbalk (Dashboard, Klanten, Taken, Zoeken, Menu) met safe-area-inset-bottom; .app-container krijgt
       dan extra ondermarge via --kivii-bottom-offset (resources/css/app.css).
     - Menu-exclusiviteit: elk menu stuurt 'kivii-menu-open' met zijn naam (mobile, search, bell, user) en sluit bij een ander.
-    - Drawer-focus: bij openen naar de sluitknop (na de 15ms waarmee x-trap activeert, als de drawer zichtbaar is), bij sluiten
+    - Actief menu-item: server-side via routeIs; na Inertia-navigatie stuurt app.jsx 'kivii-navigate' (met de URL) en
+      herberekent syncNav() aria-current en de actief/inactief-klassen (data-nav-*) van zijbalk, drawer, onderbalk en
+      profiel-link. Bij een ander pad sluit de mobiele drawer en gaat de focus naar de hoofdinhoud.
+    - Drawer-focus: bij openen naar de sluitknop zodra de drawer zichtbaar is (focusDrawerClose: na x-trap, bij transitionend
+      en uiterlijk na 300ms), bij sluiten
       terug naar de knop die hem opende (hamburger of Menu in de onderbalk). x-trap doet zelf geen autofocus of focusherstel
       (.noautofocus.noreturn), zodat sluiten via een ander menu (zoeken) de focus niet terugtrekt.
 --}}
@@ -41,7 +54,25 @@
             this.mobileOpener = opener || this.$refs.mobileButton;
             this.mobileOpen = true;
             this.$dispatch('kivii-menu-open', 'mobile');
-            setTimeout(() => { if (this.mobileOpen) this.$refs.mobileClose.focus({ preventScroll: true }) }, 50);
+            this.focusDrawerClose();
+        },
+        focusDrawerClose() {
+            // Focus pas zetten als de drawer echt zichtbaar is (visibility hoort bij de schuiftransitie): na de
+            // activering van x-trap, bij transitionend en als vangnet na 300ms. Lukt het eerder, dan stoppen.
+            const aside = this.$refs.sidebar;
+            const close = this.$refs.mobileClose;
+            let done = false;
+            const tryFocus = () => {
+                if (done || !this.mobileOpen) return;
+                if (window.getComputedStyle(aside).visibility !== 'visible') return;
+                close.focus({ preventScroll: true });
+                done = document.activeElement === close;
+                if (done) aside.removeEventListener('transitionend', onEnd);
+            };
+            const onEnd = (event) => { if (event.target === aside) tryFocus(); };
+            aside.addEventListener('transitionend', onEnd);
+            setTimeout(tryFocus, 20);
+            setTimeout(() => { tryFocus(); aside.removeEventListener('transitionend', onEnd); }, 300);
         },
         closeMobile(restoreFocus = true) {
             if (!this.mobileOpen) return;
@@ -50,11 +81,80 @@
             this.mobileOpener = null;
             if (restoreFocus && opener) setTimeout(() => opener.focus({ preventScroll: true }), 0);
         },
+        navPath: window.location.pathname,
+        syncNav(url) {
+            const path = window.kiviiNav.pathOf(url);
+            const changed = path !== this.navPath;
+            this.navPath = path;
+            window.kiviiNav.apply(this.$root, path);
+            if (changed && this.mobileOpen) {
+                this.closeMobile(false);
+                const main = document.getElementById('hoofdinhoud');
+                if (main) main.focus({ preventScroll: true });
+            }
+        },
      }" class="safe-top sticky top-0 z-30"
+     @kivii-navigate.window="syncNav($event.detail && $event.detail.url)"
      @kivii-menu-open.window="if ($event.detail !== 'mobile') closeMobile(false)"
      @keydown.escape.window="if (mobileOpen) closeMobile()"
      @resize.window.debounce.150ms="if (mobileOpen && window.innerWidth >= 1024) closeMobile(false)">
     <script>
+        // Menu-status na Inertia-navigatie (event 'kivii-navigate' uit resources/js/app.jsx). Zelfde regels als de server:
+        // een link is actief als het pad past op een van de route-URI's in data-nav-paths ({param} = een segment).
+        window.kiviiNav = window.kiviiNav || {
+            pathOf(url) {
+                try {
+                    return new URL(url || window.location.href, window.location.href).pathname;
+                } catch (e) {
+                    return window.location.pathname;
+                }
+            },
+            normalize(path) {
+                let p = path || '/';
+                try { p = decodeURI(p); } catch (e) { /* pad ongewijzigd laten */ }
+                return p.length > 1 ? p.replace(/\/+$/, '') : p;
+            },
+            toRegExp(uri) {
+                const escape = (text) => text.replace(/[.*+?^$()|[\]\\]/g, '\\$&');
+                const clean = uri.length > 1 ? uri.replace(/\/+$/, '') : uri;
+                let source = '';
+                clean.split(/(\/?\{[^}]+\})/).forEach((part) => {
+                    const param = part.match(/^(\/?)\{[^}]+?(\?)?\}$/);
+                    if (!param) {
+                        source += escape(part);
+                    } else if (param[2]) {
+                        source += '(?:' + escape(param[1]) + '[^/]+)?';
+                    } else {
+                        source += escape(param[1]) + '[^/]+';
+                    }
+                });
+                return new RegExp('^' + (source || '/') + '$');
+            },
+            isActive(uris, path) {
+                const current = this.normalize(path);
+                return uris.some((uri) => this.toRegExp(uri).test(current));
+            },
+            toggle(el, active) {
+                const on = (el.dataset.navActiveClass || '').split(' ').filter(Boolean);
+                const off = (el.dataset.navInactiveClass || '').split(' ').filter(Boolean);
+                if (on.length || off.length) {
+                    el.classList.remove(...(active ? off : on));
+                    el.classList.add(...(active ? on : off));
+                }
+            },
+            apply(root, path) {
+                root.querySelectorAll('[data-nav-paths]').forEach((link) => {
+                    let uris = [];
+                    try { uris = JSON.parse(link.dataset.navPaths || '[]'); } catch (e) { return; }
+                    const active = this.isActive(uris, path);
+                    if (active) link.setAttribute('aria-current', 'page');
+                    else link.removeAttribute('aria-current');
+                    this.toggle(link, active);
+                    link.querySelectorAll('[data-nav-active-class], [data-nav-inactive-class]').forEach((el) => this.toggle(el, active));
+                });
+            },
+        };
+
         window.kiviiSearch = window.kiviiSearch || function (endpoint) {
             return {
                 open: false,
@@ -237,7 +337,7 @@
     <div x-cloak x-show="mobileOpen" x-transition.opacity.duration.150ms class="fixed inset-0 z-30 bg-zinc-900/30 backdrop-blur-[2px] lg:hidden" @click="closeMobile()" aria-hidden="true"></div>
 
     {{-- Zijbalk: vast vanaf lg, drawer op kleinere schermen --}}
-    <aside id="app-sidebar"
+    <aside id="app-sidebar" x-ref="sidebar"
            class="fixed inset-y-0 left-0 z-40 flex w-[17.5rem] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] max-w-[85vw] flex-col border-r border-zinc-200/70 bg-white transition-[transform,visibility] duration-200 ease-out max-lg:invisible max-lg:-translate-x-full lg:w-sidebar lg:bg-white/70"
            :class="mobileOpen && '!visible !translate-x-0 shadow-pop'"
            x-trap.noscroll.noautofocus.noreturn="mobileOpen"
@@ -259,7 +359,7 @@
                 @foreach ($kiviiNavItems as $item)
                     <li>
                         @php($isActive = request()->routeIs($item['match']))
-                        <a href="{{ route($item['route']) }}" class="nav-item" @if ($isActive) aria-current="page" @endif>
+                        <a href="{{ route($item['route']) }}" class="nav-item" data-nav-paths="{{ $kiviiNavPaths($item['match']) }}" @if ($isActive) aria-current="page" @endif>
                             <x-icon :name="$item['icon']" />
                             <span class="truncate">{{ $item['label'] }}</span>
                         </a>
@@ -274,7 +374,7 @@
                         @foreach ($kiviiSettingsItems as $item)
                             <li>
                                 @php($isActive = request()->routeIs($item['match']))
-                                <a href="{{ route($item['route']) }}" class="nav-item" @if ($isActive) aria-current="page" @endif>
+                                <a href="{{ route($item['route']) }}" class="nav-item" data-nav-paths="{{ $kiviiNavPaths($item['match']) }}" @if ($isActive) aria-current="page" @endif>
                                     <x-icon :name="$item['icon']" />
                                     <span class="truncate">{{ $item['label'] }}</span>
                                 </a>
@@ -305,7 +405,8 @@
                     <x-icon name="chevrons-up-down" class="h-4 w-4 text-zinc-400" />
                 </button>
                 <div id="user-menu" x-cloak x-show="open" x-transition.opacity.duration.100ms class="menu-panel absolute inset-x-0 bottom-full z-40 mb-2">
-                    <a href="{{ route('profile.show') }}" class="menu-item {{ $kiviiProfileActive ? 'bg-zinc-100 font-semibold text-zinc-900' : '' }}" @if ($kiviiProfileActive) aria-current="page" @endif>
+                    <a href="{{ route('profile.show') }}" class="menu-item {{ $kiviiProfileActive ? 'bg-zinc-100 font-semibold text-zinc-900' : '' }}" @if ($kiviiProfileActive) aria-current="page" @endif
+                       data-nav-paths="{{ $kiviiNavPaths('profile.show') }}" data-nav-active-class="bg-zinc-100 font-semibold text-zinc-900">
                         <x-icon name="user" class="h-4 w-4 text-zinc-400" />
                         Profiel en beveiliging
                     </a>
@@ -328,8 +429,9 @@
                 @php($isActive = request()->routeIs($item['match']))
                 <li>
                     <a href="{{ route($item['route']) }}" @if ($isActive) aria-current="page" @endif
+                       data-nav-paths="{{ $kiviiNavPaths($item['match']) }}" data-nav-active-class="text-indigo-700" data-nav-inactive-class="text-zinc-500 hover:text-zinc-900"
                        class="flex h-full flex-col items-center justify-center gap-0.5 text-2xs font-medium {{ $isActive ? 'text-indigo-700' : 'text-zinc-500 hover:text-zinc-900' }} {{ $kiviiFocus }}">
-                        <x-icon :name="$item['icon']" class="h-5 w-5 {{ $isActive ? 'text-indigo-600' : 'text-zinc-400' }}" />
+                        <x-icon :name="$item['icon']" class="h-5 w-5 {{ $isActive ? 'text-indigo-600' : 'text-zinc-400' }}" data-nav-active-class="text-indigo-600" data-nav-inactive-class="text-zinc-400" />
                         {{ $item['label'] }}
                     </a>
                 </li>

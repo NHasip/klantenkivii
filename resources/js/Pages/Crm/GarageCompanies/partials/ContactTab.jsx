@@ -107,9 +107,10 @@ function PersonsSection({ persons, form, showForm, editingId, onCreate, onEdit, 
                                         </div>
                                     </div>
                                 </div>
+                                {/* E-mail en telefoon onder elkaar: tap-target (44px hoog op touch) zodat de tikvlakken niet overlappen. */}
                                 <div className="mt-4 space-y-1.5 text-sm">
                                     {person.email ? (
-                                        <a href={`mailto:${person.email}`} className="flex min-w-0 items-center gap-2 rounded text-zinc-700 hover:text-indigo-800 focus-ring">
+                                        <a href={`mailto:${person.email}`} className="tap-target flex min-w-0 items-center gap-2 rounded text-zinc-700 hover:text-indigo-800 focus-ring">
                                             <Icon name="mail" className="h-4 w-4 shrink-0 text-zinc-400" />
                                             <span className="truncate">{person.email}</span>
                                         </a>
@@ -117,7 +118,7 @@ function PersonsSection({ persons, form, showForm, editingId, onCreate, onEdit, 
                                         <span className="flex items-center gap-2 text-zinc-400"><Icon name="mail" className="h-4 w-4" />Geen e-mail</span>
                                     )}
                                     {person.telefoon ? (
-                                        <a href={telHref(person.telefoon)} className="flex items-center gap-2 rounded text-zinc-700 hover:text-indigo-800 focus-ring">
+                                        <a href={telHref(person.telefoon)} className="tap-target flex items-center gap-2 rounded text-zinc-700 hover:text-indigo-800 focus-ring">
                                             <Icon name="phone" className="h-4 w-4 shrink-0 text-zinc-400" />
                                             {person.telefoon}
                                         </a>

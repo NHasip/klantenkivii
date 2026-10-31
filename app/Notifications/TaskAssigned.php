@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\Task;
+use App\Services\Mail\MicrosoftGraphMailer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -17,7 +18,8 @@ class TaskAssigned extends Notification
 
     public function via(object $notifiable): array
     {
-        return ['database', 'mail'];
+        // E-mail alleen via Microsoft 365 (info@kivii.nl); zonder koppeling alleen de melding in het CRM.
+        return MicrosoftGraphMailer::isConfigured() ? ['database', 'mail'] : ['database'];
     }
 
     public function toMail(object $notifiable): MailMessage

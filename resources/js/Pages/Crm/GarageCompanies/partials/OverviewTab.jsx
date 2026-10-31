@@ -26,7 +26,8 @@ import {
     telHref,
 } from './showUtils';
 
-const LINK = 'link';
+// tap-link: onzichtbaar 44px tikvlak op touch (e-mail, telefoon, website); desktop ongewijzigd.
+const LINK = 'link tap-link';
 const SMALL_LINK = 'tap-link inline-flex items-center gap-1 rounded text-xs font-semibold text-indigo-700 underline-offset-2 hover:text-indigo-900 hover:underline focus-ring';
 
 function OverviewReadOnly({ company, status, onEdit }) {
