@@ -561,11 +561,9 @@ class DemoMailSequenceService
     {
         $data = self::templateData($company, $to);
         $html = (string) ($template->body_html ?? '');
-        $escaped = array_map(fn ($v) => e($v), $data);
-
         return [
             'subject' => EmailTemplateRenderer::renderString((string) $template->subject, $data),
-            'html' => EmailTemplateRenderer::renderString($html, $escaped),
+            'html' => EmailTemplateRenderer::renderHtml($html, $data),
             'text' => MandateRequestService::htmlToText(EmailTemplateRenderer::renderString($html, $data)),
         ];
     }

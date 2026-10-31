@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import axios from 'axios';
 import { Badge, Button, Card, CardHeader, EmptyState, Field, FilePicker, IconTile, KeyValue, Stat, cx, inputClasses } from '../../../../components/ui';
 import CopyButton, { formatIban } from './CopyButton';
 import { MandateRequestsCard } from './MandateRequests';
@@ -172,7 +173,48 @@ function ModulesSection({ form, totals, extraUsersHint, onToggle, onUpdateRow, o
     );
 }
 
-function MandateForm({ form, editing, incasso, onSubmit, onCancel }) {
+// Standaard alleen het gemaskeerde IBAN. Beheerders kunnen het volledige IBAN opvragen (wordt gelogd in de tijdlijn).
+function IbanValue({ mandate, revealUrl }) {
+    const [full, setFull] = useState(null);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+    if (!mandate) return '-';
+    const masked = mandate.iban_masked || '';
+    const reveal = async () => {
+        if (!revealUrl || busy) return;
+        setBusy(true);
+        setError('');
+        try {
+            const { data } = await axios.post(revealUrl.replace('__MANDATE__', mandate.id));
+            setFull(normalizeIban(data?.iban || ''));
+        } catch (e) {
+            setError(e?.response?.status === 429 ? 'Te vaak geprobeerd. Wacht even.' : 'IBAN kon niet worden opgehaald.');
+        } finally {
+            setBusy(false);
+        }
+    };
+    if (full) {
+        return (
+            <span className="inline-flex items-center font-mono">
+                {formatIban(full)}
+                <CopyButton value={full} label="IBAN kopiëren" />
+            </span>
+        );
+    }
+    return (
+        <span className="inline-flex flex-wrap items-center gap-2">
+            <span className="font-mono">{masked || '-'}</span>
+            {revealUrl && masked ? (
+                <button type="button" onClick={reveal} disabled={busy} className="text-xs font-medium text-indigo-600 hover:text-indigo-800 focus-ring rounded disabled:opacity-60">
+                    {busy ? 'Ophalen...' : 'Toon volledig IBAN'}
+                </button>
+            ) : null}
+            {error ? <span className="text-xs text-rose-600" role="alert">{error}</span> : null}
+        </span>
+    );
+}
+
+function MandateForm({ form, editing, currentIbanMasked, incasso, onSubmit, onCancel }) {
     return (
         <form id="mandate-form" onSubmit={onSubmit} noValidate className="scroll-mt-48 border-y border-zinc-200 bg-zinc-50/70 px-5 py-5 sm:px-6" aria-labelledby="mandate-form-title">
             <h3 id="mandate-form-title" className="mb-4 text-sm font-semibold text-zinc-900">{editing ? 'Mandaat bewerken' : 'Nieuw mandaat'}</h3>
@@ -184,7 +226,18 @@ function MandateForm({ form, editing, incasso, onSubmit, onCancel }) {
                     <FormField form={form} name="postcode" id="mandateForm-postcode" label="Postcode" required />
                     <FormField form={form} name="plaats" id="mandateForm-plaats" label="Plaats" required />
                     <FormField form={form} name="land" id="mandateForm-land" label="Land" required />
-                    <FormField form={form} name="iban" id="mandateForm-iban" label="IBAN" required inputClassName="font-mono uppercase" autoComplete="off" spellCheck={false} />
+                    <FormField
+                        form={form}
+                        name="iban"
+                        id="mandateForm-iban"
+                        label={editing ? 'Nieuw IBAN' : 'IBAN'}
+                        required={!editing}
+                        placeholder={editing ? 'Leeg laten om het huidige IBAN te behouden' : undefined}
+                        hint={editing ? `Huidig IBAN: ${currentIbanMasked || 'onbekend'}. Typ alleen een IBAN als je het wilt vervangen.` : undefined}
+                        inputClassName="font-mono uppercase"
+                        autoComplete="off"
+                        spellCheck={false}
+                    />
                     <FormField form={form} name="bic" id="mandateForm-bic" label="BIC" inputClassName="font-mono uppercase" autoComplete="off" spellCheck={false} />
                     <FormField form={form} name="email" id="mandateForm-email" label="E-mail" type="email" required />
                     <FormField form={form} name="telefoonnummer" id="mandateForm-telefoonnummer" label="Telefoon" type="tel" required />
@@ -286,20 +339,14 @@ function IncassoSection({
     onSubmitMandate,
     onChangeMandateStatus,
     mandateBusyId,
+    canManageMandates = false,
+    revealIbanUrl = null,
 }) {
-    const activeIban = normalizeIban(activeMandate?.iban);
     const overview = [
         ['Naam debiteur', company.bedrijfsnaam || '-'],
         [
             'IBAN debiteur',
-            activeIban ? (
-                <span className="inline-flex items-center font-mono">
-                    {formatIban(activeIban)}
-                    <CopyButton value={activeIban} label="IBAN kopiëren" />
-                </span>
-            ) : (
-                '-'
-            ),
+            activeMandate?.iban_masked ? <IbanValue mandate={activeMandate} revealUrl={revealIbanUrl} /> : '-',
         ],
         [
             'Kenmerk machtiging',
@@ -326,7 +373,7 @@ function IncassoSection({
                         title="Incasso en SEPA-mandaten"
                         description="Maximaal 1 actief mandaat per klant. Eerdere mandaten blijven bewaard."
                         actions={
-                            !showMandateForm || editingMandateId ? (
+                            canManageMandates && (!showMandateForm || editingMandateId) ? (
                                 <Button size="sm" icon="plus" onClick={onNewMandate}>
                                     Nieuw mandaat
                                 </Button>
@@ -369,7 +416,14 @@ function IncassoSection({
 
                 <div className="mt-5">
                     {showMandateForm && (
-                        <MandateForm form={mandateForm} editing={Boolean(editingMandateId)} incasso={incasso} onSubmit={onSubmitMandate} onCancel={onCancelMandate} />
+                        <MandateForm
+                            form={mandateForm}
+                            editing={Boolean(editingMandateId)}
+                            currentIbanMasked={mandates.find((item) => item.id === editingMandateId)?.iban_masked}
+                            incasso={incasso}
+                            onSubmit={onSubmitMandate}
+                            onCancel={onCancelMandate}
+                        />
                     )}
 
                     {mandates.length === 0 ? (
@@ -379,14 +433,13 @@ function IncassoSection({
                                     icon="credit-card"
                                     title="Nog geen mandaten"
                                     description="Leg het getekende SEPA-mandaat vast om te kunnen incasseren."
-                                    action={<Button size="sm" onClick={onNewMandate}>Nieuw mandaat</Button>}
+                                    action={canManageMandates ? <Button size="sm" onClick={onNewMandate}>Nieuw mandaat</Button> : null}
                                 />
                             </div>
                         )
                     ) : (
                         <ul className="divide-y divide-zinc-100 border-t border-zinc-100" aria-label="SEPA-mandaten">
                             {mandates.map((mandate) => {
-                                const iban = normalizeIban(mandate.iban);
                                 const busy = mandateBusyId === mandate.id;
                                 return (
                                     <li
@@ -410,9 +463,8 @@ function IncassoSection({
                                             </div>
                                         </div>
                                         <div className="min-w-0 flex-1 text-sm">
-                                            <p className="inline-flex items-center whitespace-nowrap font-mono text-zinc-800">
-                                                {iban ? formatIban(iban) : '-'}
-                                                <CopyButton value={iban} label="IBAN kopiëren" />
+                                            <p className="text-zinc-800">
+                                                <IbanValue mandate={mandate} revealUrl={revealIbanUrl} />
                                             </p>
                                             <p className="text-xs text-zinc-500">Ontvangen {mandate.ontvangen_op ? formatDateTime(mandate.ontvangen_op) : 'onbekend'}</p>
                                         </div>
@@ -431,9 +483,11 @@ function IncassoSection({
                                                     </option>
                                                 ))}
                                             </select>
-                                            <Button variant="ghost" size="sm" icon="edit" onClick={() => onEditMandate(mandate)} aria-label={`Mandaat ${mandate.mandaat_id} bewerken`}>
-                                                Bewerken
-                                            </Button>
+                                            {canManageMandates ? (
+                                                <Button variant="ghost" size="sm" icon="edit" onClick={() => onEditMandate(mandate)} aria-label={`Mandaat ${mandate.mandaat_id} bewerken`}>
+                                                    Bewerken
+                                                </Button>
+                                            ) : null}
                                         </div>
                                     </li>
                                 );
@@ -480,7 +534,7 @@ export default function SubscriptionTab({ moduleProps, incassoProps, exportProps
             <ModulesSection {...moduleProps} />
             <IncassoSection {...incassoProps} />
             {mandateRequestProps ? <MandateRequestsCard {...mandateRequestProps} /> : null}
-            <ExportCard {...exportProps} />
+            {exportProps?.canExport ? <ExportCard {...exportProps} /> : null}
         </div>
     );
 }

@@ -25,6 +25,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Ook Livewire-updates (POST /livewire/update) door dezelfde controles als de oorspronkelijke route.
+        \Livewire\Livewire::addPersistentMiddleware([
+            \App\Http\Middleware\EnsureUserIsActive::class,
+            \App\Http\Middleware\RequireTwoFactorForAdmin::class,
+        ]);
+
         Carbon::setLocale(config('app.locale', 'nl'));
 
         GarageCompany::observe(GarageCompanyObserver::class);

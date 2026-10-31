@@ -113,11 +113,9 @@ class EmailTemplatesController
             'geldig_tot' => now()->addDays((int) config('crm.mandate_valid_days', 30))->format('d-m-Y'),
             'modules' => \App\Services\Crm\DemoMailSequenceService::moduleNames($company),
         ];
-        $escaped = array_map(fn ($value) => e($value), $values);
-
         return response()->json([
             'subject' => EmailTemplateRenderer::renderString((string) ($data['subject'] ?? ''), $values),
-            'html' => EmailTemplateRenderer::renderString((string) ($data['body_html'] ?? ''), $escaped),
+            'html' => EmailTemplateRenderer::renderHtml((string) ($data['body_html'] ?? ''), $values),
             'to' => $company->hoofd_email,
         ]);
     }

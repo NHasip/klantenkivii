@@ -43,6 +43,19 @@ class MandateRequestService
         'akkoord' => ['akkoord', 'consent', 'toestemming', 'machtiging', 'acceptance', 'ik_machtig_kivii'],
     ];
 
+    /** Maximale lengte per formulierveld; overige velden maximaal 255 tekens. */
+    public const FIELD_MAX = [
+        'ref' => 64,
+        'kenmerk' => 35,
+        'iban' => 42,
+        'bic' => 11,
+        'postcode' => 20,
+        'telefoon' => 50,
+        'land' => 100,
+        'datum_van_tekenen' => 30,
+        'akkoord' => 100,
+    ];
+
     public static function available(): bool
     {
         return Schema::hasTable('sepa_mandate_requests');
@@ -110,8 +123,7 @@ class MandateRequestService
         $html = $template ? (string) ($template->body_html ?? '') : $default['body_html'];
 
         $data = $this->templateData($company, $request);
-        $escaped = array_map(fn ($v) => e($v), $data);
-        $renderedHtml = EmailTemplateRenderer::renderString($html, $escaped);
+        $renderedHtml = EmailTemplateRenderer::renderHtml($html, $data);
 
         return [
             'subject' => EmailTemplateRenderer::renderString($subject, $data),
@@ -150,7 +162,13 @@ class MandateRequestService
     public function ingest(array $input): array
     {
         $fields = FormPayloadNormalizer::map(FormPayloadNormalizer::flatten($input), self::FIELD_ALIASES);
-        $fields = array_map(fn ($v) => is_string($v) ? mb_substr(trim($v), 0, 255) : $v, $fields);
+        $fields = array_map(fn ($v) => is_string($v) ? mb_substr(trim($v), 0, 255) : (is_scalar($v) || $v === null ? $v : null), $fields);
+        // Strakkere maximale lengtes per veld (publiek formulier).
+        foreach (self::FIELD_MAX as $key => $max) {
+            if (isset($fields[$key]) && is_string($fields[$key])) {
+                $fields[$key] = mb_substr($fields[$key], 0, $max);
+            }
+        }
 
         $ibanRaw = (string) ($fields['iban'] ?? '');
         unset($fields['iban']);
@@ -161,13 +179,20 @@ class MandateRequestService
         $formKenmerk = strtoupper((string) ($fields['kenmerk'] ?? ''));
         $note = null;
 
-        return DB::transaction(function () use ($ref, $formKenmerk, $iban, $payload, $fields, &$note) {
+        $akkoord = self::truthy($fields['akkoord'] ?? null);
+
+        return DB::transaction(function () use ($ref, $formKenmerk, $iban, $payload, $fields, $akkoord, &$note) {
             $request = null;
+            $byRef = null;
 
             if ($ref !== '') {
                 $byRef = SepaMandateRequest::query()->where('ref_token', $ref)->lockForUpdate()->first();
                 if ($byRef && $byRef->status === SepaMandateRequest::STATUS_OPEN && ! $byRef->isExpired()) {
-                    $request = $byRef;
+                    if ($formKenmerk !== '' && $formKenmerk !== strtoupper((string) $byRef->kenmerk)) {
+                        $note = 'Kenmerk op het formulier komt niet overeen met verzoek '.$byRef->kenmerk.': handmatig controleren.';
+                    } else {
+                        $request = $byRef;
+                    }
                 } elseif ($byRef) {
                     $note = $byRef->isExpired() || $byRef->status === SepaMandateRequest::STATUS_VERLOPEN
                         ? 'Link was verlopen ('.$byRef->kenmerk.').'
@@ -187,8 +212,11 @@ class MandateRequestService
                     'error' => null,
                 ])->save();
                 $reason = 'gekoppeld via ref';
+                $viaRef = true;
             } else {
-                $companyId = isset($byRef) && $byRef ? $byRef->garage_company_id : $this->matchCompany($fields);
+                $viaRef = false;
+                // Zonder geldige persoonlijke link alleen een suggestie voor de koppeling: nooit automatisch verwerken.
+                $companyId = $byRef ? $byRef->garage_company_id : $this->matchCompany($fields);
                 $kenmerk = $formKenmerk !== '' && SepaTools::validKenmerk($formKenmerk) && ! SepaTools::kenmerkInUse($formKenmerk)
                     ? $formKenmerk
                     : SepaTools::generateKenmerk();
@@ -202,13 +230,24 @@ class MandateRequestService
                     'completed_at' => now(),
                     'iban' => $iban !== '' ? $iban : null,
                     'payload' => $payload,
-                    'error' => $note ?? ($companyId ? null : 'Geen klant gevonden: koppel handmatig.'),
+                    'error' => $note ?? ($companyId
+                        ? 'Ontvangen zonder geldige persoonlijke link (gekoppeld op e-mail of bedrijfsnaam): controleer en klik op Verwerken.'
+                        : 'Geen klant gevonden: koppel handmatig.'),
                 ]);
-                $reason = $companyId ? 'gekoppeld via e-mail of naam' : 'niet gekoppeld';
+                $reason = $byRef ? 'ref niet bruikbaar, handmatig controleren'
+                    : ($companyId ? 'voorgesteld via e-mail of naam, handmatig controleren' : 'niet gekoppeld');
             }
 
-            // Een dubbele of verlopen inzending niet automatisch verwerken: eerst handmatig controleren.
-            if ($request->garage_company_id && $note === null) {
+            // Zonder akkoord geen machtiging.
+            if (! $akkoord) {
+                $request->forceFill(['status' => SepaMandateRequest::STATUS_FOUT, 'error' => 'Akkoord ontbreekt'])->save();
+
+                return ['request' => $request, 'reason' => $reason.', akkoord ontbreekt'];
+            }
+
+            // Alleen automatisch verwerken met een geldige, open, niet-verlopen persoonlijke link (en passend kenmerk).
+            // Alles daarbuiten blijft "ontvangen" en wacht op Verwerken door een beheerder op /machtigingen.
+            if ($viaRef && $note === null && $request->garage_company_id) {
                 $result = $this->process($request, null);
                 $reason .= $result['ok'] ? ', verwerkt' : ', fout: '.$result['reason'];
             }
@@ -276,6 +315,10 @@ class MandateRequestService
             return $this->fail($request, 'Het formulier is nog niet ingevuld.', $request->status);
         }
 
+        if (! self::truthy($payload['akkoord'] ?? null)) {
+            return $this->fail($request, 'Akkoord ontbreekt');
+        }
+
         $iban = SepaTools::normalizeIban((string) $request->iban);
         if ($iban === '') {
             return $this->fail($request, 'IBAN ontbreekt.');
@@ -295,6 +338,16 @@ class MandateRequestService
             $personName = $person ? trim(((string) $person->voornaam).' '.((string) $person->achternaam)) : '';
             $val = fn (string $key) => trim((string) ($payload[$key] ?? ''));
             $pick = fn (string $key, ?string $fallback) => $val($key) !== '' ? $val($key) : (string) ($fallback ?? '');
+
+            // Vorige actieve IBAN onthouden (ontsleuteld via de cast) om een wijziging te kunnen melden.
+            $previousIbans = SepaMandate::query()
+                ->where('garage_company_id', $company->id)
+                ->where('status', SepaMandateStatus::Actief)
+                ->get()
+                ->map(fn (SepaMandate $m) => SepaTools::normalizeIban((string) $m->iban))
+                ->filter()
+                ->unique()
+                ->values();
 
             $revoked = SepaMandate::query()
                 ->where('garage_company_id', $company->id)
@@ -353,6 +406,20 @@ class MandateRequestService
                         .($revoked ? ' Vorig actief mandaat ingetrokken.' : ''),
                     'created_by' => $creator,
                 ]);
+
+                $changed = $previousIbans->reject(fn (string $old) => $old === $iban);
+                if ($changed->isNotEmpty()) {
+                    // Ook de bel voor beheerders toont dit signaal (titel "IBAN gewijzigd").
+                    Activity::create([
+                        'garage_company_id' => $company->id,
+                        'type' => ActivityType::Mandate,
+                        'titel' => 'IBAN gewijzigd',
+                        'inhoud' => 'Let op: het nieuwe mandaat '.$mandate->mandaat_id.' heeft een ander IBAN dan het vorige actieve mandaat. '
+                            .'Oud: eindigend op '.$changed->map(fn ($old) => SepaTools::lastFour($old))->implode(', ')
+                            .'. Nieuw: eindigend op '.SepaTools::lastFour($iban).'. Controleer of de klant dit zelf heeft gewijzigd.',
+                        'created_by' => $creator,
+                    ]);
+                }
             }
 
             return $mandate;

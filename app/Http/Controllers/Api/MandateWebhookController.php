@@ -18,7 +18,9 @@ class MandateWebhookController extends Controller
     public function __invoke(Request $request, MandateRequestService $service): JsonResponse
     {
         try {
-            if (! MandateRequestService::available()) {
+            if (strlen((string) $request->getContent()) > 65536 || count($request->all(), COUNT_RECURSIVE) > 300) {
+                Log::warning('Machtiging webhook: inzending te groot, genegeerd.');
+            } elseif (! MandateRequestService::available()) {
                 Log::warning('Machtiging webhook: tabel sepa_mandate_requests ontbreekt (migratie nog niet gedraaid).');
             } else {
                 $result = $service->ingest($request->except(['token']));

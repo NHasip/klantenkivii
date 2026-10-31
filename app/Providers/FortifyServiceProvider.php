@@ -8,7 +8,10 @@ use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Laravel\Fortify\Contracts\FailedPasswordResetLinkRequestResponse;
+use Laravel\Fortify\Contracts\SuccessfulPasswordResetLinkRequestResponse;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -23,7 +26,20 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Wachtwoord vergeten: altijd dezelfde melding, of het e-mailadres nu bestaat of niet.
+        $neutral = fn () => new class implements FailedPasswordResetLinkRequestResponse, SuccessfulPasswordResetLinkRequestResponse
+        {
+            public function toResponse($request)
+            {
+                $message = 'Als dit e-mailadres bij ons bekend is, ontvang je binnen enkele minuten een e-mail met een link om je wachtwoord opnieuw in te stellen.';
+
+                return $request->wantsJson()
+                    ? new JsonResponse(['message' => $message], 200)
+                    : back()->with('status', $message);
+            }
+        };
+        $this->app->singleton(FailedPasswordResetLinkRequestResponse::class, $neutral);
+        $this->app->singleton(SuccessfulPasswordResetLinkRequestResponse::class, $neutral);
     }
 
     /**
@@ -50,6 +66,11 @@ class FortifyServiceProvider extends ServiceProvider
             }
 
             if ($user->isCustomerAccount()) {
+                return null;
+            }
+
+            // Gedeactiveerde accounts kunnen niet inloggen (zelfde generieke foutmelding).
+            if (! $user->active) {
                 return null;
             }
 

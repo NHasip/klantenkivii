@@ -36,14 +36,14 @@ Route::middleware(['auth', 'active', 'admin.2fa'])->group(function () {
     // Engelstalige/gegokte URL vriendelijk doorsturen (moet voor de {garageCompany}-route staan).
     Route::redirect('/garagebedrijven/create', '/garagebedrijven/nieuw');
     Route::post('/garagebedrijven', [GarageCompaniesController::class, 'store'])->name('crm.garage_companies.store');
-    Route::get('/garagebedrijven/export/csv', [GarageCompaniesController::class, 'exportCsv'])->name('crm.garage_companies.export_csv');
+    Route::get('/garagebedrijven/export/csv', [GarageCompaniesController::class, 'exportCsv'])->middleware(['admin', 'throttle:20,1'])->name('crm.garage_companies.export_csv');
     Route::post('/garagebedrijven/bulk/tag', [GarageCompaniesController::class, 'bulkTag'])->name('crm.garage_companies.bulk_tag');
     Route::get('/garagebedrijven/duplicaten', [GarageCompaniesController::class, 'duplicateCheck'])->name('crm.garage_companies.duplicates');
     Route::get('/garagebedrijven/{garageCompany}', [GarageCompaniesController::class, 'show'])->name('crm.garage_companies.show');
     Route::delete('/garagebedrijven/{garageCompany}', [GarageCompaniesController::class, 'destroy'])->name('crm.garage_companies.destroy');
     Route::post('/garagebedrijven/{garageCompany}/restore', [GarageCompaniesController::class, 'restore'])->name('crm.garage_companies.restore');
-    Route::delete('/garagebedrijven/{garageCompany}/force', [GarageCompaniesController::class, 'forceDelete'])->name('crm.garage_companies.force_delete');
-    Route::delete('/garagebedrijven/prullenbak/leegmaken', [GarageCompaniesController::class, 'purgeTrash'])->name('crm.garage_companies.purge_trash');
+    Route::delete('/garagebedrijven/{garageCompany}/force', [GarageCompaniesController::class, 'forceDelete'])->middleware('admin')->name('crm.garage_companies.force_delete');
+    Route::delete('/garagebedrijven/prullenbak/leegmaken', [GarageCompaniesController::class, 'purgeTrash'])->middleware('admin')->name('crm.garage_companies.purge_trash');
     Route::patch('/garagebedrijven/{garageCompany}', [GarageCompaniesController::class, 'updateOverview'])->name('crm.garage_companies.update');
     Route::post('/garagebedrijven/{garageCompany}/contactpersonen', [GarageCompaniesController::class, 'storePerson'])->name('crm.garage_companies.persons.store');
     Route::patch('/garagebedrijven/{garageCompany}/contactpersonen/{person}', [GarageCompaniesController::class, 'updatePerson'])->name('crm.garage_companies.persons.update');
@@ -57,11 +57,12 @@ Route::middleware(['auth', 'active', 'admin.2fa'])->group(function () {
     Route::patch('/garagebedrijven/{garageCompany}/demo/status', [GarageCompaniesController::class, 'setDemoStatus'])->name('crm.garage_companies.demo.status');
     Route::post('/garagebedrijven/{garageCompany}/pauze', [GarageCompaniesController::class, 'pause'])->name('crm.garage_companies.pause');
     Route::post('/garagebedrijven/{garageCompany}/hervat', [GarageCompaniesController::class, 'resume'])->name('crm.garage_companies.resume');
-    Route::post('/garagebedrijven/{garageCompany}/incasso', [GarageCompaniesController::class, 'saveMandate'])->name('crm.garage_companies.mandates.save');
+    Route::post('/garagebedrijven/{garageCompany}/incasso', [GarageCompaniesController::class, 'saveMandate'])->middleware('admin')->name('crm.garage_companies.mandates.save');
     Route::post('/garagebedrijven/{garageCompany}/incasso-instellingen', [GarageCompaniesController::class, 'updateIncassoSettings'])->name('crm.garage_companies.incasso.settings');
     Route::patch('/garagebedrijven/{garageCompany}/incasso/{mandate}', [GarageCompaniesController::class, 'setMandateStatus'])->name('crm.garage_companies.mandates.status');
-    Route::get('/incasso/export', [GarageCompaniesController::class, 'exportIncassoBatch'])->name('crm.incasso.export');
+    Route::get('/incasso/export', [GarageCompaniesController::class, 'exportIncassoBatch'])->middleware(['admin', 'throttle:20,1'])->name('crm.incasso.export');
     Route::get('/incasso/voorbeeld', [GarageCompaniesController::class, 'previewIncassoBatch'])->name('crm.incasso.preview');
+    Route::post('/garagebedrijven/{garageCompany}/incasso/{mandate}/iban', [GarageCompaniesController::class, 'revealIban'])->middleware(['admin', 'throttle:10,1'])->name('crm.garage_companies.mandates.reveal_iban');
     Route::post('/garagebedrijven/{garageCompany}/timeline', [GarageCompaniesController::class, 'addTimelineNote'])->name('crm.garage_companies.timeline.add');
     Route::post('/garagebedrijven/{garageCompany}/taken', [GarageCompaniesController::class, 'addTaskAppointment'])->name('crm.garage_companies.tasks.add');
     Route::patch('/garagebedrijven/{garageCompany}/taken/{activity}', [GarageCompaniesController::class, 'markTaskDone'])->name('crm.garage_companies.tasks.done');

@@ -21,13 +21,14 @@ class LeadWebhookController extends Controller
             'email' => ['required', 'email', 'max:255'],
             'telefoon' => ['nullable', 'string', 'max:50'],
             'plaats' => ['nullable', 'string', 'max:255'],
-            'bericht' => ['nullable', 'string'],
+            'bericht' => ['nullable', 'string', 'max:5000'],
             'bron' => ['nullable', Rule::enum(GarageCompanySource::class)],
         ], [
             'bedrijfsnaam.required' => 'Bedrijfsnaam ontbreekt.',
             'contactnaam.required' => 'Naam ontbreekt.',
             'email.required' => 'E-mailadres ontbreekt.',
             'email.email' => 'E-mailadres is ongeldig.',
+            'bericht.max' => 'Het bericht is te lang (maximaal 5000 tekens).',
         ]);
 
         $company = app(LeadIngestor::class)->ingest($data, 'webhook');

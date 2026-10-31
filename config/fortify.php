@@ -101,7 +101,7 @@ return [
     |
     */
 
-    'middleware' => ['web'],
+    'middleware' => ['web', \App\Http\Middleware\EnsureUserIsActive::class],
 
     /*
     |--------------------------------------------------------------------------

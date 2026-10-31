@@ -11,6 +11,7 @@ use App\Models\GarageCompany;
 use App\Models\GarageCompanyModule;
 use App\Models\Module;
 use App\Models\SepaMandate;
+use App\Services\Sepa\SepaTools;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -186,7 +187,7 @@ class Create extends Component
                 'garage_company_id' => $company->id,
                 'type' => ActivityType::Mandate,
                 'titel' => 'SEPA mandaat vastgelegd (pending)',
-                'inhoud' => "IBAN: {$data['iban']}",
+                'inhoud' => SepaTools::endingText((string) $data['iban']),
                 'created_by' => auth()->id(),
             ]);
 

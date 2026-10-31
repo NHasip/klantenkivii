@@ -33,12 +33,13 @@ return Application::configure(basePath: dirname(__DIR__))
                 return;
             }
 
+            // Korte regel zonder trace of exception-tekst (daarin kunnen requestgegevens staan).
+            // De volledige details staan in het Laravel-log via de standaard reporter.
             error_log(sprintf(
-                "[kivii][livewire] %s in %s:%d\n%s",
-                $e->getMessage(),
-                $e->getFile(),
+                '[kivii][livewire] %s in %s:%d',
+                get_class($e),
+                basename($e->getFile()),
                 $e->getLine(),
-                $e->getTraceAsString(),
             ));
         });
     })->create();

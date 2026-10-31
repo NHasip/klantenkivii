@@ -279,6 +279,36 @@ class Bell extends Component
             }
         }
 
+        // 8. IBAN gewijzigd (admin): een nieuw mandaat verving een actief mandaat met een ander IBAN (afgelopen 14 dagen).
+        if (auth()->user()?->isAdmin()) {
+            $ibanChanges = Activity::query()
+                ->where('type', ActivityType::Mandate->value)
+                ->where('titel', 'IBAN gewijzigd')
+                ->where('created_at', '>=', $now->copy()->subDays(14))
+                ->whereHas('garageCompany');
+            $ibanCount = (clone $ibanChanges)->count();
+            if ($ibanCount > 0) {
+                $signals[] = [
+                    'key' => 'iban_gewijzigd',
+                    'title' => 'IBAN gewijzigd',
+                    'count' => $ibanCount,
+                    'link' => null,
+                    'linkLabel' => null,
+                    'items' => $ibanChanges->with('garageCompany:id,bedrijfsnaam')->latest()->limit(5)
+                        ->get(['id', 'garage_company_id', 'inhoud', 'created_at'])
+                        ->map(fn (Activity $activity) => [
+                            'label' => $activity->garageCompany?->bedrijfsnaam ?? 'Klant',
+                            'meta' => 'Controleer of dit klopt · '.$activity->created_at?->format('d-m-Y H:i'),
+                            'url' => route('crm.garage_companies.show', ['garageCompany' => $activity->garage_company_id, 'tab' => 'abonnement']),
+                            'overdue' => false,
+                            'at' => $activity->created_at?->toIso8601String(),
+                            'avatar' => $activity->garageCompany?->bedrijfsnaam,
+                            'sub' => null,
+                        ])->all(),
+                ];
+            }
+        }
+
         return $signals;
     }
 }

@@ -118,6 +118,18 @@ class WebAuthnService
         ];
     }
 
+    /** Opties zonder bekende credentials (onbekend account): zelfde vorm als echte opties. */
+    public function decoyAuthenticationOptions(Request $request): array
+    {
+        return [
+            'challenge' => Base64Url::encode(random_bytes(32)),
+            'timeout' => 60000,
+            'rpId' => $this->rpId($request),
+            'userVerification' => $this->userVerification(),
+            'allowCredentials' => [],
+        ];
+    }
+
     public function verifyAuthentication(Request $request, User $user, array $credential): Passkey
     {
         $expectedChallenge = (string) $request->session()->get($this->authenticationChallengeKey($user->id), '');
@@ -218,6 +230,7 @@ class WebAuthnService
         if (($flags & 0x01) === 0) {
             throw ValidationException::withMessages(['passkey' => 'User Presence ontbreekt in authData.']);
         }
+        $this->assertUserVerified($flags);
 
         if (($flags & 0x40) === 0) {
             throw ValidationException::withMessages(['passkey' => 'Attested credential data ontbreekt.']);
@@ -263,10 +276,21 @@ class WebAuthnService
         if (($flags & 0x01) === 0) {
             throw ValidationException::withMessages(['passkey' => 'User Presence ontbreekt in assertion.']);
         }
+        $this->assertUserVerified($flags);
 
         $signCount = unpack('N', substr($authData, 33, 4))[1];
 
         return ['sign_count' => (int) $signCount];
+    }
+
+    /** Bij user_verification "required" moet de UV-vlag (bit 2) gezet zijn: pincode, vingerafdruk of gezicht. */
+    private function assertUserVerified(int $flags): void
+    {
+        if ($this->userVerification() === 'required' && ($flags & 0x04) === 0) {
+            throw ValidationException::withMessages([
+                'passkey' => 'Bevestig de passkey met je pincode, vingerafdruk of gezichtsherkenning.',
+            ]);
+        }
     }
 
     private function assertRpIdHash(string $authData, string $rpId): void
@@ -317,12 +341,13 @@ class WebAuthnService
             return $configured;
         }
 
-        $host = (string) parse_url($request->getSchemeAndHttpHost(), PHP_URL_HOST);
-        if ($host !== '') {
-            return $host;
+        // Niet uit de Host-header afleiden (te manipuleren): eerst APP_URL, alleen zonder APP_URL de request-host.
+        $appHost = (string) parse_url((string) config('app.url', ''), PHP_URL_HOST);
+        if ($appHost !== '') {
+            return $appHost;
         }
 
-        return (string) parse_url((string) config('app.url', ''), PHP_URL_HOST);
+        return (string) parse_url($request->getSchemeAndHttpHost(), PHP_URL_HOST);
     }
 
     /**
@@ -342,10 +367,17 @@ class WebAuthnService
             }
         }
 
-        $origins[] = rtrim($request->getSchemeAndHttpHost(), '/');
-        $appUrl = trim((string) config('app.url', ''));
-        if ($appUrl !== '') {
-            $origins[] = rtrim($appUrl, '/');
+        if ($origins === []) {
+            // Niet uit de Host-header: standaard alleen de origin van APP_URL.
+            $appUrl = trim((string) config('app.url', ''));
+            $scheme = (string) parse_url($appUrl, PHP_URL_SCHEME);
+            $host = (string) parse_url($appUrl, PHP_URL_HOST);
+            $port = parse_url($appUrl, PHP_URL_PORT);
+            if ($scheme !== '' && $host !== '') {
+                $origins[] = $scheme.'://'.$host.($port ? ':'.$port : '');
+            } else {
+                $origins[] = rtrim($request->getSchemeAndHttpHost(), '/');
+            }
         }
 
         return array_values(array_unique($origins));
@@ -353,9 +385,9 @@ class WebAuthnService
 
     private function userVerification(): string
     {
-        $mode = (string) config('security.passkeys.user_verification', 'preferred');
+        $mode = (string) config('security.passkeys.user_verification', 'required');
         if (! in_array($mode, ['required', 'preferred', 'discouraged'], true)) {
-            return 'preferred';
+            return 'required';
         }
 
         return $mode;

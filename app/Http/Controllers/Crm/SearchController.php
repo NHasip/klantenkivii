@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Crm;
 
 use App\Models\GarageCompany;
-use App\Models\SepaMandate;
+use App\Services\Sepa\SepaTools;
 use App\Models\Task;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -31,17 +31,8 @@ class SearchController
         $compact = preg_replace('/[\s\.\-]+/', '', $term) ?? $term;
         $compactLike = '%'.addcslashes(Str::upper($compact), '%_\\').'%';
 
-        // IBAN (exact of gedeeltelijk, spaties genegeerd) via mandaten.
-        $ibanCompanyIds = [];
-        if (mb_strlen($compact) >= 4) {
-            $ibanCompanyIds = SepaMandate::query()
-                ->whereRaw("UPPER(REPLACE(iban, ' ', '')) LIKE ?", [$compactLike])
-                ->limit(50)
-                ->pluck('garage_company_id')
-                ->unique()
-                ->values()
-                ->all();
-        }
+        // IBAN: de IBAN staat versleuteld. Volledige IBAN zoeken via hash, 4 cijfers via de laatste 4.
+        $ibanCompanyIds = array_slice(SepaTools::mandateCompanyIdsForSearch($term), 0, 50);
 
         $companies = GarageCompany::query()
             ->with('primaryPerson')

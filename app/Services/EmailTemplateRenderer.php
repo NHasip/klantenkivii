@@ -13,7 +13,7 @@ class EmailTemplateRenderer
     {
         return [
             'subject' => self::renderString($template->subject ?? '', $data),
-            'html' => self::renderString($template->body_html ?? '', $data),
+            'html' => self::renderHtml($template->body_html ?? '', $data),
             'text' => self::renderString($template->body_text ?? '', $data),
         ];
     }
@@ -21,16 +21,31 @@ class EmailTemplateRenderer
     /**
      * @param  array<string, string>  $data
      */
-    public static function renderString(string $content, array $data): string
+    public static function renderString(string $content, array $data, bool $escape = false): string
     {
         $output = $content;
         foreach ($data as $key => $value) {
             $value = (string) $value;
-            $pattern = '/{{\\s*'.preg_quote($key, '/').'\\s*}}/u';
-            $output = preg_replace($pattern, $value, $output) ?? $output;
+            if ($escape) {
+                // Ook URL-variabelen (machtigingslink, activatielink, weblink): e() is veilig in href-attributen.
+                $value = e($value);
+            }
+            $pattern = '/{{\\s*'.preg_quote((string) $key, '/').'\\s*}}/u';
+            // Callback: geen interpretatie van $1 of \1 in de ingevulde waarde.
+            $output = preg_replace_callback($pattern, static fn () => $value, $output) ?? $output;
         }
 
         return $output;
+    }
+
+    /**
+     * Voor HTML-mailbodies: waarden worden HTML-ge-escaped. Onderwerp en platte tekst gebruiken renderString.
+     *
+     * @param  array<string, string>  $data
+     */
+    public static function renderHtml(string $content, array $data): string
+    {
+        return self::renderString($content, $data, true);
     }
 
     /**

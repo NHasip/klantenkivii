@@ -662,7 +662,8 @@ export default function Show({
             postcode: mandate.postcode || '',
             plaats: mandate.plaats || '',
             land: mandate.land || 'Nederland',
-            iban: mandate.iban || '',
+            // Nooit het volledige IBAN voorinvullen: leeg = huidig IBAN behouden.
+            iban: '',
             bic: mandate.bic || '',
             email: mandate.email || '',
             telefoonnummer: mandate.telefoonnummer || '',
@@ -1197,8 +1198,10 @@ export default function Show({
                             onSubmitMandate: submitMandate,
                             onChangeMandateStatus: changeMandateStatus,
                             mandateBusyId,
+                            canManageMandates: Boolean(urls.save_mandate),
+                            revealIbanUrl: urls.reveal_iban || null,
                         }}
-                        exportProps={{ form: exportForm, maandOpties: MAAND_OPTIES, jaarOpties, onExport: exportIncasso }}
+                        exportProps={{ form: exportForm, maandOpties: MAAND_OPTIES, jaarOpties, onExport: exportIncasso, canExport: Boolean(urls.export_incasso_batch) }}
                         mandateRequestProps={{
                             requests: asList(mandateRequests?.requests),
                             config: mandateRequests?.config,

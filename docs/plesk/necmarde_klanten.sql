@@ -330,16 +330,8 @@ CREATE TABLE IF NOT EXISTS `reminders` (
   CONSTRAINT `reminders_activity_id_foreign` FOREIGN KEY (`activity_id`) REFERENCES `activities` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/* Basis data (admin + modules) */
-
-INSERT INTO `users` (`name`, `email`, `password`, `role`, `active`, `created_at`, `updated_at`)
-VALUES ('Kivii Admin', 'admin@kivii.local', '$2y$12$jOPP6LZanOyT4/FK8W5aOuxq6MRRo/xVM8Jh0eRR.h.2BPyH1eEmi', 'admin', 1, NOW(), NOW())
-ON DUPLICATE KEY UPDATE
-  `name` = VALUES(`name`),
-  `password` = VALUES(`password`),
-  `role` = VALUES(`role`),
-  `active` = VALUES(`active`),
-  `updated_at` = VALUES(`updated_at`);
+/* Basis data (modules). Geen gebruikers in deze dump: maak de eerste beheerder aan met
+   php artisan tinker of via de registratie, met een eigen sterk wachtwoord. */
 
 INSERT IGNORE INTO `modules` (`naam`, `omschrijving`, `default_visible`, `created_at`, `updated_at`) VALUES
 ('Basis', 'Basis abonnement', 1, NOW(), NOW()),

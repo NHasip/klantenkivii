@@ -29,7 +29,7 @@ return [
     |
     */
 
-    'middleware' => ['web'],
+    'middleware' => ['web', \App\Http\Middleware\EnsureUserIsActive::class],
 
     'auth_session' => AuthenticateSession::class,
 
@@ -62,7 +62,7 @@ return [
         // Features::profilePhotos(),
         // Features::api(),
         // Features::teams(['invitations' => true]),
-        Features::accountDeletion(),
+        // Features::accountDeletion(), // uitgeschakeld: accounts worden alleen door een beheerder verwijderd.
     ],
 
     /*

@@ -82,7 +82,7 @@ class ImportController extends Controller
                     'url' => route('crm.garage_companies.show', ['garageCompany' => $company->id]),
                 ];
             } catch (\Throwable $e) {
-                Log::warning('Klantimport: rij mislukt', ['rij' => $row['index'] + 1, 'fout' => $e->getMessage()]);
+                Log::warning('Klantimport: rij mislukt', ['rij' => $row['index'] + 1, 'fout' => get_class($e), 'code' => $e->getCode()]);
                 $row['status'] = 'fout';
                 $row['messages'] = ['Opslaan mislukt. Er is niets aangemaakt voor deze rij.'];
             }

@@ -26,6 +26,8 @@ use App\Services\Crm\RevenueCalculator;
 use App\Services\EmailTemplateRenderer;
 use App\Services\IncassoProrataCalculator;
 use App\Services\Mail\MicrosoftGraphMailer;
+use App\Services\Sepa\SepaTools;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -122,14 +124,16 @@ class GarageCompaniesController
 
         if ($filters['search'] !== '') {
             $search = $filters['search'];
-            $filterQuery->where(function ($q) use ($search) {
+            // IBAN: volledige IBAN via hash, 4 cijfers via laatste 4 (de IBAN zelf staat versleuteld).
+            $ibanCompanyIds = SepaTools::mandateCompanyIdsForSearch($search);
+            $filterQuery->where(function ($q) use ($search, $ibanCompanyIds) {
                 $q->where('bedrijfsnaam', 'like', '%'.$search.'%')
                     ->orWhere('hoofd_email', 'like', '%'.$search.'%')
                     ->orWhere('hoofd_telefoon', 'like', '%'.$search.'%')
                     ->orWhere('plaats', 'like', '%'.$search.'%')
                     ->orWhere('status', 'like', '%'.$search.'%')
                     ->orWhereHas('customerPersons', fn ($p) => $p->where('email', 'like', '%'.$search.'%'))
-                    ->orWhereHas('mandates', fn ($m) => $m->where('iban', 'like', '%'.$search.'%'));
+                    ->when($ibanCompanyIds !== [], fn ($qq) => $qq->orWhereIn('id', $ibanCompanyIds));
             });
         }
 
@@ -231,7 +235,7 @@ class GarageCompaniesController
             'restore_url' => $view === 'prullenbak'
                 ? route('crm.garage_companies.restore', ['garageCompany' => $company->id])
                 : null,
-            'force_delete_url' => $view === 'prullenbak'
+            'force_delete_url' => $view === 'prullenbak' && auth()->user()?->isAdmin()
                 ? route('crm.garage_companies.force_delete', ['garageCompany' => $company->id])
                 : null,
         ]);
@@ -250,10 +254,11 @@ class GarageCompaniesController
             'urls' => [
                 'index' => route('crm.garage_companies.index'),
                 'create' => route('crm.garage_companies.create'),
-                'purge_trash' => route('crm.garage_companies.purge_trash'),
-                'export_incasso_batch' => route('crm.incasso.export'),
+                // Alleen beheerders: knoppen verdwijnen voor medewerkers (routes hebben ook admin-middleware).
+                'purge_trash' => auth()->user()?->isAdmin() ? route('crm.garage_companies.purge_trash') : null,
+                'export_incasso_batch' => auth()->user()?->isAdmin() ? route('crm.incasso.export') : null,
                 'preview_incasso_batch' => route('crm.incasso.preview'),
-                'export_csv' => route('crm.garage_companies.export_csv'),
+                'export_csv' => auth()->user()?->isAdmin() ? route('crm.garage_companies.export_csv') : null,
                 'bulk_tag' => route('crm.garage_companies.bulk_tag'),
             ],
         ]);
@@ -530,7 +535,7 @@ class GarageCompaniesController
                     'garage_company_id' => $company->id,
                     'type' => ActivityType::Mandate,
                     'titel' => 'SEPA mandaat vastgelegd (pending)',
-                    'inhoud' => "IBAN: {$data['iban']}",
+                    'inhoud' => SepaTools::endingText((string) $data['iban']),
                     'created_by' => auth()->id(),
                 ]);
             }
@@ -584,6 +589,7 @@ class GarageCompaniesController
         };
 
         $filename = 'klanten-'.now()->format('Y-m-d').'.csv';
+        Log::info('Export: klanten-CSV', ['user_id' => $request->user()?->id, 'user' => $request->user()?->email, 'aantal' => $companies->count(), 'tijd' => now()->toIso8601String()]);
 
         return response()->streamDownload(function () use ($companies, $labels, $safe) {
             $out = fopen('php://output', 'w');
@@ -1001,7 +1007,10 @@ class GarageCompaniesController
                 'postcode' => $mandate->postcode,
                 'plaats' => $mandate->plaats,
                 'land' => $mandate->land,
-                'iban' => $mandate->iban,
+                // Nooit de volledige IBAN in de props: beheerders kunnen hem apart opvragen (revealIban).
+                'iban' => null,
+                'iban_masked' => $mandate->maskedIban(),
+                'iban_last4' => SepaTools::lastFour((string) $mandate->iban),
                 'bic' => $mandate->bic,
                 'email' => $mandate->email,
                 'telefoonnummer' => $mandate->telefoonnummer,
@@ -1237,9 +1246,10 @@ class GarageCompaniesController
                 'set_demo_status' => route('crm.garage_companies.demo.status', ['garageCompany' => $garageCompany->id]),
                 'pause' => route('crm.garage_companies.pause', ['garageCompany' => $garageCompany->id]),
                 'resume' => route('crm.garage_companies.resume', ['garageCompany' => $garageCompany->id]),
-                'save_mandate' => route('crm.garage_companies.mandates.save', ['garageCompany' => $garageCompany->id]),
+                'save_mandate' => auth()->user()?->isAdmin() ? route('crm.garage_companies.mandates.save', ['garageCompany' => $garageCompany->id]) : null,
+                'reveal_iban' => auth()->user()?->isAdmin() ? route('crm.garage_companies.mandates.reveal_iban', ['garageCompany' => $garageCompany->id, 'mandate' => '__MANDATE__']) : null,
                 'save_incasso_settings' => route('crm.garage_companies.incasso.settings', ['garageCompany' => $garageCompany->id]),
-                'export_incasso_batch' => route('crm.incasso.export'),
+                'export_incasso_batch' => auth()->user()?->isAdmin() ? route('crm.incasso.export') : null,
                 'preview_incasso_batch' => route('crm.incasso.preview'),
                 'set_mandate_status' => route('crm.garage_companies.mandates.status', ['garageCompany' => $garageCompany->id, 'mandate' => '__MANDATE__']),
                 'add_note' => route('crm.garage_companies.timeline.add', ['garageCompany' => $garageCompany->id]),
@@ -1299,6 +1309,7 @@ class GarageCompaniesController
 
         $naam = $company->bedrijfsnaam;
         $company->delete();
+        Log::info('Klant definitief verwijderd', ['company_id' => $garageCompany, 'user_id' => auth()->id(), 'tijd' => now()->toIso8601String()]);
 
         return redirect()
             ->route('crm.garage_companies.index', ['view' => 'prullenbak'])
@@ -1930,7 +1941,8 @@ class GarageCompaniesController
             'postcode' => ['required', 'string', 'max:20'],
             'plaats' => ['required', 'string', 'max:255'],
             'land' => ['required', 'string', 'max:255'],
-            'iban' => ['required', 'string', 'max:34'],
+            // Bij bewerken mag IBAN leeg blijven: dan blijft de bestaande (versleutelde) IBAN staan.
+            'iban' => [$request->filled('mandate_id') ? 'nullable' : 'required', 'string', 'max:42'],
             'bic' => ['nullable', 'string', 'max:11'],
             'email' => ['required', 'email', 'max:255'],
             'telefoonnummer' => ['required', 'string', 'max:50'],
@@ -1958,6 +1970,22 @@ class GarageCompaniesController
             $existingMandate = SepaMandate::query()
                 ->where('garage_company_id', $garageCompany->id)
                 ->findOrFail($mandateId);
+        }
+
+        $newIban = SepaTools::normalizeIban((string) ($data['iban'] ?? ''));
+        if ($newIban === '') {
+            unset($data['iban']);
+        } elseif (! preg_match('/^[A-Z]{2}[0-9]{2}[A-Z0-9]{10,30}$/', $newIban)) {
+            return back()->withErrors(['iban' => 'Dit lijkt geen geldig IBAN, bijvoorbeeld NL91ABNA0417164300.'])->withInput();
+        } else {
+            $data['iban'] = $newIban;
+        }
+        $oldIban = $existingMandate ? SepaTools::normalizeIban((string) $existingMandate->iban) : '';
+        if ($oldIban === '' && $data['status'] === SepaMandateStatus::Actief->value) {
+            $oldIban = SepaTools::normalizeIban((string) SepaMandate::query()
+                ->where('garage_company_id', $garageCompany->id)
+                ->where('status', SepaMandateStatus::Actief)
+                ->latest('id')->first()?->iban);
         }
 
         if ($data['status'] === SepaMandateStatus::Actief->value) {
@@ -2023,6 +2051,17 @@ class GarageCompaniesController
             'created_by' => auth()->id(),
         ]);
 
+        if ($newIban !== '' && $oldIban !== '' && $oldIban !== $newIban) {
+            Activity::create([
+                'garage_company_id' => $garageCompany->id,
+                'type' => ActivityType::Mandate,
+                'titel' => 'IBAN gewijzigd',
+                'inhoud' => 'IBAN gewijzigd van eindigend op '.SepaTools::lastFour($oldIban).' naar eindigend op '.SepaTools::lastFour($newIban)
+                    .' (mandaat '.$mandate->mandaat_id.', door '.(auth()->user()?->name ?? 'onbekend').').',
+                'created_by' => auth()->id(),
+            ]);
+        }
+
         $statusMessage = 'Mandaat opgeslagen.';
         if ($incassoStatusExtra) {
             $statusMessage .= ' '.$incassoStatusExtra;
@@ -2061,6 +2100,27 @@ class GarageCompaniesController
         ]);
 
         return back()->with('status', 'Mandaat status bijgewerkt.');
+    }
+
+    /**
+     * Volledige IBAN tonen (alleen beheerders, route is gethrottled). Elke weergave komt in de tijdlijn.
+     */
+    public function revealIban(Request $request, GarageCompany $garageCompany, SepaMandate $mandate): JsonResponse
+    {
+        abort_unless($request->user()?->isAdmin(), 403);
+        abort_unless($mandate->garage_company_id === $garageCompany->id, 404);
+
+        $iban = SepaTools::normalizeIban((string) $mandate->iban);
+
+        Activity::create([
+            'garage_company_id' => $garageCompany->id,
+            'type' => ActivityType::Mandate,
+            'titel' => 'Volledig IBAN bekeken',
+            'inhoud' => 'Volledig IBAN bekeken door '.($request->user()->name ?? 'onbekend').' (mandaat '.$mandate->mandaat_id.', '.SepaTools::endingText($iban).').',
+            'created_by' => $request->user()->id,
+        ]);
+
+        return response()->json(['iban' => $iban], 200, ['Cache-Control' => 'no-store, private']);
     }
 
     public function updateIncassoSettings(Request $request, GarageCompany $garageCompany): RedirectResponse
@@ -2301,6 +2361,14 @@ class GarageCompaniesController
 
         $filename = 'ING_Incasso_'.Str::lower($this->dutchMonthName($month)).'_'.$year.'.xlsx';
 
+        Log::info('Export: ING-incassobatch', [
+            'user_id' => $request->user()?->id,
+            'user' => $request->user()?->email,
+            'periode' => $year.'-'.str_pad((string) $month, 2, '0', STR_PAD_LEFT),
+            'aantal' => count($records),
+            'tijd' => now()->toIso8601String(),
+        ]);
+
         return response()->download($outputPath, $filename)->deleteFileAfterSend(true);
     }
 
@@ -2431,7 +2499,7 @@ class GarageCompaniesController
         try {
             $templateData = $this->welcomeTemplateData($garageCompany, true);
             $subject = EmailTemplateRenderer::renderString((string) $draft->subject, $templateData);
-            $bodyHtml = EmailTemplateRenderer::renderString((string) ($draft->body_html ?? ''), $templateData);
+            $bodyHtml = EmailTemplateRenderer::renderHtml((string) ($draft->body_html ?? ''), $templateData);
             $bodyText = EmailTemplateRenderer::renderString((string) ($draft->body_text ?? ''), $templateData);
             if (trim($bodyText) === '') {
                 $bodyText = $this->htmlToText($bodyHtml);
@@ -2462,7 +2530,8 @@ class GarageCompaniesController
                 'last_error' => mb_substr($e->getMessage(), 0, 2000),
             ]);
 
-            $human = EmailLogController::humanError($e->getMessage()) ?? $e->getMessage();
+            // Bekende fouten krijgen een uitleg; de technische details staan alleen in het log en de e-maillog.
+            $human = EmailLogController::humanError($e->getMessage()) ?? 'Er ging iets mis bij het versturen. Probeer het later opnieuw of bekijk de e-maillog.';
 
             return back()->with('status', 'Versturen mislukt: '.$human);
         }

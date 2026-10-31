@@ -55,6 +55,52 @@ class SepaTools
         return substr($iban, 0, 2).'** **** **** **** '.substr($iban, -4);
     }
 
+    /**
+     * Zoekbare, niet-omkeerbare vingerafdruk van een IBAN (HMAC-SHA256 met een sleutel afgeleid van APP_KEY).
+     * Leeg resultaat bij lege IBAN.
+     */
+    public static function ibanHash(?string $iban): ?string
+    {
+        $iban = self::normalizeIban((string) $iban);
+        if ($iban === '') {
+            return null;
+        }
+        $key = hash_hmac('sha256', 'kivii-sepa-iban-hash-v1', (string) config('app.key'), true);
+
+        return hash_hmac('sha256', $iban, $key);
+    }
+
+    /** Alleen de laatste 4 tekens tonen, bijvoorbeeld "IBAN eindigend op 4300". */
+    public static function endingText(?string $iban): string
+    {
+        $last4 = self::lastFour($iban);
+
+        return $last4 ? 'IBAN eindigend op '.$last4 : 'IBAN onbekend';
+    }
+
+    /**
+     * Klant-ids van mandaten die bij een zoekterm horen: volledige IBAN via hash, 4 tekens via laatste 4.
+     *
+     * @return list<int>
+     */
+    public static function mandateCompanyIdsForSearch(string $term): array
+    {
+        if (! Schema::hasColumn('sepa_mandates', 'iban_hash')) {
+            return [];
+        }
+        $compact = self::normalizeIban($term);
+        if (preg_match('/^[A-Z]{2}[0-9]{2}[A-Z0-9]{10,30}$/', $compact)) {
+            return SepaMandate::query()->where('iban_hash', self::ibanHash($compact))
+                ->pluck('garage_company_id')->map(fn ($id) => (int) $id)->unique()->values()->all();
+        }
+        if (preg_match('/^[0-9]{4}$/', $compact)) {
+            return SepaMandate::query()->where('iban_last4', $compact)
+                ->pluck('garage_company_id')->map(fn ($id) => (int) $id)->unique()->values()->all();
+        }
+
+        return [];
+    }
+
     public static function lastFour(?string $iban): ?string
     {
         $iban = self::normalizeIban((string) $iban);

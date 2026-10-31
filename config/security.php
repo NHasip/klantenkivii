@@ -14,6 +14,6 @@ return [
         'rp_name' => env('PASSKEYS_RP_NAME', env('APP_NAME', 'Kivii CRM')),
         'rp_id' => env('PASSKEYS_RP_ID'),
         'origins' => array_filter(array_map('trim', explode(',', (string) env('PASSKEYS_ALLOWED_ORIGINS', '')))),
-        'user_verification' => env('PASSKEYS_USER_VERIFICATION', 'preferred'),
+        'user_verification' => env('PASSKEYS_USER_VERIFICATION', 'required'),
     ],
 ];

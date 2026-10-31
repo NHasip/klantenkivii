@@ -31,10 +31,10 @@ class PasskeyLoginController extends Controller
             ->with('passkeys')
             ->first();
 
-        if (! $user || $user->passkeys->isEmpty()) {
-            throw ValidationException::withMessages([
-                'email' => 'Voor dit account is geen passkey beschikbaar.',
-            ]);
+        // Neutraal: onbekend e-mailadres of geen passkey geeft dezelfde soort respons (geen allowCredentials),
+        // zodat niet af te leiden is welke accounts bestaan.
+        if (! $user || $user->passkeys->isEmpty() || $user->isCustomerAccount()) {
+            return response()->json($webAuthn->decoyAuthenticationOptions($request));
         }
 
         return response()->json($webAuthn->authenticationOptions($request, $user));
@@ -59,9 +59,9 @@ class PasskeyLoginController extends Controller
             ->with('passkeys')
             ->first();
 
-        if (! $user || $user->isCustomerAccount()) {
+        if (! $user || $user->isCustomerAccount() || $user->passkeys->isEmpty()) {
             throw ValidationException::withMessages([
-                'email' => 'Gebruiker niet gevonden.',
+                'email' => 'Inloggen met een passkey is niet gelukt. Probeer het opnieuw of log in met je wachtwoord.',
             ]);
         }
 
