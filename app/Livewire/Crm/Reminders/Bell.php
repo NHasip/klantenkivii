@@ -64,7 +64,7 @@ class Bell extends Component
         $userId = (int) auth()->id();
 
         try {
-            return Cache::remember('crm-bell-signals:v2:'.$userId, 60, fn () => $this->buildSignals($userId));
+            return Cache::remember('crm-bell-signals:v3:'.$userId, 60, fn () => $this->buildSignals($userId));
         } catch (Throwable $e) {
             report($e);
 
@@ -186,6 +186,52 @@ class Bell extends Component
                 'linkLabel' => 'Naar klantenlijst',
                 'items' => [],
             ];
+        }
+
+        // 5. Machtigingen via kivii.nl: nieuw ontvangen (7 dagen) en nog te koppelen/verwerken.
+        if (\App\Services\Sepa\MandateRequestService::available()) {
+            $isAdmin = (bool) auth()->user()?->isAdmin();
+            $overview = $isAdmin ? route('crm.mandate_requests.index') : null;
+            $received = \App\Models\SepaMandateRequest::query()
+                ->where('status', \App\Models\SepaMandateRequest::STATUS_VERWERKT)
+                ->where('completed_at', '>=', $now->copy()->subDays(7))
+                ->with('garageCompany:id,bedrijfsnaam');
+            $receivedCount = (clone $received)->count();
+            if ($receivedCount > 0) {
+                $signals[] = [
+                    'key' => 'machtiging_ontvangen',
+                    'title' => 'Nieuwe machtiging ontvangen',
+                    'count' => $receivedCount,
+                    'link' => $overview,
+                    'linkLabel' => $overview ? 'Alle machtigingen' : null,
+                    'items' => $received->latest('completed_at')->limit(5)->get()
+                        ->map(fn ($r) => [
+                            'label' => $r->garageCompany?->bedrijfsnaam ?? $r->kenmerk,
+                            'meta' => 'Kenmerk '.$r->kenmerk.' · '.$r->completed_at?->format('d-m-Y H:i'),
+                            'url' => $r->garage_company_id
+                                ? route('crm.garage_companies.show', ['garageCompany' => $r->garage_company_id, 'tab' => 'abonnement'])
+                                : ($overview ?? route('dashboard')),
+                            'overdue' => false,
+                            'at' => $r->completed_at?->toIso8601String(),
+                            'avatar' => $r->garageCompany?->bedrijfsnaam,
+                            'sub' => null,
+                        ])->all(),
+                ];
+            }
+            $pendingCount = \App\Models\SepaMandateRequest::query()
+                ->whereIn('status', [\App\Models\SepaMandateRequest::STATUS_ONTVANGEN, \App\Models\SepaMandateRequest::STATUS_FOUT])
+                ->count();
+            if ($pendingCount > 0) {
+                $signals[] = [
+                    'key' => 'machtiging_koppelen',
+                    'title' => 'Machtiging moet gekoppeld worden',
+                    'count' => $pendingCount,
+                    'link' => $overview,
+                    'linkLabel' => $overview ? 'Naar machtigingen' : null,
+                    'summary' => $pendingCount === 1 ? 'machtiging wacht op koppelen of verwerken' : 'machtigingen wachten op koppelen of verwerken',
+                    'items' => [],
+                ];
+            }
         }
 
         return $signals;

@@ -35,6 +35,14 @@ return [
         'token' => env('LEADS_WEBHOOK_TOKEN'),
     ],
 
+    // Microsoft Graph (client credentials) om machtigingsmails namens info@kivii.nl te versturen.
+    'msgraph' => [
+        'tenant_id' => env('MSGRAPH_TENANT_ID'),
+        'client_id' => env('MSGRAPH_CLIENT_ID'),
+        'client_secret' => env('MSGRAPH_CLIENT_SECRET'),
+        'sender' => env('MSGRAPH_SENDER', 'info@kivii.nl'),
+    ],
+
     'imap' => [
         'host' => env('IMAP_HOST'),
         'port' => env('IMAP_PORT', 993),

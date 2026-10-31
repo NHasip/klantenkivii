@@ -343,6 +343,12 @@ class DashboardController
                 'active_missing_sepa' => $activeSepaIssues->count(),
                 'companies_paused' => $companiesPaused,
                 'pause_expired' => $pauseExpired->count(),
+                'mandates_received_7' => \App\Services\Sepa\MandateRequestService::available()
+                    ? \App\Models\SepaMandateRequest::query()->where('status', 'verwerkt')->where('completed_at', '>=', $now->copy()->subDays(7))->count()
+                    : 0,
+                'mandates_to_link' => \App\Services\Sepa\MandateRequestService::available()
+                    ? \App\Models\SepaMandateRequest::query()->whereIn('status', ['ontvangen', 'fout'])->count()
+                    : 0,
             ],
             'lists' => [
                 'tasks' => $taskItems,
@@ -374,6 +380,7 @@ class DashboardController
                 'tasks' => route('crm.tasks.index'),
                 'customers' => route('crm.garage_companies.index'),
                 'reports' => route('crm.reports.index'),
+                'mandates' => auth()->user()?->isAdmin() ? route('crm.mandate_requests.index') : null,
             ],
             'meta' => [
                 'generated_at' => $now->format('d-m-Y H:i'),

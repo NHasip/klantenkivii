@@ -10,6 +10,7 @@ use App\Models\Activity;
 use App\Models\GarageCompany;
 use App\Models\GarageCompanyModule;
 use App\Models\SepaMandate;
+use App\Services\Sepa\SepaTools;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -32,8 +33,6 @@ class SepaImportController extends Controller
     private const MAX_ROWS = 200;
 
     private const FUZZY_THRESHOLD = 0.8;
-
-    private const LEGAL_FORMS = ['bv', 'vof', 'nv', 'cv'];
 
     /** Vaste aliassen: genormaliseerde naam zonder spaties => mogelijke doelnamen (idem genormaliseerd). */
     private const ALIASES = [
@@ -208,9 +207,7 @@ class SepaImportController extends Controller
         $person = $company->primaryPerson()->first() ?? $company->customerPersons()->orderBy('id')->first();
         $personName = $person ? trim(((string) $person->voornaam).' '.((string) $person->achternaam)) : '';
 
-        do {
-            $mandaatId = 'KIVII-'.$company->id.'-'.Str::upper(Str::random(10));
-        } while (SepaMandate::query()->where('mandaat_id', $mandaatId)->exists());
+        $mandaatId = SepaTools::generateMandaatId($company->id);
 
         $mandate = SepaMandate::create([
             'garage_company_id' => $company->id,
@@ -325,12 +322,8 @@ class SepaImportController extends Controller
             $errors[] = 'IBAN is ongeldig (controlegetal of lengte klopt niet).';
         }
 
-        if ($kenmerk === '') {
-            $errors[] = 'Kenmerk machtiging ontbreekt.';
-        } elseif (mb_strlen($kenmerk) > 35) {
-            $errors[] = 'Kenmerk machtiging is langer dan 35 tekens.';
-        } elseif (! preg_match("~^[0-9A-Za-z /\\-?:().,'+]+$~", $kenmerk)) {
-            $errors[] = "Kenmerk machtiging bevat niet-toegestane tekens (toegestaan: letters, cijfers, spatie en / - ? : ( ) . , ' +).";
+        if ($kenmerkError = SepaTools::kenmerkError($kenmerk)) {
+            $errors[] = $kenmerkError;
         }
 
         $datum = $this->parseDate($datumRaw);
@@ -390,47 +383,22 @@ class SepaImportController extends Controller
 
     public static function normalizeIban(string $iban): string
     {
-        return strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $iban) ?? '');
+        return SepaTools::normalizeIban($iban);
     }
 
     public static function validIban(string $iban): bool
     {
-        if (! preg_match('/^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$/', $iban)) {
-            return false;
-        }
-        if (str_starts_with($iban, 'NL') && strlen($iban) !== 18) {
-            return false;
-        }
-
-        $rearranged = substr($iban, 4).substr($iban, 0, 4);
-        $remainder = 0;
-        foreach (str_split($rearranged) as $char) {
-            $digits = ctype_alpha($char) ? (string) (ord($char) - 55) : $char;
-            foreach (str_split($digits) as $digit) {
-                $remainder = ($remainder * 10 + (int) $digit) % 97;
-            }
-        }
-
-        return $remainder === 1;
+        return SepaTools::validIban($iban);
     }
 
     public static function maskIban(string $iban): string
     {
-        if (strlen($iban) < 6) {
-            return $iban === '' ? '' : '****';
-        }
-
-        return substr($iban, 0, 2).'** **** **** **** '.substr($iban, -4);
+        return SepaTools::maskIban($iban);
     }
 
     public static function normalizeName(string $name): string
     {
-        $name = mb_strtolower(Str::ascii($name));
-        $name = str_replace(['.', "'", '`'], '', $name);
-        $name = preg_replace('/[^a-z0-9]+/', ' ', $name) ?? $name;
-        $tokens = array_filter(explode(' ', trim($name)), fn ($t) => $t !== '' && ! in_array($t, self::LEGAL_FORMS, true));
-
-        return implode(' ', $tokens);
+        return SepaTools::normalizeName($name);
     }
 
     private function loadCompanies(): Collection

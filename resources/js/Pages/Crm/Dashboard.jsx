@@ -451,6 +451,8 @@ export default function Dashboard({ kpis = {}, urls = {}, meta = {}, lists = {} 
                         { key: 'appointments', count: appointmentsOverdue, label: appointmentsOverdue === 1 ? 'verlopen afspraak open' : 'verlopen afspraken open', tone: 'warning', href: '#vandaag' },
                         { key: 'sepa', count: missingSepa, label: 'actief zonder complete SEPA', tone: 'warning', href: '#sepa' },
                         { key: 'pause', count: pauseExpired, label: pauseExpired === 1 ? 'pauze verlopen' : 'pauzes verlopen', tone: 'warning', href: '#pauze' },
+                        { key: 'mandate-link', count: Number(kpis.mandates_to_link) || 0, label: 'machtiging moet gekoppeld worden', tone: 'danger', href: urls.mandates || '#' },
+                        { key: 'mandate-new', count: Number(kpis.mandates_received_7) || 0, label: Number(kpis.mandates_received_7) === 1 ? 'nieuwe machtiging ontvangen' : 'nieuwe machtigingen ontvangen', tone: 'warning', href: urls.mandates || '#' },
                     ]}
                 />
 

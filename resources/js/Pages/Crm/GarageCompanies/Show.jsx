@@ -14,6 +14,7 @@ import SubscriptionTab from './partials/SubscriptionTab';
 import ActivityTab from './partials/ActivityTab';
 import DemoStatusTab from './partials/DemoStatusTab';
 import WelcomeTab from './partials/WelcomeTab';
+import { MandateRequestDialog } from './partials/MandateRequests';
 import {
     CURRENT_DRAFT,
     DATE_ONLY_FIELDS,
@@ -68,6 +69,7 @@ export default function Show({
     emailTemplates,
     smtpConfigured,
     incasso,
+    mandateRequests,
     urls,
 }) {
     const persons = asList(personsProp);
@@ -90,6 +92,10 @@ export default function Show({
     const visibleTabs = showWelcomeTab ? [...TABS, WELCOME_TAB] : TABS;
     const activeTab = visibleTabs.some((item) => item.key === mappedTab) ? mappedTab : 'overzicht';
     const confirm = useConfirm();
+    const [mandateDialog, setMandateDialog] = useState({ open: false, resend: null });
+    const canSendMandate = Boolean(mandateRequests?.config?.available && mandateRequests?.config?.can_send);
+    const openMandateDialog = (resend = null) => setMandateDialog({ open: true, resend });
+    const closeMandateDialog = () => setMandateDialog({ open: false, resend: null });
 
     // Tabwissel zonder serververzoek: alle data staat al in de props.
     const changeTab = (key, anchor = null) => {
@@ -1060,6 +1066,17 @@ export default function Show({
                 pauseForm={pauseForm}
                 onSubmitPause={submitPause}
                 onResume={resumeCompany}
+                onSendMandate={canSendMandate ? () => openMandateDialog() : null}
+            />
+
+            <MandateRequestDialog
+                open={mandateDialog.open}
+                onClose={closeMandateDialog}
+                company={garageCompany}
+                config={mandateRequests?.config}
+                urls={mandateRequests?.urls || {}}
+                templates={asList(emailTemplates)}
+                resendRequest={mandateDialog.resend}
             />
 
             <TabPanel idBase={tabsIdBase} value="overzicht" active={activeTab === 'overzicht'}>
@@ -1157,6 +1174,13 @@ export default function Show({
                             mandateBusyId,
                         }}
                         exportProps={{ form: exportForm, maandOpties: MAAND_OPTIES, jaarOpties, onExport: exportIncasso }}
+                        mandateRequestProps={{
+                            requests: asList(mandateRequests?.requests),
+                            config: mandateRequests?.config,
+                            urls: mandateRequests?.urls || {},
+                            onSend: () => openMandateDialog(),
+                            onResend: (request) => openMandateDialog(request),
+                        }}
                     />
             </TabPanel>
 

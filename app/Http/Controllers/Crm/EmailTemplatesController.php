@@ -103,6 +103,10 @@ class EmailTemplatesController
             'activatielink' => $activatielink,
             'reset_link' => $activatielink,
             'weblink' => 'https://web.kivii.nl/',
+            // Machtigingslink en kenmerk worden pas bij versturen aangemaakt; hier voorbeeldwaarden.
+            'machtigingslink' => EmailTemplateRenderer::mandateLink('VOORBEELDREF', 'KIVII-VOORBEELD', (string) $company->bedrijfsnaam),
+            'kenmerk' => 'KIVII-VOORBEELD',
+            'geldig_tot' => now()->addDays((int) config('crm.mandate_valid_days', 30))->format('d-m-Y'),
         ];
         $escaped = array_map(fn ($value) => e($value), $values);
 

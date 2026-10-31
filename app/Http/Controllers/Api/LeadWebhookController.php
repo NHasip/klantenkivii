@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enums\GarageCompanySource;
+use App\Services\Forms\FormPayloadNormalizer;
 use App\Services\Leads\LeadIngestor;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -45,26 +46,7 @@ class LeadWebhookController extends Controller
      */
     private function normalizeFormPayload(Request $request): void
     {
-        $input = $request->all();
-        $flat = [];
-
-        foreach (['fields', 'form_fields'] as $container) {
-            if (is_array($input[$container] ?? null)) {
-                foreach ($input[$container] as $key => $value) {
-                    if (is_array($value)) {
-                        $label = (string) ($value['id'] ?? $value['title'] ?? $key);
-                        $flat[$label] = $value['value'] ?? ($value['raw_value'] ?? null);
-                    } else {
-                        $flat[(string) $key] = $value;
-                    }
-                }
-            }
-        }
-        foreach ($input as $key => $value) {
-            if (! is_array($value)) {
-                $flat[(string) $key] = $value;
-            }
-        }
+        $flat = FormPayloadNormalizer::flatten($request->all());
 
         $aliases = [
             'bedrijfsnaam' => ['bedrijfsnaam', 'bedrijf', 'company', 'company_name', 'companyname', 'organisatie', 'garage', 'garagenaam', 'your-company'],
@@ -75,21 +57,14 @@ class LeadWebhookController extends Controller
             'bericht' => ['bericht', 'message', 'opmerking', 'opmerkingen', 'vraag', 'your-message'],
         ];
 
-        $lower = [];
-        foreach ($flat as $key => $value) {
-            $lower[strtolower(trim($key))] = is_string($value) ? trim($value) : $value;
-        }
-
         $merge = [];
         foreach ($aliases as $target => $names) {
             if (filled($request->input($target)) && ! is_array($request->input($target))) {
                 continue;
             }
-            foreach ($names as $name) {
-                if (filled($lower[$name] ?? null)) {
-                    $merge[$target] = $lower[$name];
-                    break;
-                }
+            $found = FormPayloadNormalizer::map($flat, [$target => $names]);
+            if (array_key_exists($target, $found)) {
+                $merge[$target] = $found[$target];
             }
         }
 

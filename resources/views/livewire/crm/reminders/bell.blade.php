@@ -5,6 +5,8 @@
         'afspraken' => ['icon' => 'calendar', 'tile' => 'bg-amber-50 text-amber-700'],
         'demos' => ['icon' => 'clock', 'tile' => 'bg-sky-50 text-sky-700'],
         'mandaten' => ['icon' => 'credit-card', 'tile' => 'bg-violet-50 text-violet-700'],
+        'machtiging_ontvangen' => ['icon' => 'file-text', 'tile' => 'bg-emerald-50 text-emerald-700'],
+        'machtiging_koppelen' => ['icon' => 'link', 'tile' => 'bg-rose-50 text-rose-700'],
     ];
     $bellRelative = function ($value) {
         try {
@@ -142,7 +144,7 @@
                         <a href="{{ $signal['link'] }}" class="mx-2 flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-600">
                             <span class="icon-tile h-8 w-8 rounded-lg {{ $bellType['tile'] }}" aria-hidden="true"><x-icon :name="$bellType['icon']" class="h-4 w-4" /></span>
                             <span class="min-w-0 flex-1 text-sm text-zinc-700">
-                                <span class="font-semibold tabular-nums text-zinc-900">{{ $signal['count'] }}</span> {{ $signal['count'] === 1 ? 'klant vraagt' : 'klanten vragen' }} aandacht
+                                <span class="font-semibold tabular-nums text-zinc-900">{{ $signal['count'] }}</span> {{ $signal['summary'] ?? ($signal['count'] === 1 ? 'klant vraagt aandacht' : 'klanten vragen aandacht') }}
                             </span>
                             <x-icon name="chevron-right" class="h-4 w-4 text-zinc-400" />
                         </a>

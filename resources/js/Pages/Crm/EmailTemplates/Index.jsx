@@ -40,6 +40,9 @@ const VARIABLE_META = {
     loginnaam: { label: 'Loginnaam', icon: 'mail' },
     wachtwoord: { label: 'Wachtwoord', icon: 'key' },
     weblink: { label: 'Weblink', icon: 'globe' },
+    machtigingslink: { label: 'Machtigingslink', icon: 'link' },
+    kenmerk: { label: 'Kenmerk machtiging', icon: 'tag' },
+    geldig_tot: { label: 'Geldig tot', icon: 'calendar' },
 };
 
 function variableMeta(token) {

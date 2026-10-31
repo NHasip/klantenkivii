@@ -1217,6 +1217,7 @@ class GarageCompaniesController
             'crmTasks' => $crmTasks,
             'reminderChannels' => collect(ReminderChannel::cases())->map(fn ($c) => $c->value)->values(),
             'hasActiveMandate' => $activeMandate !== null,
+            'mandateRequests' => MandateRequestsController::forCompany($garageCompany),
             'statusErrors' => $this->statusErrors($garageCompany),
             'urls' => [
                 'index' => route('crm.garage_companies.index'),

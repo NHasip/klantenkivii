@@ -81,6 +81,7 @@ export default function CustomerHeader({
     pauseForm,
     onSubmitPause,
     onResume,
+    onSendMandate,
 }) {
     const panelRef = useRef(null);
 
@@ -160,6 +161,12 @@ export default function CustomerHeader({
                                     <Icon name="mail" className="h-4 w-4 text-zinc-500" />
                                     Mailen
                                 </a>
+                            )}
+                            {onSendMandate && (
+                                <button type="button" className={QUICK} onClick={onSendMandate}>
+                                    <Icon name="file-text" className="h-4 w-4 text-zinc-500" />
+                                    Machtiging versturen
+                                </button>
                             )}
                             <button type="button" className={QUICK} onClick={() => togglePanel('note')} aria-expanded={panel === 'note'} aria-controls="header-panel-note">
                                 <Icon name="message-square" className="h-4 w-4 text-zinc-500" />

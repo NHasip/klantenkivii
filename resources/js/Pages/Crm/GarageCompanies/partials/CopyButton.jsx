@@ -7,7 +7,7 @@ export function formatIban(value) {
     return String(value).replace(/\s+/g, '').toUpperCase().replace(/(.{4})/g, '$1 ').trim();
 }
 
-async function copyText(text) {
+export async function copyText(text) {
     if (navigator.clipboard && window.isSecureContext) {
         try {
             await navigator.clipboard.writeText(text);

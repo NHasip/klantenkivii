@@ -4,6 +4,7 @@ use App\Http\Controllers\Crm\DashboardController;
 use App\Http\Controllers\Crm\EmailTemplatesController;
 use App\Http\Controllers\Crm\GarageCompaniesController;
 use App\Http\Controllers\Crm\ImportController;
+use App\Http\Controllers\Crm\MandateRequestsController;
 use App\Http\Controllers\Crm\SepaImportController;
 use App\Http\Controllers\Crm\SearchController;
 use App\Http\Controllers\Crm\TasksController;
@@ -112,6 +113,25 @@ Route::middleware(['auth', 'active', 'admin.2fa'])->group(function () {
     Route::post('/sepa-importeren', [SepaImportController::class, 'store'])
         ->middleware(['admin', 'throttle:10,1'])
         ->name('crm.sepa_import.store');
+
+    Route::get('/machtigingen', [MandateRequestsController::class, 'index'])
+        ->middleware('admin')
+        ->name('crm.mandate_requests.index');
+    Route::post('/garagebedrijven/{garageCompany}/machtigingen', [MandateRequestsController::class, 'store'])
+        ->middleware(['admin', 'throttle:30,1'])
+        ->name('crm.mandate_requests.store');
+    Route::post('/machtigingen/{mandateRequest}/opnieuw', [MandateRequestsController::class, 'resend'])
+        ->middleware(['admin', 'throttle:30,1'])
+        ->name('crm.mandate_requests.resend');
+    Route::post('/machtigingen/{mandateRequest}/intrekken', [MandateRequestsController::class, 'revoke'])
+        ->middleware('admin')
+        ->name('crm.mandate_requests.revoke');
+    Route::post('/machtigingen/{mandateRequest}/koppelen', [MandateRequestsController::class, 'link'])
+        ->middleware('admin')
+        ->name('crm.mandate_requests.link');
+    Route::post('/machtigingen/{mandateRequest}/verwerken', [MandateRequestsController::class, 'process'])
+        ->middleware(['admin', 'throttle:30,1'])
+        ->name('crm.mandate_requests.process');
 
     Route::get('/email-templates', [EmailTemplatesController::class, 'index'])
         ->middleware('admin')

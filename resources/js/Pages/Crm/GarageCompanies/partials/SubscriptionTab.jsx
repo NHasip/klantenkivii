@@ -1,6 +1,7 @@
 import React from 'react';
 import { Badge, Button, Card, CardHeader, EmptyState, Field, FilePicker, IconTile, KeyValue, Stat, cx, inputClasses } from '../../../../components/ui';
 import CopyButton, { formatIban } from './CopyButton';
+import { MandateRequestsCard } from './MandateRequests';
 import {
     CheckboxField,
     FormActions,
@@ -460,11 +461,12 @@ function ExportCard({ form, maandOpties, jaarOpties, onExport }) {
     );
 }
 
-export default function SubscriptionTab({ moduleProps, incassoProps, exportProps }) {
+export default function SubscriptionTab({ moduleProps, incassoProps, exportProps, mandateRequestProps }) {
     return (
         <div className="space-y-6">
             <ModulesSection {...moduleProps} />
             <IncassoSection {...incassoProps} />
+            {mandateRequestProps ? <MandateRequestsCard {...mandateRequestProps} /> : null}
             <ExportCard {...exportProps} />
         </div>
     );
