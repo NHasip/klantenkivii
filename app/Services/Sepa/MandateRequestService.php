@@ -557,7 +557,7 @@ class MandateRequestService
             if ($updates !== []) {
                 $company->forceFill($updates)->save();
             }
-
+            $creator = $actorId ?? $request->sent_by ?? User::query()->where('role', 'admin')->orderBy('id')->value('id');
             $creator = $actorId ?? $request->sent_by;
             if ($adopted !== [] && $creator) {
                 Activity::create([
