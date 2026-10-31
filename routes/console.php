@@ -8,6 +8,9 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote')->hourly();
 
-Schedule::command('reminders:send-due')->everyFiveMinutes()->withoutOverlapping();
-Schedule::command('crm:daily-checks')->dailyAt('08:00')->timezone('Europe/Amsterdam')->withoutOverlapping();
-Schedule::command('leads:import-imap')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('reminders:send-due')->everyFiveMinutes()->withoutOverlapping()
+    ->when(fn () => (bool) config('crm.schedule.reminders'));
+Schedule::command('crm:daily-checks')->dailyAt('08:00')->timezone('Europe/Amsterdam')->withoutOverlapping()
+    ->when(fn () => (bool) config('crm.schedule.daily_checks'));
+Schedule::command('leads:import-imap')->everyFiveMinutes()->withoutOverlapping()
+    ->when(fn () => (bool) config('crm.schedule.leads_import'));
