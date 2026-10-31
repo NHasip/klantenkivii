@@ -39,7 +39,7 @@
     - De layout zet de inhoudskolom in <div class="app-shell"> (lg:pl-sidebar) en <main class="app-container">.
     - Onder md: vaste onderbalk (Dashboard, Klanten, Taken, Zoeken, Menu) met safe-area-inset-bottom; .app-container krijgt
       dan extra ondermarge via --kivii-bottom-offset (resources/css/app.css).
-    - Menu-exclusiviteit: elk menu stuurt 'kivii-menu-open' met zijn naam (mobile, search, bell, user) en sluit bij een ander.
+    - Menu-exclusiviteit: elk menu stuurt 'kivii-menu-open' met zijn naam (mobile, search, bell, user) en sluit bij een ander (het gebruikersmenu zit in de drawer en sluit die dus niet).
     - Actief menu-item: server-side via routeIs; na Inertia-navigatie stuurt app.jsx 'kivii-navigate' (met de URL) en
       herberekent syncNav() aria-current en de actief/inactief-klassen (data-nav-*) van zijbalk, drawer, onderbalk en
       profiel-link. Bij een ander pad sluit de mobiele drawer en gaat de focus naar de hoofdinhoud.
@@ -96,7 +96,7 @@
         },
      }" class="safe-top sticky top-0 z-30"
      @kivii-navigate.window="syncNav($event.detail && $event.detail.url)"
-     @kivii-menu-open.window="if ($event.detail !== 'mobile') closeMobile(false)"
+     @kivii-menu-open.window="if ($event.detail !== 'mobile' && $event.detail !== 'user') closeMobile(false)"
      @keydown.escape.window="if (mobileOpen) closeMobile()"
      @resize.window.debounce.150ms="if (mobileOpen && window.innerWidth >= 1024) closeMobile(false)">
     <script>
