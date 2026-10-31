@@ -456,7 +456,10 @@ class MandateRequestService
             return $person ? trim(((string) $person->voornaam).' '.((string) $person->achternaam)) : '';
         }
 
-        return trim((string) ($company->{self::COMPANY_COLUMNS[$key]} ?? ''));
+        $value = trim((string) ($company->{self::COMPANY_COLUMNS[$key]} ?? ''));
+
+        // Plaatshouders uit eerdere imports gelden als leeg.
+        return in_array(mb_strtolower($value), ['onbekend', 'unknown', '-', 'n.v.t.', 'nvt', '?'], true) ? '' : $value;
     }
 
     private static function sameValue(string $key, string $a, string $b): bool
