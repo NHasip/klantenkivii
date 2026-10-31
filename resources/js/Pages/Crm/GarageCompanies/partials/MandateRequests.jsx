@@ -223,7 +223,7 @@ export function MandateRequestDialog({ open, onClose, company, config, urls, tem
                                     className={inputClasses}
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    data-autofocus
+                                    data-autofocus="desktop"
                                     autoComplete="off"
                                 />
                             </Field>

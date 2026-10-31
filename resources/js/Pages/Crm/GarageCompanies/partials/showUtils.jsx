@@ -388,7 +388,7 @@ export function ToolbarButton({ active, disabled, onClick, children, title }) {
             onClick={onClick}
             disabled={disabled}
             className={cx(
-                'inline-flex h-8 items-center rounded-md px-2.5 text-xs font-semibold transition',
+                'tap-target inline-flex h-8 items-center rounded-md px-2.5 text-xs font-semibold transition',
                 active ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-zinc-200/70',
                 disabled && 'cursor-not-allowed opacity-40'
             )}
@@ -425,7 +425,7 @@ export function FormField({ form, name, id, label, as = 'input', required = fals
 
 export function CheckboxField({ id, label, checked, onChange, description, className = '' }) {
     return (
-        <label htmlFor={id} className={cx('flex min-h-9 cursor-pointer items-start gap-2.5 text-sm text-zinc-800', className)}>
+        <label htmlFor={id} className={cx('tap-target flex min-h-9 cursor-pointer items-start gap-2.5 text-sm text-zinc-800', className)}>
             <input
                 id={id}
                 type="checkbox"

@@ -348,7 +348,7 @@
                         $width = (int) round(($total / $funnelMax) * 100);
                     @endphp
                     <li>
-                        <a href="{{ $customersUrl }}?status={{ $key }}" class="group flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
+                        <a href="{{ $customersUrl }}?status={{ $key }}" class="tap-target group flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
                             <x-icon :name="$step['icon']" class="h-4 w-4 text-zinc-400 group-hover:text-zinc-600" />
                             <div class="min-w-0 flex-1">
                                 <div class="mb-1 flex items-center justify-between gap-2 text-sm">

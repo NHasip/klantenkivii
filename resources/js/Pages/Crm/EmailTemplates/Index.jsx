@@ -21,7 +21,7 @@ function ToolbarButton({ active, disabled, onClick, children, title }) {
             onClick={onClick}
             disabled={disabled}
             className={cx(
-                'inline-flex h-8 min-w-[2rem] items-center justify-center rounded-lg px-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1',
+                'tap-target-icon inline-flex h-8 min-w-[2rem] items-center justify-center rounded-lg px-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1',
                 active ? 'bg-white text-indigo-700 shadow-card ring-1 ring-indigo-200' : 'text-zinc-700 hover:bg-zinc-200/70',
                 disabled && 'cursor-not-allowed opacity-40'
             )}
@@ -658,7 +658,7 @@ export default function Index({ templates = [], variables, urls, previewCustomer
                                                     title={`{{ ${token} }} Voorbeeld: ${variables[token]}`}
                                                     aria-label={`Veld ${meta.label} invoegen`}
                                                     className={cx(
-                                                        'inline-flex h-8 items-center gap-1.5 rounded-full pl-2 pr-3 text-xs font-medium ring-1 ring-inset transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600',
+                                                        'tap-target inline-flex h-8 items-center gap-1.5 rounded-full pl-2 pr-3 text-xs font-medium ring-1 ring-inset transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600',
                                                         recommended ? 'bg-indigo-50 text-indigo-900 ring-indigo-200 hover:bg-indigo-100' : 'bg-white text-zinc-700 ring-zinc-200 hover:bg-zinc-50 hover:ring-zinc-300',
                                                     )}
                                                 >
@@ -763,7 +763,7 @@ export default function Index({ templates = [], variables, urls, previewCustomer
                                         aria-pressed={previewMode === mode}
                                         onClick={() => setPreviewMode(mode)}
                                         className={cx(
-                                            'inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600',
+                                            'tap-target inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600',
                                             previewMode === mode ? 'bg-white text-zinc-900 shadow-card ring-1 ring-black/5' : 'text-zinc-600 hover:text-zinc-900',
                                         )}
                                     >

@@ -1098,7 +1098,7 @@ export default function Index({ companies, totals, statusCounts, trashCount, fil
             {/* Kaarten: altijd op mobiel, en op grotere schermen als de kaartweergave is gekozen. */}
             <div className={cx(cardView ? '' : 'md:hidden')} aria-busy={filtering || undefined}>
                 {bulkEnabled && rows.length > 0 ? (
-                    <label className="mb-3 flex min-h-[2.5rem] items-center gap-3 px-1 text-sm text-zinc-700">
+                    <label className="tap-target mb-3 flex min-h-[2.5rem] items-center gap-3 px-1 text-sm text-zinc-700">
                         <input ref={selectAllCardsRef} type="checkbox" className="checkbox h-5 w-5" checked={allSelected} onChange={toggleAll} />
                         Alles op deze pagina selecteren
                     </label>

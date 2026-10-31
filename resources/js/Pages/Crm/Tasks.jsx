@@ -261,7 +261,7 @@ function CustomerChip({ customer, stopDrag = false, className = '' }) {
             title={`Klant openen: ${customer.naam}`}
             onPointerDown={stopDrag ? (e) => e.stopPropagation() : undefined}
             className={cx(
-                'inline-flex max-w-full items-center gap-1.5 rounded-full bg-white py-0.5 pl-0.5 pr-2.5 text-xs font-medium text-zinc-700 ring-1 ring-inset ring-zinc-200 transition-colors hover:bg-indigo-50 hover:text-indigo-900 hover:ring-indigo-200 focus-ring',
+                'tap-link inline-flex max-w-full items-center gap-1.5 rounded-full bg-white py-0.5 pl-0.5 pr-2.5 text-xs font-medium text-zinc-700 ring-1 ring-inset ring-zinc-200 transition-colors hover:bg-indigo-50 hover:text-indigo-900 hover:ring-indigo-200 focus-ring',
                 className,
             )}
         >
@@ -2298,7 +2298,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                             <button
                                                 key={kind}
                                                 type="button"
-                                                className="rounded-lg bg-zinc-100 px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
+                                                className="tap-target rounded-lg bg-zinc-100 px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
                                                 onClick={() => setTaskForm((t) => ({ ...t, deadline: shortcutDate(kind) }))}
                                             >
                                                 {label}

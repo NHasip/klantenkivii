@@ -625,7 +625,7 @@ export default function Create({ statusOptions: rawStatusOptions, statusLabels, 
                                         <li key={row.module_id ?? index} className={cx('rounded-xl border p-3 transition-colors', row.actief ? 'border-indigo-300 bg-indigo-50/50' : 'border-zinc-200 bg-white')}>
                                             <div className="flex items-center gap-3">
                                                 <input id={checkboxId} type="checkbox" className="checkbox h-5 w-5" checked={!!row.actief} onChange={() => toggleModule(index)} />
-                                                <label htmlFor={checkboxId} className="min-w-0 flex-1 cursor-pointer">
+                                                <label htmlFor={checkboxId} className="tap-target flex min-w-0 flex-1 cursor-pointer flex-col justify-center">
                                                     <span className="block truncate text-sm font-semibold text-zinc-900">{row.naam}</span>
                                                     {!row.actief ? <span className="block text-xs text-zinc-500">{formatEuro(numberValue(row.prijs_maand_excl))} per maand excl. btw</span> : null}
                                                 </label>

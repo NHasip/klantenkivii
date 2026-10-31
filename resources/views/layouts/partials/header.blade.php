@@ -30,11 +30,30 @@
     - Onder md: vaste onderbalk (Dashboard, Klanten, Taken, Zoeken, Menu) met safe-area-inset-bottom; .app-container krijgt
       dan extra ondermarge via --kivii-bottom-offset (resources/css/app.css).
     - Menu-exclusiviteit: elk menu stuurt 'kivii-menu-open' met zijn naam (mobile, search, bell, user) en sluit bij een ander.
+    - Drawer-focus: bij openen naar de sluitknop (na de 15ms waarmee x-trap activeert, als de drawer zichtbaar is), bij sluiten
+      terug naar de knop die hem opende (hamburger of Menu in de onderbalk). x-trap doet zelf geen autofocus of focusherstel
+      (.noautofocus.noreturn), zodat sluiten via een ander menu (zoeken) de focus niet terugtrekt.
 --}}
-<div x-data="{ mobileOpen: false }" class="safe-top sticky top-0 z-30"
-     @kivii-menu-open.window="if ($event.detail !== 'mobile') mobileOpen = false"
-     @keydown.escape.window="if (mobileOpen) { mobileOpen = false; $refs.mobileButton.focus() }"
-     @resize.window.debounce.150ms="if (mobileOpen && window.innerWidth >= 1024) mobileOpen = false">
+<div x-data="{
+        mobileOpen: false,
+        mobileOpener: null,
+        openMobile(opener) {
+            this.mobileOpener = opener || this.$refs.mobileButton;
+            this.mobileOpen = true;
+            this.$dispatch('kivii-menu-open', 'mobile');
+            setTimeout(() => { if (this.mobileOpen) this.$refs.mobileClose.focus({ preventScroll: true }) }, 50);
+        },
+        closeMobile(restoreFocus = true) {
+            if (!this.mobileOpen) return;
+            this.mobileOpen = false;
+            const opener = this.mobileOpener;
+            this.mobileOpener = null;
+            if (restoreFocus && opener) setTimeout(() => opener.focus({ preventScroll: true }), 0);
+        },
+     }" class="safe-top sticky top-0 z-30"
+     @kivii-menu-open.window="if ($event.detail !== 'mobile') closeMobile(false)"
+     @keydown.escape.window="if (mobileOpen) closeMobile()"
+     @resize.window.debounce.150ms="if (mobileOpen && window.innerWidth >= 1024) closeMobile(false)">
     <script>
         window.kiviiSearch = window.kiviiSearch || function (endpoint) {
             return {
@@ -149,11 +168,11 @@
     <header class="border-b border-zinc-200/70 bg-canvas/85 backdrop-blur supports-[backdrop-filter]:bg-canvas/75">
         <div class="flex h-14 items-center gap-2 px-4 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:gap-3 sm:px-6 lg:px-10">
             <button type="button" x-ref="mobileButton" class="tap-target-icon -ml-2 inline-flex h-10 w-10 items-center justify-center rounded-xl text-zinc-700 hover:bg-zinc-200/60 lg:hidden {{ $kiviiFocus }}"
-                    @click="mobileOpen = true; $dispatch('kivii-menu-open', 'mobile')"
+                    @click="openMobile($el)"
                     :aria-expanded="mobileOpen.toString()" aria-controls="app-sidebar" aria-label="Menu openen">
                 <x-icon name="menu" class="h-6 w-6" />
             </button>
-            <a href="{{ route('dashboard') }}" class="mr-1 flex shrink-0 items-center gap-2 rounded-lg lg:hidden {{ $kiviiFocus }}">
+            <a href="{{ route('dashboard') }}" class="tap-area mr-1 flex shrink-0 items-center gap-2 rounded-lg lg:hidden {{ $kiviiFocus }}">
                 <img src="{{ asset('brand/kivii-mark.png') }}" alt="Kivii CRM" class="h-8 w-8 rounded-lg bg-white" />
             </a>
 
@@ -215,22 +234,22 @@
     </header>
 
     {{-- Achtergrond van de mobiele drawer --}}
-    <div x-cloak x-show="mobileOpen" x-transition.opacity.duration.150ms class="fixed inset-0 z-30 bg-zinc-900/30 backdrop-blur-[2px] lg:hidden" @click="mobileOpen = false" aria-hidden="true"></div>
+    <div x-cloak x-show="mobileOpen" x-transition.opacity.duration.150ms class="fixed inset-0 z-30 bg-zinc-900/30 backdrop-blur-[2px] lg:hidden" @click="closeMobile()" aria-hidden="true"></div>
 
     {{-- Zijbalk: vast vanaf lg, drawer op kleinere schermen --}}
     <aside id="app-sidebar"
            class="fixed inset-y-0 left-0 z-40 flex w-[17.5rem] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] max-w-[85vw] flex-col border-r border-zinc-200/70 bg-white transition-[transform,visibility] duration-200 ease-out max-lg:invisible max-lg:-translate-x-full lg:w-sidebar lg:bg-white/70"
            :class="mobileOpen && '!visible !translate-x-0 shadow-pop'"
-           x-trap.noscroll="mobileOpen"
+           x-trap.noscroll.noautofocus.noreturn="mobileOpen"
            :role="mobileOpen ? 'dialog' : null" :aria-modal="mobileOpen ? 'true' : null"
            aria-label="Zijbalk">
         <div class="flex h-14 shrink-0 items-center justify-between gap-2 px-4 lg:h-16 lg:px-5">
-            <a href="{{ route('dashboard') }}" class="flex items-center gap-2.5 rounded-lg {{ $kiviiFocus }}">
+            <a href="{{ route('dashboard') }}" class="tap-link flex items-center gap-2.5 rounded-lg {{ $kiviiFocus }}">
                 <img src="{{ asset('brand/kivii-mark.png') }}" alt="" class="h-8 w-8 rounded-lg bg-white shadow-sm ring-1 ring-black/5" />
                 <span class="text-[15px] font-semibold tracking-snug text-zinc-900">Kivii <span class="font-medium text-zinc-400">CRM</span></span>
             </a>
-            <button type="button" class="tap-target-icon -mr-1 inline-flex h-9 w-9 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 lg:hidden {{ $kiviiFocus }}"
-                    @click="mobileOpen = false; $refs.mobileButton.focus()" aria-label="Menu sluiten">
+            <button type="button" x-ref="mobileClose" class="tap-target-icon -mr-1 inline-flex h-9 w-9 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 lg:hidden {{ $kiviiFocus }}"
+                    @click="closeMobile()" aria-label="Menu sluiten">
                 <x-icon name="x" class="h-5 w-5" />
             </button>
         </div>
@@ -323,7 +342,7 @@
                 </button>
             </li>
             <li>
-                <button type="button" @click="mobileOpen = true; $dispatch('kivii-menu-open', 'mobile')"
+                <button type="button" @click="openMobile($el)"
                         :aria-expanded="mobileOpen.toString()" aria-controls="app-sidebar"
                         class="flex h-full w-full flex-col items-center justify-center gap-0.5 text-2xs font-medium text-zinc-500 hover:text-zinc-900 {{ $kiviiFocus }}">
                     <x-icon name="menu" class="h-5 w-5 text-zinc-400" />

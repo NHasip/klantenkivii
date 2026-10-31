@@ -245,9 +245,9 @@
         @apply bg-sky-50 text-sky-800 ring-sky-200;
     }
 
-    /* Tabellen */
+    /* Tabellen. relative: absoluut gepositioneerde kinderen (zoals th span.sr-only) blijven binnen de scrollcontainer. */
     .table-wrap {
-        @apply min-w-0 overflow-x-auto rounded-2xl border border-hairline bg-white shadow-card;
+        @apply relative min-w-0 overflow-x-auto rounded-2xl border border-hairline bg-white shadow-card;
     }
 
     .table-base {
@@ -458,6 +458,12 @@
         width: 1.25rem;
     }
 
+    /* Formuliervelden (ook select met .input en losse selects) minimaal 44px hoog. */
+    .input,
+    select:not([multiple]):not([size]) {
+        min-height: 44px;
+    }
+
     /* Kleine tekstlinks (Alle taken, terug naar Klanten): onzichtbaar tikvlak van minstens 44px, zonder layoutverschuiving. */
     .tap-link {
         position: relative;
@@ -534,7 +540,8 @@
 
 @media (max-width: 767.98px) {
     html:has(#kivii-bottom-nav) {
-        --kivii-bottom-offset: calc(3.5rem + env(safe-area-inset-bottom));
+        /* h-14 (3.5rem) + border-t (1px) + home-indicator, gelijk aan de echte hoogte van #kivii-bottom-nav. */
+        --kivii-bottom-offset: calc(3.5rem + 1px + env(safe-area-inset-bottom));
         scroll-padding-bottom: var(--kivii-bottom-offset);
     }
 

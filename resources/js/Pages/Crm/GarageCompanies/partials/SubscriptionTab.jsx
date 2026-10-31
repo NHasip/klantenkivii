@@ -22,6 +22,8 @@ const SMALL_INPUT = cx(inputClasses, 'tabular-nums');
 
 function ModulesSection({ form, totals, extraUsersHint, onToggle, onUpdateRow, onSubmit, changeTab }) {
     const rows = form.data.rows || [];
+    // Onder md plakt de actiebalk bij niet opgeslagen wijzigingen boven de mobiele onderbalk.
+    const pinned = form.isDirty || form.processing;
     return (
         <section id="sectie-modules" className="scroll-mt-48">
             <Card padded={false}>
@@ -43,7 +45,7 @@ function ModulesSection({ form, totals, extraUsersHint, onToggle, onUpdateRow, o
                             <span className="font-semibold">{extraUsersHint.name}:</span> {extraUsersHint.quantity} ingesteld, {extraUsersHint.activeSeats} actieve{' '}
                             {extraUsersHint.activeSeats === 1 ? 'gebruiker' : 'gebruikers'}.
                             {!extraUsersHint.matches && ' Controleer of het aantal klopt. Er wordt niets automatisch aangepast.'}{' '}
-                            <button type="button" className="font-semibold underline underline-offset-2" onClick={() => changeTab('contact', 'sectie-gebruikers')}>
+                            <button type="button" className="tap-link font-semibold underline underline-offset-2" onClick={() => changeTab('contact', 'sectie-gebruikers')}>
                                 Naar gebruikers
                             </button>
                         </Notice>
@@ -55,7 +57,7 @@ function ModulesSection({ form, totals, extraUsersHint, onToggle, onUpdateRow, o
                         <EmptyState illustration="inbox" title="Geen modules beschikbaar" description="Er zijn nog geen modules aangemaakt in Kivii." />
                     </div>
                 ) : (
-                    <div className="mt-5">
+                    <div className={cx('mt-5', pinned && 'max-md:pb-40')}>
                         <div className={cx('hidden gap-3 border-y border-zinc-200 bg-zinc-50 px-6 py-2 text-xs font-medium text-zinc-500 sm:grid', MODULE_GRID)} aria-hidden="true">
                             <span>Module</span>
                             <span>Aantal</span>
@@ -139,12 +141,13 @@ function ModulesSection({ form, totals, extraUsersHint, onToggle, onUpdateRow, o
                 )}
 
                 {rows.length > 0 && (
-                    // Onder md: bij niet opgeslagen wijzigingen een vaste actiebalk boven de mobiele onderbalk (zelfde aanpak als GarageCompanies/Create.jsx).
+                    // Onder md: bij niet opgeslagen wijzigingen staat de actiebalk vast (fixed) direct boven de mobiele onderbalk,
+                    // zodat hij altijd in beeld is. pb-40 op de lijst houdt de laatste modules bereikbaar.
                     <div
                         className={cx(
                             'flex flex-col gap-2 rounded-b-2xl border-t border-zinc-200 bg-zinc-50 px-5 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-6',
-                            (form.isDirty || form.processing) &&
-                                'max-md:sticky max-md:bottom-[var(--kivii-bottom-offset,0px)] max-md:z-20 max-md:bg-white/95 max-md:shadow-[0_-6px_16px_-8px_rgba(24,24,27,0.18)] max-md:backdrop-blur',
+                            pinned &&
+                                'max-md:fixed max-md:inset-x-0 max-md:bottom-[var(--kivii-bottom-offset,0px)] max-md:z-30 max-md:rounded-none max-md:bg-white/95 max-md:shadow-[0_-6px_16px_-8px_rgba(24,24,27,0.18)] max-md:backdrop-blur',
                         )}
                     >
                         <p className="text-sm text-zinc-600 sm:mr-auto">

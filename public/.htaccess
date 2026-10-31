@@ -3,6 +3,13 @@
     AddType application/manifest+json .webmanifest
 </IfModule>
 
+# Service worker altijd opnieuw valideren, zodat een nieuwe versie direct wordt opgepakt.
+<IfModule mod_headers.c>
+    <FilesMatch "^sw\.js$">
+        Header set Cache-Control "no-cache"
+    </FilesMatch>
+</IfModule>
+
 <IfModule mod_rewrite.c>
     <IfModule mod_negotiation.c>
         Options -MultiViews -Indexes
