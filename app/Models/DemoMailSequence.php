@@ -18,6 +18,7 @@ class DemoMailSequence extends Model
         'garage_company_id',
         'active_company_id',
         'status',
+        'test_mode',
         'started_at',
         'stopped_at',
         'stop_reason',
@@ -29,6 +30,7 @@ class DemoMailSequence extends Model
     protected function casts(): array
     {
         return [
+            'test_mode' => 'boolean',
             'started_at' => 'datetime',
             'stopped_at' => 'datetime',
             'finished_at' => 'datetime',

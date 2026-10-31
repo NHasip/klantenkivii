@@ -19,10 +19,10 @@ const SEQUENCE_META = {
     afgerond: { label: 'Afgerond', tone: 'neutral' },
 };
 
-function stepDetail(step) {
+function stepDetail(step, testMode) {
     switch (step.status) {
         case 'gepland':
-            return `Gepland op ${formatDateTime(step.due_at)}${step.last_error ? `. Vorige poging mislukt: ${step.last_error}` : ''}`;
+            return `Gepland op ${formatDateTime(step.due_at)}${testMode ? ` (na ${step.day} minuten)` : ''}${step.last_error ? `. Vorige poging mislukt: ${step.last_error}` : ''}`;
         case 'verstuurd':
             return `Verstuurd op ${formatDateTime(step.sent_at)}${step.recipient ? ` naar ${step.recipient}` : ''}`;
         case 'mislukt':
@@ -41,6 +41,7 @@ export default function DemoMailSequenceCard({ data }) {
 
     const sequence = data.sequence;
     const active = sequence?.status === 'actief';
+    const testMode = Boolean(sequence?.test_mode);
     if (!sequence && !data.is_demo) return null;
 
     const post = (url) => {
@@ -67,6 +68,26 @@ export default function DemoMailSequenceCard({ data }) {
             cancelText: 'Annuleren',
         });
         if (ok) post(data.urls.restart);
+    };
+
+    const onStartTest = async () => {
+        if (!data.recipient) {
+            await confirm({
+                title: 'Geen e-mailadres',
+                message: 'Vul eerst een login-e-mail, hoofd-e-mail of e-mail bij het hoofdcontact in.',
+                confirmText: 'Sluiten',
+                showCancel: false,
+            });
+            return;
+        }
+        const ok = await confirm({
+            title: 'Testmodus starten?',
+            message: `De huidige reeks wordt gestopt en er start een testreeks. De drie mails gaan automatisch na 2, 5 en 13 minuten naar ${data.recipient}, namens ${data.sender}. Het verzendvenster (08:00 tot 20:00) geldt niet voor de testreeks. Gebruik dit alleen met een eigen testadres.`,
+            confirmText: 'Testmodus starten',
+            cancelText: 'Annuleren',
+            tone: 'danger',
+        });
+        if (ok) post(data.urls.start_test);
     };
 
     const canSendNow = (step) =>
@@ -110,9 +131,14 @@ export default function DemoMailSequenceCard({ data }) {
                     Reeks stoppen
                 </Button>
             ) : null}
-            {!active && data.is_demo && data.available ? (
+            {(!active || testMode) && data.is_demo && data.available ? (
                 <Button variant="secondary" size="sm" onClick={onRestart} loading={busy}>
                     {sequence ? 'Reeks opnieuw starten' : 'Reeks starten'}
+                </Button>
+            ) : null}
+            {data.is_demo && data.available && data.test_mode_available ? (
+                <Button variant="secondary" size="sm" onClick={onStartTest} loading={busy}>
+                    Testmodus starten (minuten)
                 </Button>
             ) : null}
         </>
@@ -153,9 +179,16 @@ export default function DemoMailSequenceCard({ data }) {
                     <>
                         <div className="flex flex-wrap items-center gap-2 text-sm text-zinc-600">
                             <Badge tone={seqMeta.tone} dot>{seqMeta.label}</Badge>
-                            <span>Gestart op {formatDate(sequence.started_at)}</span>
+                            {testMode ? <Badge tone="warning">Testmodus</Badge> : null}
+                            <span>Gestart op {testMode ? formatDateTime(sequence.started_at) : formatDate(sequence.started_at)}</span>
                             {active && data.recipient ? <span>· Naar {data.recipient}</span> : null}
                         </div>
+                        {testMode ? (
+                            <Notice tone="warning" title="Testmodus">
+                                Deze reeks verstuurt de mails automatisch na 2, 5 en 13 minuten in plaats van dagen, ook buiten 08:00 tot 20:00.
+                                Met Reeks opnieuw starten ga je terug naar de normale reeks (dag 2, 5 en 13).
+                            </Notice>
+                        ) : null}
                         {sequence.status === 'gestopt' && sequence.stop_reason ? (
                             <p className="text-sm text-zinc-600">
                                 {sequence.stop_reason}
@@ -169,7 +202,7 @@ export default function DemoMailSequenceCard({ data }) {
                                     <li key={step.key} className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                                         <div className="min-w-0">
                                             <p className="text-sm font-medium text-zinc-900">{step.name}</p>
-                                            <p className="text-xs text-zinc-500">{stepDetail(step)}</p>
+                                            <p className="text-xs text-zinc-500">{stepDetail(step, testMode)}</p>
                                         </div>
                                         <div className="flex shrink-0 items-center gap-2 self-start sm:self-center">
                                             <Badge tone={meta.tone} dot>

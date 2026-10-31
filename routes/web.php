@@ -148,6 +148,9 @@ Route::middleware(['auth', 'active', 'admin.2fa'])->group(function () {
     Route::post('/garagebedrijven/{garageCompany}/demo-mailreeks/starten', [DemoMailSequenceController::class, 'restart'])
         ->middleware(['admin', 'throttle:10,1'])
         ->name('crm.demo_sequence.restart');
+    Route::post('/garagebedrijven/{garageCompany}/demo-mailreeks/testmodus', [DemoMailSequenceController::class, 'startTest'])
+        ->middleware(['admin', 'throttle:10,1'])
+        ->name('crm.demo_sequence.start_test');
     Route::post('/garagebedrijven/{garageCompany}/demo-mailreeks/stappen/{step}/nu-versturen', [DemoMailSequenceController::class, 'sendNow'])
         ->middleware(['admin', 'throttle:10,1'])
         ->whereNumber('step')

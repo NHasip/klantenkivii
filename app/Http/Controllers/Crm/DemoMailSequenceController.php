@@ -38,6 +38,23 @@ class DemoMailSequenceController extends Controller
         return back()->with('status', 'Demo-mailreeks gestart. De eerste mail gaat over 2 dagen uit.');
     }
 
+    /** (Her)start de reeks in testmodus: mails na 2, 5 en 13 minuten, alleen als de klant op Demo staat. */
+    public function startTest(GarageCompany $garageCompany): RedirectResponse
+    {
+        if (! DemoMailSequenceService::testModeAvailable()) {
+            return back()->with('error', 'De database-migratie voor de testmodus van de demo-mailreeks ontbreekt nog.');
+        }
+        if (GarageCompanyStatus::normalize((string) $garageCompany->status?->value) !== GarageCompanyStatus::Proefperiode->value) {
+            return back()->with('error', 'De testmodus kan alleen starten als de klant op Demo staat.');
+        }
+        $sequence = $this->service->start($garageCompany, auth()->id(), null, true);
+        if (! $sequence) {
+            return back()->with('error', 'De demo-mailreeks kon niet in testmodus starten.');
+        }
+
+        return back()->with('status', 'Demo-mailreeks gestart in testmodus. De mails gaan automatisch na 2, 5 en 13 minuten uit.');
+    }
+
     /** Eén geplande of mislukte stap direct versturen, buiten het verzendvenster en de geplande datum om. */
     public function sendNow(GarageCompany $garageCompany, int $step): RedirectResponse
     {

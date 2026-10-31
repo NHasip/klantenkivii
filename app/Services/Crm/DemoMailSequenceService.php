@@ -57,33 +57,74 @@ class DemoMailSequenceService
         }
     }
 
+    private static ?bool $testModeAvailable = null;
+
+    /** Testmodus vereist de kolom test_mode (aparte migratie). */
+    public static function testModeAvailable(): bool
+    {
+        if (self::$testModeAvailable !== null) {
+            return self::$testModeAvailable;
+        }
+        try {
+            return self::$testModeAvailable = self::available() && Schema::hasColumn('demo_mail_sequences', 'test_mode');
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     public static function resetAvailability(): void
     {
         self::$available = null;
+        self::$testModeAvailable = null;
+    }
+
+    /** Snelle check voor de minuuttaak: zijn er actieve reeksen in testmodus? */
+    public static function hasActiveTestSequences(): bool
+    {
+        if (! self::testModeAvailable()) {
+            return false;
+        }
+
+        return DemoMailSequence::query()
+            ->where('status', DemoMailSequence::STATUS_ACTIEF)
+            ->where('test_mode', true)
+            ->exists();
     }
 
     // ------------------------------------------------------------------
     // Starten en stoppen
 
-    /** Start een nieuwe reeks (stopt een eventuele actieve reeks eerst). */
-    public function start(GarageCompany $company, ?int $userId = null, ?Carbon $startedAt = null): ?DemoMailSequence
+    /**
+     * Start een nieuwe reeks (stopt een eventuele actieve reeks eerst).
+     * Testmodus: mails na 2, 5 en 13 minuten in plaats van dagen, zonder verzendvenster.
+     */
+    public function start(GarageCompany $company, ?int $userId = null, ?Carbon $startedAt = null, bool $testMode = false): ?DemoMailSequence
     {
-        if (! self::available()) {
+        if (! self::available() || ($testMode && ! self::testModeAvailable())) {
             return null;
         }
         $startedAt ??= now();
 
-        return DB::transaction(function () use ($company, $userId, $startedAt) {
-            $this->stop($company, 'Vervangen door een nieuwe reeks', $userId, false);
+        return DB::transaction(function () use ($company, $userId, $startedAt, $testMode) {
+            if ($testMode) {
+                $this->stop($company, 'Herstart in testmodus', $userId);
+            } else {
+                $this->stop($company, 'Vervangen door een nieuwe reeks', $userId, false);
+            }
+
+            $attributes = [
+                'garage_company_id' => $company->id,
+                'active_company_id' => $company->id,
+                'status' => DemoMailSequence::STATUS_ACTIEF,
+                'started_at' => $startedAt,
+                'created_by' => $userId,
+            ];
+            if (self::testModeAvailable()) {
+                $attributes['test_mode'] = $testMode;
+            }
 
             try {
-                $sequence = DemoMailSequence::create([
-                    'garage_company_id' => $company->id,
-                    'active_company_id' => $company->id,
-                    'status' => DemoMailSequence::STATUS_ACTIEF,
-                    'started_at' => $startedAt,
-                    'created_by' => $userId,
-                ]);
+                $sequence = DemoMailSequence::create($attributes);
             } catch (QueryException) {
                 // Een gelijktijdig proces heeft al een actieve reeks aangemaakt (unieke sleutel).
                 return DemoMailSequence::query()->where('active_company_id', $company->id)->first();
@@ -95,17 +136,33 @@ class DemoMailSequenceService
                     'garage_company_id' => $company->id,
                     'step_key' => $key,
                     'day_offset' => $days,
-                    'due_at' => $startedAt->copy()->timezone('Europe/Amsterdam')->startOfDay()->addDays($days)->setTime(8, 45)->utc(),
+                    'due_at' => self::dueAt($startedAt, $days, $testMode),
                     'status' => DemoMailStep::STATUS_GEPLAND,
                 ]);
             }
 
-            $this->logActivity($company, 'Demo-mailreeks gestart', 'Automatische mails gepland op '.collect(self::STEPS)
-                    ->map(fn ($d) => $startedAt->copy()->addDays($d)->timezone('Europe/Amsterdam')->format('d-m-Y'))
-                    ->implode(', ').'.', $userId);
+            if ($testMode) {
+                $this->logActivity($company, 'Demo-mailreeks gestart in testmodus (minuten)', 'Testmodus: automatische mails gepland om '.collect(self::STEPS)
+                        ->map(fn ($d) => self::dueAt($startedAt, $d, true)->timezone('Europe/Amsterdam')->format('H:i'))
+                        ->implode(', ').' (na 2, 5 en 13 minuten).', $userId);
+            } else {
+                $this->logActivity($company, 'Demo-mailreeks gestart', 'Automatische mails gepland op '.collect(self::STEPS)
+                        ->map(fn ($d) => $startedAt->copy()->addDays($d)->timezone('Europe/Amsterdam')->format('d-m-Y'))
+                        ->implode(', ').'.', $userId);
+            }
 
             return $sequence;
         });
+    }
+
+    /** Normaal: begin van de dag (Amsterdam) + N dagen om 08:45. Testmodus: start + N minuten. */
+    public static function dueAt(Carbon $startedAt, int $offset, bool $testMode = false): Carbon
+    {
+        if ($testMode) {
+            return $startedAt->copy()->addMinutes($offset)->utc();
+        }
+
+        return $startedAt->copy()->timezone('Europe/Amsterdam')->startOfDay()->addDays($offset)->setTime(8, 45)->utc();
     }
 
     /** Stopt de actieve reeks van de klant. Geeft true terug als er iets gestopt is. */
@@ -180,10 +237,12 @@ class DemoMailSequenceService
 
     /**
      * Verwerkt alle actieve reeksen. Stuurt per klant maximaal één mail: de laatste stap die aan de beurt is.
+     * $testMode: null = alle reeksen, false = alleen normale reeksen, true = alleen reeksen in testmodus.
+     * Testreeksen negeren het verzendvenster.
      *
      * @return array{sent:int, skipped:int, failed:int, waiting:int, stopped:int, graph_missing:bool, outside_window:bool}
      */
-    public function processDue(?Carbon $now = null): array
+    public function processDue(?Carbon $now = null, ?bool $testMode = null): array
     {
         $now ??= now();
         $stats = ['sent' => 0, 'skipped' => 0, 'failed' => 0, 'waiting' => 0, 'stopped' => 0, 'graph_missing' => false, 'outside_window' => false];
@@ -194,15 +253,20 @@ class DemoMailSequenceService
         $graph = MicrosoftGraphMailer::isConfigured();
         $local = $now->copy()->timezone('Europe/Amsterdam');
         $inWindow = $local->hour >= self::SEND_FROM_HOUR && $local->hour < self::SEND_UNTIL_HOUR;
+        $hasColumn = self::testModeAvailable();
+        if ($testMode === true && ! $hasColumn) {
+            return $stats;
+        }
         $stats['graph_missing'] = ! $graph;
-        $stats['outside_window'] = ! $inWindow;
+        $stats['outside_window'] = $testMode === true ? false : ! $inWindow;
 
         DemoMailSequence::query()
             ->where('status', DemoMailSequence::STATUS_ACTIEF)
+            ->when($hasColumn && $testMode !== null, fn ($q) => $q->where('test_mode', $testMode))
             ->orderBy('id')
             ->chunkById(100, function ($sequences) use ($now, $graph, $inWindow, &$stats) {
                 foreach ($sequences as $sequence) {
-                    $this->processSequence($sequence, $now, $graph, $inWindow, $stats);
+                    $this->processSequence($sequence, $now, $graph, $inWindow || (bool) $sequence->test_mode, $stats);
                 }
             });
 
@@ -568,6 +632,7 @@ class DemoMailSequenceService
         $isDemo = GarageCompanyStatus::normalize((string) $company->status?->value) === GarageCompanyStatus::Proefperiode->value;
         $base = [
             'available' => $available,
+            'test_mode_available' => self::testModeAvailable(),
             'graph_configured' => MicrosoftGraphMailer::isConfigured(),
             'schedule_enabled' => (bool) config('crm.schedule.demo_sequence'),
             'sender' => MicrosoftGraphMailer::sender(),
@@ -578,6 +643,7 @@ class DemoMailSequenceService
             'urls' => [
                 'stop' => route('crm.demo_sequence.stop', ['garageCompany' => $company->id]),
                 'restart' => route('crm.demo_sequence.restart', ['garageCompany' => $company->id]),
+                'start_test' => route('crm.demo_sequence.start_test', ['garageCompany' => $company->id]),
                 'templates' => route('crm.email_templates.index'),
             ],
         ];
@@ -603,6 +669,7 @@ class DemoMailSequenceService
         $base['sequence'] = [
             'id' => $sequence->id,
             'status' => $sequence->status,
+            'test_mode' => (bool) $sequence->test_mode,
             'started_at' => $sequence->started_at?->toIso8601String(),
             'stopped_at' => $sequence->stopped_at?->toIso8601String(),
             'stop_reason' => $sequence->stop_reason,
