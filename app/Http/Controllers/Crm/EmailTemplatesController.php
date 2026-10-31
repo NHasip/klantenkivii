@@ -19,6 +19,7 @@ class EmailTemplatesController
         'welcome_customer',
         'general',
         'announcement',
+        'sepa_machtiging',
     ];
 
     public function index(): Response
@@ -238,6 +239,8 @@ class EmailTemplatesController
                 'body_html' => '<p>Hallo {{ naam }},</p><p>...</p>',
             ],
         ];
+        $mandate = \App\Services\EmailTemplateRenderer::defaultMandateTemplate();
+        $defaults[$mandate['key']] = ['name' => $mandate['name'], 'subject' => $mandate['subject'], 'body_html' => $mandate['body_html']];
 
         foreach ($defaults as $key => $payload) {
             $create = [
