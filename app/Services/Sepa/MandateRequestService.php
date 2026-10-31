@@ -421,6 +421,7 @@ class MandateRequestService
         'plaats' => 'Plaats',
         'land' => 'Land',
         'email' => 'E-mail',
+        'login_email' => 'Login e-mail',
         'telefoon' => 'Telefoon',
         'naam' => 'Contactpersoon',
     ];
@@ -432,6 +433,7 @@ class MandateRequestService
         'plaats' => 'plaats',
         'land' => 'land',
         'email' => 'hoofd_email',
+        'login_email' => 'login_email',
         'telefoon' => 'hoofd_telefoon',
     ];
 
@@ -442,8 +444,9 @@ class MandateRequestService
 
     private static function formValue(array $payload, string $key): string
     {
-        $value = trim((string) ($payload[$key] ?? ''));
-        if ($key === 'email' && $value !== '' && ! filter_var($value, FILTER_VALIDATE_EMAIL)) {
+        // Login e-mail komt uit hetzelfde e-mailadres dat de klant op het formulier opgaf.
+        $value = trim((string) ($payload[$key === 'login_email' ? 'email' : $key] ?? ''));
+        if (in_array($key, ['email', 'login_email'], true) && $value !== '' && ! filter_var($value, FILTER_VALIDATE_EMAIL)) {
             return '';
         }
 
@@ -524,6 +527,20 @@ class MandateRequestService
                     continue;
                 }
                 $label = self::ADOPT_FIELDS[$key];
+
+                if ($key === 'login_email') {
+                    $taken = User::query()->where('email', $value)
+                        ->when($company->eigenaar_user_id, fn ($q) => $q->whereKeyNot($company->eigenaar_user_id))
+                        ->exists();
+                    if ($taken) {
+                        $skipped[] = $label.' (al in gebruik bij een ander account)';
+
+                        continue;
+                    }
+                    if ($company->eigenaar_user_id) {
+                        User::query()->whereKey($company->eigenaar_user_id)->update(['email' => $value]);
+                    }
+                }
 
                 if ($key !== 'naam') {
                     $updates[self::COMPANY_COLUMNS[$key]] = $value;
