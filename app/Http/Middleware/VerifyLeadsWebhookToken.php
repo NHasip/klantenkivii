@@ -14,7 +14,9 @@ class VerifyLeadsWebhookToken
     public function handle(Request $request, Closure $next): Response
     {
         $expected = (string) config('services.leads_webhook.token', '');
-        $provided = (string) $request->header('X-Webhook-Token', '');
+        // Header heeft voorkeur; WordPress-formulieren (Elementor, CF7) kunnen geen headers zetten,
+        // daarom mag de sleutel ook als ?token= in de URL staan.
+        $provided = (string) ($request->header('X-Webhook-Token') ?: $request->query('token', ''));
 
         if ($expected === '' || ! hash_equals($expected, $provided)) {
             return response()->json(['message' => 'Unauthorized'], 401);
