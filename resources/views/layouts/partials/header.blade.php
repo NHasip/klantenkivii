@@ -17,6 +17,7 @@
         ['route' => 'crm.sepa_import.index', 'match' => 'crm.sepa_import.*', 'label' => 'SEPA importeren', 'icon' => 'upload'],
         ['route' => 'crm.mandate_requests.index', 'match' => 'crm.mandate_requests.*', 'label' => 'Machtigingen', 'icon' => 'file-text'],
         ['route' => 'crm.email_log.index', 'match' => 'crm.email_log.*', 'label' => 'E-maillog', 'icon' => 'mail'],
+        ['route' => 'profile.show', 'match' => 'profile.show', 'label' => 'Systeeminstellingen', 'icon' => 'settings', 'hash' => '#admin-mail'],
     ] : [];
     $kiviiNeeds2fa = $kiviiIsAdmin && ! \App\Http\Middleware\RequireTwoFactorForAdmin::userHasTwoFactor($kiviiUser);
     $kiviiFocus = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1';
@@ -359,7 +360,7 @@
                 @foreach ($kiviiNavItems as $item)
                     <li>
                         @php($isActive = request()->routeIs($item['match']))
-                        <a href="{{ route($item['route']) }}" class="nav-item" data-nav-paths="{{ $kiviiNavPaths($item['match']) }}" @if ($isActive) aria-current="page" @endif>
+                        <a href="{{ route($item['route']) }}{{ $item['hash'] ?? '' }}" class="nav-item" data-nav-paths="{{ $kiviiNavPaths($item['match']) }}" @if ($isActive) aria-current="page" @endif>
                             <x-icon :name="$item['icon']" />
                             <span class="truncate">{{ $item['label'] }}</span>
                         </a>
