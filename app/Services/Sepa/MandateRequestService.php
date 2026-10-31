@@ -358,6 +358,19 @@ class MandateRequestService
             return $mandate;
         });
 
+        // Automatisch aanvullen: alleen velden die in het CRM nog leeg zijn. Afwijkende bestaande waarden blijven handmatig.
+        try {
+            $company->refresh();
+            $empty = collect(self::comparison($request->fresh(), $company))
+                ->filter(fn ($row) => ! $row['same'] && trim((string) $row['crm']) === '')
+                ->pluck('key')->values()->all();
+            if ($empty !== []) {
+                $this->adopt($request->fresh(), $company, $empty, $actorId);
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
         return ['ok' => true, 'reason' => null, 'mandate' => $mandate];
     }
 

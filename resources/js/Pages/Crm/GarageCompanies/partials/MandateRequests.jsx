@@ -368,7 +368,7 @@ export function AdoptComparison({ request, url, onDone, canAdopt = true }) {
                     </tbody>
                 </table>
             </div>
-            {request.iban_masked && <p className="text-xs text-zinc-500">IBAN {request.iban_masked} staat alleen in het mandaat en wordt niet overgenomen.</p>}
+            {request.iban_masked && <p className="text-xs text-zinc-500">IBAN {request.iban_masked} is automatisch in de actieve machtiging gezet en wordt gebruikt voor de incasso.</p>}
             {error && <Notice tone="danger">{error}</Notice>}
             {editable && rows.some((r) => !r.same) && (
                 <div className="flex justify-end">
