@@ -132,6 +132,9 @@ Route::middleware(['auth', 'active', 'admin.2fa'])->group(function () {
     Route::post('/machtigingen/{mandateRequest}/verwerken', [MandateRequestsController::class, 'process'])
         ->middleware(['admin', 'throttle:30,1'])
         ->name('crm.mandate_requests.process');
+    Route::post('/machtigingen/{mandateRequest}/overnemen', [MandateRequestsController::class, 'adopt'])
+        ->middleware(['admin', 'throttle:30,1'])
+        ->name('crm.mandate_requests.adopt');
 
     Route::get('/email-templates', [EmailTemplatesController::class, 'index'])
         ->middleware('admin')

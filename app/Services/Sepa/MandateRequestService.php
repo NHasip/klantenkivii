@@ -397,6 +397,170 @@ class MandateRequestService
     }
 
     // ------------------------------------------------------------------
+    // Klantgegevens uit het formulier overnemen (alleen handmatig)
+    // ------------------------------------------------------------------
+
+    /** Formulierveld => label. 'naam' gaat naar de contactpersoon, de rest naar het bedrijf. */
+    public const ADOPT_FIELDS = [
+        'bedrijfsnaam' => 'Bedrijfsnaam',
+        'adres' => 'Adres',
+        'postcode' => 'Postcode',
+        'plaats' => 'Plaats',
+        'land' => 'Land',
+        'email' => 'E-mail',
+        'telefoon' => 'Telefoon',
+        'naam' => 'Contactpersoon',
+    ];
+
+    private const COMPANY_COLUMNS = [
+        'bedrijfsnaam' => 'bedrijfsnaam',
+        'adres' => 'adres_straat_nummer',
+        'postcode' => 'postcode',
+        'plaats' => 'plaats',
+        'land' => 'land',
+        'email' => 'hoofd_email',
+        'telefoon' => 'hoofd_telefoon',
+    ];
+
+    public static function contactPerson(GarageCompany $company): ?CustomerPerson
+    {
+        return $company->primaryPerson ?? $company->customerPersons()->orderBy('id')->first();
+    }
+
+    private static function formValue(array $payload, string $key): string
+    {
+        $value = trim((string) ($payload[$key] ?? ''));
+        if ($key === 'email' && $value !== '' && ! filter_var($value, FILTER_VALIDATE_EMAIL)) {
+            return '';
+        }
+
+        return $key === 'postcode' ? strtoupper($value) : $value;
+    }
+
+    private static function crmValue(GarageCompany $company, ?CustomerPerson $person, string $key): string
+    {
+        if ($key === 'naam') {
+            return $person ? trim(((string) $person->voornaam).' '.((string) $person->achternaam)) : '';
+        }
+
+        return trim((string) ($company->{self::COMPANY_COLUMNS[$key]} ?? ''));
+    }
+
+    private static function sameValue(string $key, string $a, string $b): bool
+    {
+        $norm = function (string $v) use ($key): string {
+            $v = mb_strtolower(preg_replace('/\s+/u', ' ', trim($v)) ?? $v);
+
+            return match ($key) {
+                'postcode' => str_replace(' ', '', $v),
+                'telefoon' => preg_replace('/\D/', '', $v) ?? $v,
+                default => $v,
+            };
+        };
+
+        return $norm($a) === $norm($b);
+    }
+
+    /**
+     * Vergelijking formulier versus CRM (alleen velden die op het formulier zijn ingevuld).
+     *
+     * @return list<array{key:string, label:string, form:string, crm:string, same:bool}>
+     */
+    public static function comparison(SepaMandateRequest $request, GarageCompany $company): array
+    {
+        $payload = (array) ($request->payload ?? []);
+        $person = self::contactPerson($company);
+        $rows = [];
+        foreach (self::ADOPT_FIELDS as $key => $label) {
+            $form = self::formValue($payload, $key);
+            if ($form === '') {
+                continue;
+            }
+            $crm = self::crmValue($company, $person, $key);
+            $rows[] = ['key' => $key, 'label' => $label, 'form' => $form, 'crm' => $crm, 'same' => self::sameValue($key, $form, $crm)];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Geselecteerde velden overnemen. Waarden komen uitsluitend uit de opgeslagen payload.
+     *
+     * @param  list<string>  $keys
+     * @return array{adopted: list<string>, skipped: list<string>}
+     */
+    public function adopt(SepaMandateRequest $request, GarageCompany $company, array $keys, ?int $actorId): array
+    {
+        $payload = (array) ($request->payload ?? []);
+        $adopted = [];
+        $skipped = [];
+
+        DB::transaction(function () use ($request, $company, $payload, $keys, $actorId, &$adopted, &$skipped) {
+            $person = self::contactPerson($company);
+            $updates = [];
+
+            foreach (array_keys(self::ADOPT_FIELDS) as $key) {
+                if (! in_array($key, $keys, true)) {
+                    continue;
+                }
+                $value = self::formValue($payload, $key);
+                if ($value === '' || self::sameValue($key, $value, self::crmValue($company, $person, $key))) {
+                    continue;
+                }
+                $label = self::ADOPT_FIELDS[$key];
+
+                if ($key !== 'naam') {
+                    $updates[self::COMPANY_COLUMNS[$key]] = $value;
+                    $adopted[] = $label;
+
+                    continue;
+                }
+
+                $parts = preg_split('/\s+/u', $value, 2) ?: [$value];
+                $names = ['voornaam' => $parts[0], 'achternaam' => $parts[1] ?? ''];
+                if ($person) {
+                    $person->update($names);
+                    $adopted[] = $label;
+
+                    continue;
+                }
+                $email = self::formValue($payload, 'email') ?: trim((string) $company->hoofd_email);
+                if ($email === '') {
+                    $skipped[] = $label.' (geen e-mailadres voor de contactpersoon)';
+
+                    continue;
+                }
+                CustomerPerson::create($names + [
+                    'garage_company_id' => $company->id,
+                    'email' => $email,
+                    'telefoon' => self::formValue($payload, 'telefoon') ?: ($company->hoofd_telefoon ?: null),
+                    'rol' => 'eigenaar',
+                    'is_primary' => true,
+                    'active' => true,
+                ]);
+                $adopted[] = $label;
+            }
+
+            if ($updates !== []) {
+                $company->forceFill($updates)->save();
+            }
+
+            $creator = $actorId ?? $request->sent_by;
+            if ($adopted !== [] && $creator) {
+                Activity::create([
+                    'garage_company_id' => $company->id,
+                    'type' => ActivityType::Mandate,
+                    'titel' => 'Klantgegevens overgenomen uit machtiging',
+                    'inhoud' => 'Kenmerk '.$request->kenmerk.'. Overgenomen: '.implode(', ', $adopted).'.',
+                    'created_by' => $creator,
+                ]);
+            }
+        });
+
+        return ['adopted' => $adopted, 'skipped' => $skipped];
+    }
+
+    // ------------------------------------------------------------------
     // Weergave (IBAN nooit volledig)
     // ------------------------------------------------------------------
 
@@ -435,6 +599,10 @@ class MandateRequestService
             'can_resend' => $request->garage_company_id !== null && in_array($status, [SepaMandateRequest::STATUS_OPEN, SepaMandateRequest::STATUS_VERLOPEN], true),
             'can_process' => $request->garage_company_id !== null && $payload !== [] && in_array($status, [SepaMandateRequest::STATUS_ONTVANGEN, SepaMandateRequest::STATUS_FOUT], true),
         ];
+
+        $company = $request->garage_company_id && $payload !== [] ? $request->garageCompany : null;
+        $row['comparison'] = $company ? self::comparison($request, $company) : [];
+        $row['can_adopt'] = $company !== null && ! in_array($status, [SepaMandateRequest::STATUS_INGETROKKEN], true);
 
         if ($withCompany) {
             $row['company'] = $request->garageCompany ? [

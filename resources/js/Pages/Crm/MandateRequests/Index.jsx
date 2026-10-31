@@ -1,9 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { Fragment, useMemo, useState } from 'react';
 import { Head, router } from '@inertiajs/react';
 import axios from 'axios';
 import { useConfirm } from '../../../components/ConfirmProvider';
 import { Badge, Button, Card, EmptyState, PageHeader, cx, inputClasses, tableClasses } from '../../../components/ui';
-import { REQUEST_STATUS_META, RequestStatusBadge, VIA_LABELS, requestErrorMessage } from '../GarageCompanies/partials/MandateRequests';
+import { AdoptComparison, REQUEST_STATUS_META, RequestStatusBadge, VIA_LABELS, requestErrorMessage } from '../GarageCompanies/partials/MandateRequests';
 import { Notice, formatDateTime } from '../GarageCompanies/partials/showUtils';
 
 const FILTERS = [
@@ -63,6 +63,7 @@ export default function Index({ available = true, requests = [], customers = [],
     const [search, setSearch] = useState('');
     const [busyId, setBusyId] = useState(null);
     const [message, setMessage] = useState(null);
+    const [openId, setOpenId] = useState(null);
 
     const counts = useMemo(() => {
         const c = { alle: requests.length, aandacht: requests.filter(needsAction).length };
@@ -160,62 +161,93 @@ export default function Index({ available = true, requests = [], customers = [],
                             </thead>
                             <tbody className={tableClasses.tbody}>
                                 {visible.map((r) => (
-                                    <tr key={r.id} className={tableClasses.tr}>
-                                        <td className={cx(tableClasses.td, 'font-mono text-sm font-semibold')}>
-                                            {r.kenmerk}
-                                            {r.mandaat_id && <p className="font-sans text-xs font-normal text-zinc-500">Mandaat {r.mandaat_id}</p>}
-                                        </td>
-                                        <td className={tableClasses.td}>
-                                            <RequestStatusBadge status={r.status} />
-                                            {r.error && <p className="mt-1 max-w-[16rem] text-xs text-rose-700">{r.error}</p>}
-                                        </td>
-                                        <td className={tableClasses.td}>
-                                            {r.company ? (
-                                                <a href={r.company.url} className="font-medium text-indigo-700 hover:underline">{r.company.naam}</a>
-                                            ) : (
-                                                <Badge tone="warning">Niet gekoppeld</Badge>
-                                            )}
-                                            {r.status !== 'verwerkt' && r.status !== 'ingetrokken' && (!r.company || needsAction(r)) && (
-                                                <div className="mt-2">
-                                                    <LinkCustomer
-                                                        request={r}
-                                                        customers={customers}
-                                                        disabled={busyId !== null}
-                                                        onLinked={{ url: urls.link.replace('__ID__', r.id), done: (text) => reload(text) }}
-                                                    />
+                                    <Fragment key={r.id}>
+                                        <tr className={tableClasses.tr}>
+                                            <td className={cx(tableClasses.td, 'font-mono text-sm font-semibold')}>
+                                                {r.kenmerk}
+                                                {r.mandaat_id && <p className="font-sans text-xs font-normal text-zinc-500">Mandaat {r.mandaat_id}</p>}
+                                            </td>
+                                            <td className={tableClasses.td}>
+                                                <RequestStatusBadge status={r.status} />
+                                                {r.error && <p className="mt-1 max-w-[16rem] text-xs text-rose-700">{r.error}</p>}
+                                            </td>
+                                            <td className={tableClasses.td}>
+                                                {r.company ? (
+                                                    <a href={r.company.url} className="font-medium text-indigo-700 hover:underline">{r.company.naam}</a>
+                                                ) : (
+                                                    <Badge tone="warning">Niet gekoppeld</Badge>
+                                                )}
+                                                {r.status !== 'verwerkt' && r.status !== 'ingetrokken' && (!r.company || needsAction(r)) && (
+                                                    <div className="mt-2">
+                                                        <LinkCustomer
+                                                            request={r}
+                                                            customers={customers}
+                                                            disabled={busyId !== null}
+                                                            onLinked={{ url: urls.link.replace('__ID__', r.id), done: (text) => reload(text) }}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className={cx(tableClasses.td, 'text-xs text-zinc-600')}>
+                                                {r.form?.bedrijfsnaam || r.form?.naam ? (
+                                                    <>
+                                                        <p className="font-medium text-zinc-800">{r.form.bedrijfsnaam || '-'}</p>
+                                                        <p>{[r.form.naam, r.form.email].filter(Boolean).join(' · ')}</p>
+                                                        {r.iban_masked && <p className="font-mono">IBAN {r.iban_masked}</p>}
+                                                    </>
+                                                ) : (
+                                                    <span className="text-zinc-400">Nog niet ingevuld</span>
+                                                )}
+                                            </td>
+                                            <td className={cx(tableClasses.td, 'whitespace-nowrap text-xs text-zinc-600')}>
+                                                <p>{r.sent_at ? `${formatDateTime(r.sent_at)}${r.sent_via ? ` (${VIA_LABELS[r.sent_via] || r.sent_via})` : ''}` : '-'}</p>
+                                                <p>{r.completed_at ? `Ingevuld ${formatDateTime(r.completed_at)}` : ''}</p>
+                                            </td>
+                                            <td className={tableClasses.td}>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {r.comparison?.length > 0 && (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="secondary"
+                                                            icon="file-text"
+                                                            onClick={() => setOpenId(openId === r.id ? null : r.id)}
+                                                            aria-expanded={openId === r.id}
+                                                            aria-controls={`gegevens-${r.id}`}
+                                                        >
+                                                            Gegevens
+                                                        </Button>
+                                                    )}
+                                                    {r.can_process && (
+                                                        <Button size="sm" icon="check" onClick={() => act(r, 'process')} loading={busyId === r.id} disabled={busyId !== null}>
+                                                            Verwerken
+                                                        </Button>
+                                                    )}
+                                                    {r.can_revoke && (
+                                                        <Button size="sm" variant="ghost" icon="x-circle" onClick={() => act(r, 'revoke')} disabled={busyId !== null}>
+                                                            Intrekken
+                                                        </Button>
+                                                    )}
                                                 </div>
-                                            )}
-                                        </td>
-                                        <td className={cx(tableClasses.td, 'text-xs text-zinc-600')}>
-                                            {r.form?.bedrijfsnaam || r.form?.naam ? (
-                                                <>
-                                                    <p className="font-medium text-zinc-800">{r.form.bedrijfsnaam || '-'}</p>
-                                                    <p>{[r.form.naam, r.form.email].filter(Boolean).join(' · ')}</p>
-                                                    {r.iban_masked && <p className="font-mono">IBAN {r.iban_masked}</p>}
-                                                </>
-                                            ) : (
-                                                <span className="text-zinc-400">Nog niet ingevuld</span>
-                                            )}
-                                        </td>
-                                        <td className={cx(tableClasses.td, 'whitespace-nowrap text-xs text-zinc-600')}>
-                                            <p>{r.sent_at ? `${formatDateTime(r.sent_at)}${r.sent_via ? ` (${VIA_LABELS[r.sent_via] || r.sent_via})` : ''}` : '-'}</p>
-                                            <p>{r.completed_at ? `Ingevuld ${formatDateTime(r.completed_at)}` : ''}</p>
-                                        </td>
-                                        <td className={tableClasses.td}>
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {r.can_process && (
-                                                    <Button size="sm" icon="check" onClick={() => act(r, 'process')} loading={busyId === r.id} disabled={busyId !== null}>
-                                                        Verwerken
-                                                    </Button>
-                                                )}
-                                                {r.can_revoke && (
-                                                    <Button size="sm" variant="ghost" icon="x-circle" onClick={() => act(r, 'revoke')} disabled={busyId !== null}>
-                                                        Intrekken
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
+                                            </td>
+                                        </tr>
+                                        {openId === r.id && (
+                                            <tr id={`gegevens-${r.id}`}>
+                                                <td colSpan={6} className="bg-zinc-50/60 px-4 py-3">
+                                                    <div className="max-w-3xl">
+                                                        <p className="mb-2 text-xs font-medium text-zinc-700">Gegevens van het formulier vergeleken met {r.company?.naam}</p>
+                                                        <AdoptComparison
+                                                            request={r}
+                                                            url={urls.adopt?.replace('__ID__', r.id)}
+                                                            onDone={(text) => {
+                                                                setOpenId(null);
+                                                                reload(text);
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </Fragment>
                                 ))}
                             </tbody>
                         </table>

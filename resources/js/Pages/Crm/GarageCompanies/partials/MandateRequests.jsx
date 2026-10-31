@@ -286,13 +286,115 @@ export function MandateRequestDialog({ open, onClose, company, config, urls, tem
     );
 }
 
+const defaultSelection = (rows) => rows.filter((r) => !r.same && !r.crm).map((r) => r.key);
+
+/**
+ * Vergelijking formuliergegevens versus CRM met vinkjes. De server neemt alleen de gekozen
+ * veldnamen aan en haalt de waarden zelf uit de opgeslagen inzending.
+ */
+export function AdoptComparison({ request, url, onDone, canAdopt = true }) {
+    const rows = request.comparison || [];
+    const signature = rows.map((r) => `${r.key}:${r.crm}`).join('|');
+    const [selected, setSelected] = useState(() => defaultSelection(rows));
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        setSelected(defaultSelection(rows));
+        setError(null);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [request.id, signature]);
+
+    if (rows.length === 0) {
+        return <p className="text-xs text-zinc-500">Geen klantgegevens op het formulier ingevuld.</p>;
+    }
+
+    const editable = canAdopt && request.can_adopt && url;
+    const toggle = (key) => setSelected((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+
+    const submit = async () => {
+        setBusy(true);
+        setError(null);
+        try {
+            const { data } = await axios.post(url, { fields: selected });
+            onDone?.(data.message);
+        } catch (e) {
+            setError(requestErrorMessage(e));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <div className="space-y-3">
+            <div className="overflow-x-auto rounded-xl border border-zinc-200">
+                <table className="w-full text-left text-xs">
+                    <thead className="bg-zinc-50 text-zinc-500">
+                        <tr>
+                            {editable && <th className="w-8 px-3 py-2"><span className="sr-only">Overnemen</span></th>}
+                            <th className="px-3 py-2 font-medium">Gegeven</th>
+                            <th className="px-3 py-2 font-medium">Formulier</th>
+                            <th className="px-3 py-2 font-medium">Nu in CRM</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-100">
+                        {rows.map((row) => {
+                            const id = `overnemen-${request.id}-${row.key}`;
+                            return (
+                                <tr key={row.key} className={row.same ? 'text-zinc-500' : 'text-zinc-800'}>
+                                    {editable && (
+                                        <td className="px-3 py-2 align-top">
+                                            {row.same ? null : (
+                                                <input id={id} type="checkbox" className="checkbox" checked={selected.includes(row.key)} onChange={() => toggle(row.key)} disabled={busy} />
+                                            )}
+                                        </td>
+                                    )}
+                                    <td className="px-3 py-2 align-top font-medium">
+                                        <label htmlFor={row.same || !editable ? undefined : id}>{row.label}</label>
+                                    </td>
+                                    <td className="break-words px-3 py-2 align-top">{row.form}</td>
+                                    <td className="break-words px-3 py-2 align-top">
+                                        {row.same ? (
+                                            <Badge tone="success">Gelijk</Badge>
+                                        ) : row.crm ? (
+                                            row.crm
+                                        ) : (
+                                            <span className="text-zinc-400">Leeg</span>
+                                        )}
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+            {request.iban_masked && <p className="text-xs text-zinc-500">IBAN {request.iban_masked} staat alleen in het mandaat en wordt niet overgenomen.</p>}
+            {error && <Notice tone="danger">{error}</Notice>}
+            {editable && rows.some((r) => !r.same) && (
+                <div className="flex justify-end">
+                    <Button size="sm" icon="check" onClick={submit} loading={busy} disabled={busy || selected.length === 0}>
+                        Geselecteerde gegevens overnemen
+                    </Button>
+                </div>
+            )}
+        </div>
+    );
+}
+
 /** Lijst met machtigingsverzoeken op de klantpagina (incasso-sectie). */
 export function MandateRequestsCard({ requests = [], config, urls, onSend, onResend }) {
     const confirm = useConfirm();
     const [busyId, setBusyId] = useState(null);
     const [message, setMessage] = useState(null);
+    const [openId, setOpenId] = useState(null);
 
     if (!config?.available) return null;
+
+    const adopted = (text) => {
+        setMessage({ tone: 'success', text });
+        setOpenId(null);
+        router.reload({ preserveScroll: true });
+    };
 
     const act = async (request, kind) => {
         const texts = {
@@ -338,41 +440,60 @@ export function MandateRequestsCard({ requests = [], config, urls, onSend, onRes
                 ) : (
                     <ul className="divide-y divide-zinc-100 border-t border-zinc-100" aria-label="Machtigingsverzoeken">
                         {requests.map((r) => (
-                            <li key={r.id} className="flex flex-col gap-3 px-5 py-3.5 sm:flex-row sm:items-center sm:gap-4 sm:px-6">
-                                <div className="min-w-0 sm:w-1/3">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <span className="inline-flex items-center font-mono text-sm font-semibold text-zinc-900">
-                                            {r.kenmerk}
-                                            <CopyButton value={r.kenmerk} label="Kenmerk kopiëren" />
-                                        </span>
-                                        <RequestStatusBadge status={r.status} />
+                            <li key={r.id} className="px-5 py-3.5 sm:px-6">
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+                                    <div className="min-w-0 sm:w-1/3">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className="inline-flex items-center font-mono text-sm font-semibold text-zinc-900">
+                                                {r.kenmerk}
+                                                <CopyButton value={r.kenmerk} label="Kenmerk kopiëren" />
+                                            </span>
+                                            <RequestStatusBadge status={r.status} />
+                                        </div>
+                                        {r.mandaat_id && <p className="text-xs text-zinc-500">Mandaat {r.mandaat_id}</p>}
                                     </div>
-                                    {r.mandaat_id && <p className="text-xs text-zinc-500">Mandaat {r.mandaat_id}</p>}
+                                    <div className="min-w-0 flex-1 text-xs text-zinc-500">
+                                        <p>
+                                            {r.sent_at ? `Verstuurd ${formatDateTime(r.sent_at)}${r.sent_via ? ` via ${VIA_LABELS[r.sent_via] || r.sent_via}` : ''}${r.recipient_email ? ` aan ${r.recipient_email}` : ''}` : 'Ontvangen zonder verzoek'}
+                                        </p>
+                                        {r.completed_at ? <p>Ingevuld {formatDateTime(r.completed_at)}{r.iban_masked ? ` · IBAN ${r.iban_masked}` : ''}</p> : r.expires_at ? <p>Geldig tot {formatDate(r.expires_at)}</p> : null}
+                                        {r.error && <p className="text-rose-700">{r.error}</p>}
+                                    </div>
+                                    {config.can_send && (
+                                        <div className="flex shrink-0 flex-wrap items-center gap-2">
+                                            {r.comparison?.length > 0 && (
+                                                <Button
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    icon="file-text"
+                                                    onClick={() => setOpenId(openId === r.id ? null : r.id)}
+                                                    aria-expanded={openId === r.id}
+                                                    aria-controls={`gegevens-${r.id}`}
+                                                >
+                                                    Gegevens
+                                                </Button>
+                                            )}
+                                            {r.can_process && (
+                                                <Button size="sm" icon="check" onClick={() => act(r, 'process')} loading={busyId === r.id} disabled={busyId !== null}>
+                                                    Verwerken
+                                                </Button>
+                                            )}
+                                            {r.can_resend && (
+                                                <Button variant="secondary" size="sm" icon="refresh" onClick={() => onResend(r)} disabled={busyId !== null}>
+                                                    Opnieuw versturen
+                                                </Button>
+                                            )}
+                                            {r.can_revoke && (
+                                                <Button variant="ghost" size="sm" icon="x-circle" onClick={() => act(r, 'revoke')} disabled={busyId !== null}>
+                                                    Intrekken
+                                                </Button>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
-                                <div className="min-w-0 flex-1 text-xs text-zinc-500">
-                                    <p>
-                                        {r.sent_at ? `Verstuurd ${formatDateTime(r.sent_at)}${r.sent_via ? ` via ${VIA_LABELS[r.sent_via] || r.sent_via}` : ''}${r.recipient_email ? ` aan ${r.recipient_email}` : ''}` : 'Ontvangen zonder verzoek'}
-                                    </p>
-                                    {r.completed_at ? <p>Ingevuld {formatDateTime(r.completed_at)}{r.iban_masked ? ` · IBAN ${r.iban_masked}` : ''}</p> : r.expires_at ? <p>Geldig tot {formatDate(r.expires_at)}</p> : null}
-                                    {r.error && <p className="text-rose-700">{r.error}</p>}
-                                </div>
-                                {config.can_send && (
-                                    <div className="flex shrink-0 flex-wrap items-center gap-2">
-                                        {r.can_process && (
-                                            <Button size="sm" icon="check" onClick={() => act(r, 'process')} loading={busyId === r.id} disabled={busyId !== null}>
-                                                Verwerken
-                                            </Button>
-                                        )}
-                                        {r.can_resend && (
-                                            <Button variant="secondary" size="sm" icon="refresh" onClick={() => onResend(r)} disabled={busyId !== null}>
-                                                Opnieuw versturen
-                                            </Button>
-                                        )}
-                                        {r.can_revoke && (
-                                            <Button variant="ghost" size="sm" icon="x-circle" onClick={() => act(r, 'revoke')} disabled={busyId !== null}>
-                                                Intrekken
-                                            </Button>
-                                        )}
+                                {openId === r.id && (
+                                    <div id={`gegevens-${r.id}`} className="mt-3">
+                                        <AdoptComparison request={r} url={urls.adopt?.replace('__ID__', r.id)} onDone={adopted} canAdopt={config.can_send} />
                                     </div>
                                 )}
                             </li>

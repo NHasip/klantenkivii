@@ -37,7 +37,7 @@ class MandateRequestsController extends Controller
 
         $requests = $available
             ? SepaMandateRequest::query()
-                ->with(['garageCompany:id,bedrijfsnaam', 'mandate:id,mandaat_id', 'sender:id,name'])
+                ->with(['garageCompany:id,bedrijfsnaam,adres_straat_nummer,postcode,plaats,land,hoofd_email,hoofd_telefoon', 'garageCompany.primaryPerson', 'mandate:id,mandaat_id', 'sender:id,name'])
                 ->latest('id')
                 ->limit(500)
                 ->get()
@@ -60,6 +60,7 @@ class MandateRequestsController extends Controller
                 'revoke' => route('crm.mandate_requests.revoke', ['mandateRequest' => '__ID__']),
                 'link' => route('crm.mandate_requests.link', ['mandateRequest' => '__ID__']),
                 'process' => route('crm.mandate_requests.process', ['mandateRequest' => '__ID__']),
+                'adopt' => route('crm.mandate_requests.adopt', ['mandateRequest' => '__ID__']),
             ],
         ]);
     }
@@ -69,6 +70,7 @@ class MandateRequestsController extends Controller
     {
         $available = MandateRequestService::available();
         $requests = collect();
+        $company->loadMissing('primaryPerson');
         if ($available) {
             SepaMandateRequest::expireOverdue();
             $requests = SepaMandateRequest::query()
@@ -77,11 +79,10 @@ class MandateRequestsController extends Controller
                 ->latest('id')
                 ->limit(50)
                 ->get()
-                ->map(fn (SepaMandateRequest $r) => MandateRequestService::present($r))
+                ->map(fn (SepaMandateRequest $r) => MandateRequestService::present($r->setRelation('garageCompany', $company)))
                 ->values();
         }
 
-        $company->loadMissing('primaryPerson');
         $primary = $company->primaryPerson;
         $naam = $primary ? trim("{$primary->voornaam} {$primary->achternaam}") : '';
 
@@ -106,6 +107,7 @@ class MandateRequestsController extends Controller
                 'resend' => route('crm.mandate_requests.resend', ['mandateRequest' => '__ID__']),
                 'revoke' => route('crm.mandate_requests.revoke', ['mandateRequest' => '__ID__']),
                 'process' => route('crm.mandate_requests.process', ['mandateRequest' => '__ID__']),
+                'adopt' => route('crm.mandate_requests.adopt', ['mandateRequest' => '__ID__']),
                 'templates_store' => route('crm.email_templates.store'),
                 'overview' => route('crm.mandate_requests.index'),
             ],
@@ -197,6 +199,39 @@ class MandateRequestsController extends Controller
         }
 
         return response()->json(['message' => 'Mandaat '.$result['mandate']->mandaat_id.' aangemaakt en actief gezet.']);
+    }
+
+    /** Geselecteerde klantgegevens uit het formulier overnemen; waarden komen alleen uit de opgeslagen payload. */
+    public function adopt(Request $request, SepaMandateRequest $mandateRequest): JsonResponse
+    {
+        $data = $request->validate([
+            'fields' => ['required', 'array', 'min:1'],
+            'fields.*' => ['string', 'distinct', Rule::in(array_keys(MandateRequestService::ADOPT_FIELDS))],
+        ], [
+            'fields.required' => 'Selecteer minimaal één gegeven.',
+            'fields.min' => 'Selecteer minimaal één gegeven.',
+            'fields.*.in' => 'Onbekend veld geselecteerd.',
+        ]);
+
+        $company = $mandateRequest->garageCompany;
+        if (! $company) {
+            return response()->json(['message' => 'Koppel het verzoek eerst aan een klant.'], 422);
+        }
+        if (((array) ($mandateRequest->payload ?? [])) === [] || $mandateRequest->status === SepaMandateRequest::STATUS_INGETROKKEN) {
+            return response()->json(['message' => 'Er zijn geen formuliergegevens om over te nemen.'], 422);
+        }
+
+        $result = $this->service->adopt($mandateRequest, $company, $data['fields'], auth()->id());
+        if ($result['adopted'] === []) {
+            return response()->json(['message' => $result['skipped'] !== []
+                ? 'Niets overgenomen: '.implode(', ', $result['skipped']).'.'
+                : 'Niets overgenomen: de geselecteerde gegevens zijn al gelijk.'], 422);
+        }
+
+        return response()->json([
+            'message' => 'Overgenomen in klantprofiel: '.implode(', ', $result['adopted']).'.'
+                .($result['skipped'] !== [] ? ' Niet overgenomen: '.implode(', ', $result['skipped']).'.' : ''),
+        ]);
     }
 
     // ------------------------------------------------------------------
