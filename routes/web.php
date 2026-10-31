@@ -34,6 +34,8 @@ Route::middleware(['auth', 'active', 'admin.2fa'])->group(function () {
 
     Route::get('/garagebedrijven', [GarageCompaniesController::class, 'index'])->name('crm.garage_companies.index');
     Route::get('/garagebedrijven/nieuw', [GarageCompaniesController::class, 'create'])->name('crm.garage_companies.create');
+    // Engelstalige/gegokte URL vriendelijk doorsturen (moet voor de {garageCompany}-route staan).
+    Route::redirect('/garagebedrijven/create', '/garagebedrijven/nieuw');
     Route::post('/garagebedrijven', [GarageCompaniesController::class, 'store'])->name('crm.garage_companies.store');
     Route::get('/garagebedrijven/export/csv', [GarageCompaniesController::class, 'exportCsv'])->name('crm.garage_companies.export_csv');
     Route::post('/garagebedrijven/bulk/tag', [GarageCompaniesController::class, 'bulkTag'])->name('crm.garage_companies.bulk_tag');

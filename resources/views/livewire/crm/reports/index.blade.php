@@ -3,6 +3,10 @@
         $nf = fn ($v) => number_format((float) $v, 0, ',', '.');
         $money = fn ($v) => '€ '.number_format((float) $v, 2, ',', '.');
         $euro = fn ($v) => '€ '.number_format((float) $v, 0, ',', '.');
+        // Korte asnotatie voor mobiel (bijv. €12,5k), zodat grotere labels in de linkermarge passen.
+        $euroShort = fn ($v) => (float) $v >= 1000
+            ? '€'.rtrim(rtrim(number_format((float) $v / 1000, 1, ',', '.'), '0'), ',').'k'
+            : '€'.number_format((float) $v, 0, ',', '.');
         $csvBtn = 'btn btn-secondary btn-xs';
         $tileTones = [
             'brand' => 'bg-indigo-100/80 text-indigo-700',
@@ -239,7 +243,10 @@
                 @foreach ([0, 0.25, 0.5, 0.75, 1] as $f)
                     @php $gy = round($padT + $plotH - $plotH * $f, 1); @endphp
                     <line x1="{{ $padL }}" x2="{{ $chartW - $padR }}" y1="{{ $gy }}" y2="{{ $gy }}" stroke="#e4e4e7" stroke-width="1" @if($f > 0) stroke-dasharray="3 4" @endif />
-                    <text x="{{ $padL - 10 }}" y="{{ $gy + 4 }}" text-anchor="end" font-size="11" fill="#71717a">{{ $euro($mrrTop * $f) }}</text>
+                    <text x="{{ $padL - 10 }}" y="{{ $gy + 4 }}" text-anchor="end" font-size="11" fill="#71717a" class="chart-tick-desktop">{{ $euro($mrrTop * $f) }}</text>
+                    @if (in_array($f, [0, 0.5, 1], true))
+                        <text x="{{ $padL - 6 }}" y="{{ $gy + 7 }}" text-anchor="end" font-size="11" fill="#71717a" class="chart-tick-mobile chart-tick-y" aria-hidden="true">{{ $euroShort($mrrTop * $f) }}</text>
+                    @endif
                 @endforeach
                 @if ($mrrArea !== '')
                     <path d="{{ $mrrArea }}" fill="url(#mrrFill)" />
@@ -250,12 +257,18 @@
                     <circle cx="{{ $p['x'] }}" cy="{{ $p['y'] }}" r="{{ $isLast ? 5 : 3.5 }}" fill="{{ $isLast ? '#667319' : '#fff' }}" stroke="#667319" stroke-width="2">
                         <title>{{ $p['row']['label'] }}: {{ $money($p['row']['excl']) }}</title>
                     </circle>
-                    @if ($i % 2 === (count($mrrPoints) - 1) % 2)
-                        <text x="{{ $p['x'] }}" y="{{ $chartH - 10 }}" text-anchor="{{ $isLast ? 'end' : 'middle' }}" font-size="11" fill="{{ $isLast ? '#3f3f46' : '#71717a' }}" font-weight="{{ $isLast ? 600 : 400 }}">{{ $p['row']['label'] }}</text>
+                    @php
+                        // Desktop: elke 2e maand. Mobiel (grotere letters): elke 3e maand, altijd inclusief de laatste.
+                        $fromEnd = count($mrrPoints) - 1 - $i;
+                        $tickDesktop = $fromEnd % 2 === 0;
+                        $tickMobile = $fromEnd % 3 === 0;
+                    @endphp
+                    @if ($tickDesktop || $tickMobile)
+                        <text x="{{ $p['x'] }}" y="{{ $chartH - 10 }}" text-anchor="{{ $isLast ? 'end' : 'middle' }}" font-size="11" fill="{{ $isLast ? '#3f3f46' : '#71717a' }}" font-weight="{{ $isLast ? 600 : 400 }}" @class(['chart-tick-lg', 'chart-tick-desktop' => ! $tickMobile, 'chart-tick-mobile' => ! $tickDesktop])>{{ $p['row']['label'] }}</text>
                     @endif
                 @endforeach
                 @if ($mrrLast && (float) $mrrLast['row']['excl'] > 0)
-                    <text x="{{ $mrrLast['x'] - 8 }}" y="{{ max($padT + 12, $mrrLast['y'] - 12) }}" text-anchor="end" font-size="12" font-weight="600" fill="#3f3f46">{{ $euro($mrrLast['row']['excl']) }}</text>
+                    <text x="{{ $mrrLast['x'] - 8 }}" y="{{ max($padT + 12, $mrrLast['y'] - 12) }}" text-anchor="end" font-size="12" font-weight="600" fill="#3f3f46" class="chart-tick-lg">{{ $euro($mrrLast['row']['excl']) }}</text>
                 @endif
             </svg>
             <dl class="mt-4 grid grid-cols-1 gap-3 border-t border-zinc-100 pt-4 text-sm sm:grid-cols-3">
@@ -288,7 +301,7 @@
                 @foreach ([0, 0.25, 0.5, 0.75, 1] as $f)
                     @php $gy = round($padT + $flowPlotH - $flowPlotH * $f, 1); @endphp
                     <line x1="{{ $flowPadL }}" x2="{{ $flowW - $flowPadR }}" y1="{{ $gy }}" y2="{{ $gy }}" stroke="#e4e4e7" stroke-width="1" @if($f > 0) stroke-dasharray="3 4" @endif />
-                    <text x="{{ $flowPadL - 8 }}" y="{{ $gy + 4 }}" text-anchor="end" font-size="11" fill="#71717a">{{ (int) round($flowTop * $f) }}</text>
+                    <text x="{{ $flowPadL - 8 }}" y="{{ $gy + 4 }}" text-anchor="end" font-size="11" fill="#71717a" class="chart-tick-md">{{ (int) round($flowTop * $f) }}</text>
                 @endforeach
                 @foreach ($flowByMonth as $i => $row)
                     @php
@@ -305,8 +318,13 @@
                         <rect x="{{ round($cx + 1, 1) }}" y="{{ round($base - $hOp, 1) }}" width="{{ round($barW, 1) }}" height="{{ round($hOp, 1) }}" rx="2" fill="#f43f5e" />
                         <rect x="{{ round($cx + 1, 1) }}" y="{{ round($base - $hOp - $hVe, 1) }}" width="{{ round($barW, 1) }}" height="{{ round($hVe, 1) }}" rx="2" fill="#fda4af" />
                     </g>
-                    @if ($i % 2 === (count($flowByMonth) - 1) % 2)
-                        <text x="{{ round($cx, 1) }}" y="{{ $flowH - 10 }}" text-anchor="middle" font-size="11" fill="#71717a">{{ $row['label'] }}</text>
+                    @php
+                        $flowFromEnd = count($flowByMonth) - 1 - $i;
+                        $flowTickDesktop = $flowFromEnd % 2 === 0;
+                        $flowTickMobile = $flowFromEnd % 3 === 0;
+                    @endphp
+                    @if ($flowTickDesktop || $flowTickMobile)
+                        <text x="{{ round($cx, 1) }}" y="{{ $flowH - 10 }}" text-anchor="middle" font-size="11" fill="#71717a" @class(['chart-tick-md', 'chart-tick-last' => $flowFromEnd === 0, 'chart-tick-desktop' => ! $flowTickMobile, 'chart-tick-mobile' => ! $flowTickDesktop])>{{ $row['label'] }}</text>
                     @endif
                 @endforeach
             </svg>

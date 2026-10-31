@@ -86,7 +86,7 @@ function ModulesSection({ form, totals, extraUsersHint, onToggle, onUpdateRow, o
                                             />
                                         </div>
                                         <Field id={`${base}-aantal`} error={errors.aantal}>
-                                            <label htmlFor={`${base}-aantal`} className="mb-1 block text-xs font-medium text-zinc-600 sm:sr-only">Aantal</label>
+                                            <label htmlFor={`${base}-aantal`} className="mb-1 block truncate whitespace-nowrap text-xs font-medium text-zinc-600 sm:sr-only">Aantal</label>
                                             <input
                                                 id={`${base}-aantal`}
                                                 type="number"
@@ -99,7 +99,7 @@ function ModulesSection({ form, totals, extraUsersHint, onToggle, onUpdateRow, o
                                             />
                                         </Field>
                                         <Field id={`${base}-prijs`} error={errors.prijs}>
-                                            <label htmlFor={`${base}-prijs`} className="mb-1 block text-xs font-medium text-zinc-600 sm:sr-only">Prijs per maand excl. btw</label>
+                                            <label htmlFor={`${base}-prijs`} className="mb-1 block truncate whitespace-nowrap text-xs font-medium text-zinc-600 sm:sr-only">Prijs p/m<span className="sr-only"> excl. btw</span></label>
                                             <input
                                                 id={`${base}-prijs`}
                                                 type="number"
@@ -113,7 +113,7 @@ function ModulesSection({ form, totals, extraUsersHint, onToggle, onUpdateRow, o
                                             />
                                         </Field>
                                         <Field id={`${base}-btw`} error={errors.btw}>
-                                            <label htmlFor={`${base}-btw`} className="mb-1 block text-xs font-medium text-zinc-600 sm:sr-only">Btw percentage</label>
+                                            <label htmlFor={`${base}-btw`} className="mb-1 block truncate whitespace-nowrap text-xs font-medium text-zinc-600 sm:sr-only">Btw<span className="sr-only"> percentage</span><span aria-hidden="true"> %</span></label>
                                             <input
                                                 id={`${base}-btw`}
                                                 type="number"

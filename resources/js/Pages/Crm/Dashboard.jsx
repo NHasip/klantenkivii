@@ -130,7 +130,7 @@ const LINK_FOCUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visibl
 
 function TextLink({ href, children, className = '' }) {
     return (
-        <a href={href} className={cx('inline-flex items-center gap-1 rounded text-sm font-medium text-indigo-700 hover:text-indigo-900 hover:underline', LINK_FOCUS, className)}>
+        <a href={href} className={cx('tap-link inline-flex items-center gap-1 rounded text-sm font-medium text-indigo-700 hover:text-indigo-900 hover:underline', LINK_FOCUS, className)}>
             {children}
             <Icon name="chevron-right" className="h-3.5 w-3.5" />
         </a>

@@ -56,7 +56,7 @@ export function FlashToast() {
             key={toast.id}
             role={isError ? 'alert' : 'status'}
             aria-live={isError ? 'assertive' : 'polite'}
-            className={`fixed bottom-4 left-4 right-4 z-[65] rounded-xl border bg-white p-4 text-sm shadow-lg sm:left-auto sm:w-96 ${
+            className={`fixed bottom-[calc(1rem+var(--kivii-bottom-offset,0px))] left-4 right-4 z-[65] rounded-xl border bg-white p-4 text-sm shadow-lg sm:left-auto sm:w-96 ${
                 isError ? 'border-rose-200' : 'border-emerald-200'
             }`}
         >

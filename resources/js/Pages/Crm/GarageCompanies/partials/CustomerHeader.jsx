@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from '@inertiajs/react';
 import StatusBadge from '../../../../components/StatusBadge';
 import { Icon } from '../../../../components/icons';
@@ -44,13 +44,151 @@ function lifecycleCell(company, status) {
 
 function MetricCell({ label, icon, children }) {
     return (
-        <div className="min-w-0 px-5 py-4 sm:px-6">
+        <div className="min-w-0 px-5 py-3 sm:px-6 sm:py-4">
             <dt className="flex items-center gap-1.5 text-xs font-medium text-zinc-500">
                 <Icon name={icon} className="h-3.5 w-3.5 text-zinc-400" />
                 {label}
             </dt>
             <dd className="mt-1.5 min-w-0">{children}</dd>
         </div>
+    );
+}
+
+// Snelacties in de kop. Volgorde = prioriteit: op mobiel zijn de eerste twee direct zichtbaar, de rest staat onder "Meer".
+function buildActions({ phone, email, status, isDemo, panel, togglePanel, onSendMandate, pauseForm, onResume, onActivate, activateBusy }) {
+    const list = [];
+    if (status === 'gepauzeerd' && onResume) {
+        list.push({ key: 'resume', label: 'Hervatten', icon: 'check-circle', primary: true, onClick: onResume, loading: activateBusy });
+    }
+    if (isDemo) {
+        list.push({ key: 'activate', label: 'Activeren', icon: 'check-circle', primary: true, onClick: onActivate, loading: activateBusy });
+    }
+    if (phone) list.push({ key: 'call', label: 'Bellen', icon: 'phone', href: telHref(phone), title: phone });
+    if (email) list.push({ key: 'mail', label: 'Mailen', icon: 'mail', href: `mailto:${email}`, title: email });
+    list.push({ key: 'note', label: 'Notitie', icon: 'message-square', onClick: () => togglePanel('note'), expanded: panel === 'note', controls: 'header-panel-note' });
+    if (onSendMandate) list.push({ key: 'mandate', label: 'Machtiging versturen', icon: 'file-text', onClick: onSendMandate });
+    if (status === 'actief' && pauseForm) {
+        list.push({ key: 'pause', label: 'Pauzeren', icon: 'clock', onClick: () => togglePanel('pause'), expanded: panel === 'pause', controls: 'header-panel-pause-form' });
+    }
+    if (isDemo) {
+        list.push({ key: 'extend', label: 'Demo verlengen', icon: 'clock', onClick: () => togglePanel('extend'), expanded: panel === 'extend', controls: 'header-panel-extend' });
+    }
+    return list;
+}
+
+// Desktopvolgorde (ongewijzigd): contactacties eerst, primaire statusactie als laatste.
+const DESKTOP_ORDER = ['call', 'mail', 'mandate', 'note', 'pause', 'resume', 'extend', 'activate'];
+
+function ActionButton({ action, className = '' }) {
+    if (action.primary) {
+        return (
+            <Button size="sm" icon={action.icon} onClick={action.onClick} loading={action.loading} className={className}>
+                {action.label}
+            </Button>
+        );
+    }
+    const content = (
+        <>
+            <Icon name={action.icon} className="h-4 w-4 text-zinc-500" />
+            {action.label}
+        </>
+    );
+    if (action.href) {
+        return (
+            <a href={action.href} className={cx(QUICK, className)} title={action.title}>
+                {content}
+            </a>
+        );
+    }
+    return (
+        <button type="button" className={cx(QUICK, className)} onClick={action.onClick} aria-expanded={action.expanded} aria-controls={action.controls}>
+            {content}
+        </button>
+    );
+}
+
+function MoreMenu({ actions }) {
+    const [open, setOpen] = useState(false);
+    const rootRef = useRef(null);
+    const buttonRef = useRef(null);
+
+    useEffect(() => {
+        if (!open) return undefined;
+        const onPointer = (event) => {
+            if (!rootRef.current?.contains(event.target)) setOpen(false);
+        };
+        const onKey = (event) => {
+            if (event.key === 'Escape') {
+                setOpen(false);
+                buttonRef.current?.focus();
+            }
+        };
+        document.addEventListener('pointerdown', onPointer);
+        document.addEventListener('keydown', onKey);
+        return () => {
+            document.removeEventListener('pointerdown', onPointer);
+            document.removeEventListener('keydown', onKey);
+        };
+    }, [open]);
+
+    const run = (action) => {
+        setOpen(false);
+        action.onClick?.();
+    };
+
+    return (
+        <div ref={rootRef} className="relative">
+            <button
+                ref={buttonRef}
+                type="button"
+                className={QUICK}
+                onClick={() => setOpen((value) => !value)}
+                aria-expanded={open}
+                aria-haspopup="true"
+                aria-controls="klant-meer-acties"
+            >
+                <Icon name="more-horizontal" className="h-4 w-4 text-zinc-500" />
+                Meer
+            </button>
+            {open ? (
+                <div id="klant-meer-acties" className="menu-panel absolute right-0 top-full z-30 mt-2 w-60">
+                    {actions.map((action) =>
+                        action.href ? (
+                            <a key={action.key} href={action.href} className="menu-item" onClick={() => setOpen(false)}>
+                                <Icon name={action.icon} className="h-4 w-4 text-zinc-400" />
+                                {action.label}
+                            </a>
+                        ) : (
+                            <button key={action.key} type="button" className="menu-item" onClick={() => run(action)} aria-controls={action.controls}>
+                                <Icon name={action.icon} className="h-4 w-4 text-zinc-400" />
+                                {action.label}
+                            </button>
+                        ),
+                    )}
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
+function HeaderActions({ actions }) {
+    const desktop = [...actions].sort((a, b) => DESKTOP_ORDER.indexOf(a.key) - DESKTOP_ORDER.indexOf(b.key));
+    const visible = actions.slice(0, 2);
+    const overflow = actions.slice(2);
+    return (
+        <>
+            <div className="hidden flex-wrap items-center gap-2 sm:flex lg:justify-end">
+                {desktop.map((action) => (
+                    <ActionButton key={action.key} action={action} />
+                ))}
+            </div>
+            <div className="flex items-center gap-2 sm:hidden">
+                {visible.map((action) => (
+                    <ActionButton key={action.key} action={action} className="flex-1" />
+                ))}
+                {overflow.length > 0 ? <MoreMenu actions={overflow} /> : null}
+            </div>
+        </>
     );
 }
 
@@ -105,13 +243,26 @@ export default function CustomerHeader({
     const togglePanel = (name) => setPanel(panel === name ? null : name);
     const progress = isDemo ? demoProgress(company) : null;
     const lifecycle = lifecycleCell(company, status);
+    const actions = buildActions({
+        phone,
+        email,
+        status,
+        isDemo,
+        panel,
+        togglePanel,
+        onSendMandate,
+        pauseForm,
+        onResume,
+        onActivate,
+        activateBusy,
+    });
     const place = [company.plaats, company.land && company.land !== 'Nederland' ? company.land : null].filter(Boolean).join(', ');
 
     return (
         <>
             <section className="card overflow-hidden" aria-labelledby="klant-titel">
                 <div className="p-5 sm:p-6">
-                    <Link href={indexUrl} className="mb-4 inline-flex items-center gap-1 rounded-md text-sm font-medium text-zinc-500 hover:text-zinc-900 focus-ring">
+                    <Link href={indexUrl} className="tap-link mb-3 inline-flex items-center gap-1 rounded-md text-sm sm:mb-4 font-medium text-zinc-500 hover:text-zinc-900 focus-ring">
                         <Icon name="arrow-left" className="h-4 w-4" />
                         Klanten
                     </Link>
@@ -149,52 +300,7 @@ export default function CustomerHeader({
                             </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                            {phone && (
-                                <a href={telHref(phone)} className={QUICK} title={phone}>
-                                    <Icon name="phone" className="h-4 w-4 text-zinc-500" />
-                                    Bellen
-                                </a>
-                            )}
-                            {email && (
-                                <a href={`mailto:${email}`} className={QUICK} title={email}>
-                                    <Icon name="mail" className="h-4 w-4 text-zinc-500" />
-                                    Mailen
-                                </a>
-                            )}
-                            {onSendMandate && (
-                                <button type="button" className={QUICK} onClick={onSendMandate}>
-                                    <Icon name="file-text" className="h-4 w-4 text-zinc-500" />
-                                    Machtiging versturen
-                                </button>
-                            )}
-                            <button type="button" className={QUICK} onClick={() => togglePanel('note')} aria-expanded={panel === 'note'} aria-controls="header-panel-note">
-                                <Icon name="message-square" className="h-4 w-4 text-zinc-500" />
-                                Notitie
-                            </button>
-                            {status === 'actief' && pauseForm && (
-                                <button type="button" className={QUICK} onClick={() => togglePanel('pause')} aria-expanded={panel === 'pause'} aria-controls="header-panel-pause-form">
-                                    <Icon name="clock" className="h-4 w-4 text-zinc-500" />
-                                    Pauzeren
-                                </button>
-                            )}
-                            {status === 'gepauzeerd' && onResume && (
-                                <Button size="sm" icon="check-circle" onClick={onResume} loading={activateBusy}>
-                                    Hervatten
-                                </Button>
-                            )}
-                            {isDemo && (
-                                <>
-                                    <button type="button" className={QUICK} onClick={() => togglePanel('extend')} aria-expanded={panel === 'extend'} aria-controls="header-panel-extend">
-                                        <Icon name="clock" className="h-4 w-4 text-zinc-500" />
-                                        Demo verlengen
-                                    </button>
-                                    <Button size="sm" icon="check-circle" onClick={onActivate} loading={activateBusy}>
-                                        Activeren
-                                    </Button>
-                                </>
-                            )}
-                        </div>
+                        <HeaderActions actions={actions} />
                     </div>
 
                     {panel === 'note' && (
@@ -346,8 +452,28 @@ export default function CustomerHeader({
                 </dl>
             </section>
 
-            <div className="sticky top-14 z-20 -mx-4 bg-canvas/90 px-4 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10">
-                <div className="scroll-fade-r">
+            <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-20 -mx-4 bg-canvas/90 px-4 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10">
+                {/* Mobiel: volledige breedte keuzelijst in plaats van een onzichtbaar scrollende tabbalk. */}
+                <div className="py-2 sm:hidden">
+                    <label htmlFor={`${tabsIdBase}-picker`} className="sr-only">
+                        Onderdeel van het klantdossier
+                    </label>
+                    <div className="relative">
+                        <select
+                            id={`${tabsIdBase}-picker`}
+                            className={cx(inputClasses, 'h-11 pr-10 font-medium')}
+                            value={activeTab}
+                            onChange={(e) => onTabChange(e.target.value)}
+                        >
+                            {tabs.map((item) => (
+                                <option key={item.key} value={item.key}>
+                                    {item.count !== undefined && item.count !== null ? `${item.label} (${item.count})` : item.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+                <div className="scroll-fade-r hidden sm:block">
                     <Tabs
                         label="Klantdossier"
                         idBase={tabsIdBase}

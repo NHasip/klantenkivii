@@ -129,7 +129,68 @@
             @endunless
         </div>
     @else
-        <div class="table-wrap">
+        {{-- Kaarten op mobiel --}}
+        <ul class="space-y-3 md:hidden" aria-label="Gebruikers van het CRM">
+            @foreach($users as $u)
+                @php
+                    $isSelf = $u->id === $currentUserId;
+                    $isLastAdmin = $u->isAdmin() && $u->active && $activeAdminCount <= 1;
+                @endphp
+                <li wire:key="user-card-{{ $u->id }}" @class(['card p-4', 'ring-2 ring-indigo-200' => $userId === $u->id])>
+                    <div class="flex min-w-0 items-center gap-3">
+                        <x-avatar :name="$u->name" size="sm" @class(['opacity-60' => ! $u->active]) />
+                        <div class="min-w-0 flex-1">
+                            <div @class(['flex items-center gap-1.5 font-semibold', 'text-zinc-900' => $u->active, 'text-zinc-500' => ! $u->active])>
+                                <span class="truncate">{{ $u->name }}</span>
+                                @if($isSelf)<span class="text-xs font-normal text-zinc-500">(jij)</span>@endif
+                            </div>
+                            <div class="break-all text-xs text-zinc-500">{{ $u->email }}</div>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex flex-wrap items-center gap-2">
+                        @if($u->isAdmin())
+                            <x-badge tone="brand"><x-icon name="shield" class="h-3 w-3" />{{ $roleLabels[$u->role->value] ?? ucfirst($u->role->value) }}</x-badge>
+                        @else
+                            <x-badge>{{ $roleLabels[$u->role->value] ?? ucfirst($u->role->value) }}</x-badge>
+                        @endif
+                        @if($u->active)
+                            <x-badge tone="success" dot>Actief</x-badge>
+                        @else
+                            <x-badge dot>Inactief</x-badge>
+                        @endif
+                    </div>
+                    <p class="mt-2 text-xs text-zinc-500">
+                        Laatste login:
+                        @if($u->last_login_at)
+                            <time datetime="{{ $u->last_login_at->toIso8601String() }}" title="{{ $u->last_login_at->format('d-m-Y H:i') }}" class="text-zinc-700">{{ $u->last_login_at->locale('nl')->diffForHumans() }}</time>
+                        @else
+                            <span class="text-zinc-400">Nog nooit</span>
+                        @endif
+                    </p>
+                    <div class="mt-3 flex items-center gap-2 border-t border-zinc-100 pt-3">
+                        <button type="button" class="btn btn-secondary min-h-[44px] flex-1" wire:click="startEdit({{ $u->id }})" aria-label="{{ $u->name }} bewerken">
+                            <x-icon name="edit" class="h-4 w-4" />
+                            Bewerken
+                        </button>
+                        @if($isSelf || $isLastAdmin)
+                            <span class="inline-flex h-11 w-11 items-center justify-center text-zinc-300" title="{{ $isSelf ? 'Je kunt je eigen account niet verwijderen.' : 'De laatste actieve admin kan niet worden verwijderd.' }}">
+                                <x-icon name="trash" class="h-4 w-4" title="{{ $isSelf ? 'Eigen account kan niet worden verwijderd' : 'Laatste admin kan niet worden verwijderd' }}" />
+                            </span>
+                        @else
+                            <form method="POST" action="{{ route('crm.users.delete', ['user' => $u->id]) }}" class="inline" onsubmit="return confirm(@js('Weet je zeker dat je '.$u->name.' wilt verwijderen? Dit kan niet ongedaan worden gemaakt.'))">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn btn-danger-ghost btn-icon h-11 w-11" aria-label="{{ $u->name }} verwijderen" title="Verwijderen">
+                                    <x-icon name="trash" class="h-4 w-4" />
+                                </button>
+                            </form>
+                        @endif
+                    </div>
+                </li>
+            @endforeach
+        </ul>
+
+        <div class="table-wrap hidden md:block">
             <table class="table-base">
                 <caption class="sr-only">Gebruikers van het CRM</caption>
                 <thead class="table-head">

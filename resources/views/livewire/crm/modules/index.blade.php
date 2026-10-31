@@ -148,7 +148,88 @@
             @endunless
         </div>
     @else
-        <div class="table-wrap">
+        {{-- Kaarten op mobiel --}}
+        <ul class="space-y-3 md:hidden" aria-label="Modules ({{ $activeCount }} actief)">
+            @foreach($modules as $m)
+                @php
+                    $inUse = (int) ($usage[$m->id] ?? 0);
+                    $archived = $supportsArchive && $m->archived_at !== null;
+                @endphp
+                <li wire:key="module-card-{{ $m->id }}" @class(['card p-4', 'bg-zinc-50/70' => $archived, 'ring-2 ring-indigo-200' => $moduleId === $m->id])>
+                    <div class="flex min-w-0 items-start gap-3">
+                        <span @class(['icon-tile mt-0.5 h-8 w-8 shrink-0 rounded-lg', 'bg-zinc-100 text-zinc-400' => $archived, $tileTones[$m->id % count($tileTones)] => ! $archived]) aria-hidden="true">
+                            <x-icon :name="$archived ? 'archive' : 'package'" class="h-4 w-4" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span @class(['font-semibold', 'text-zinc-900' => ! $archived, 'text-zinc-500' => $archived])>{{ $m->naam }}</span>
+                                @if($archived)
+                                    <x-badge>Gearchiveerd</x-badge>
+                                @endif
+                            </div>
+                            @if(filled($m->omschrijving))
+                                <p class="mt-0.5 text-xs leading-5 text-zinc-500">{{ $m->omschrijving }}</p>
+                            @endif
+                        </div>
+                    </div>
+                    <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                        @if($supportsDefaultPricing)
+                            @php
+                                $btw = (float) $m->default_btw_percentage;
+                                $btwDecimals = abs($btw - round($btw)) < 0.001 ? 0 : 2;
+                            @endphp
+                            <div>
+                                <dt class="text-xs text-zinc-500">Prijs p/m excl.</dt>
+                                <dd class="font-semibold tabular-nums text-zinc-900">&euro; {{ number_format((float) $m->default_prijs_maand_excl, 2, ',', '.') }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-xs text-zinc-500">Btw</dt>
+                                <dd class="tabular-nums text-zinc-800">{{ number_format($btw, $btwDecimals, ',', '.') }}%</dd>
+                            </div>
+                        @endif
+                        <div>
+                            <dt class="text-xs text-zinc-500">Klanten</dt>
+                            <dd @class(['tabular-nums', 'font-semibold text-zinc-900' => $inUse > 0, 'text-zinc-400' => $inUse === 0])>{{ number_format($inUse, 0, ',', '.') }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs text-zinc-500">Nieuwe klanten</dt>
+                            <dd>
+                                @if($m->default_visible)
+                                    <x-badge tone="info"><x-icon name="eye" class="h-3 w-3" />Zichtbaar</x-badge>
+                                @else
+                                    <x-badge>Verborgen</x-badge>
+                                @endif
+                            </dd>
+                        </div>
+                    </dl>
+                    <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-zinc-100 pt-3">
+                        <button type="button" class="btn btn-secondary min-h-[44px]" wire:click="startEdit({{ $m->id }})" aria-label="{{ $m->naam }} bewerken">
+                            <x-icon name="edit" class="h-4 w-4" />Bewerken
+                        </button>
+                        @if($archived)
+                            <button type="button" class="btn btn-ghost min-h-[44px]" wire:click="restoreModule({{ $m->id }})" wire:loading.attr="disabled" wire:target="restoreModule({{ $m->id }})" aria-label="{{ $m->naam }} herstellen">
+                                <x-icon name="refresh" class="h-4 w-4" />Herstellen
+                            </button>
+                        @elseif($supportsArchive)
+                            <button type="button" class="btn btn-ghost min-h-[44px] text-amber-800 hover:bg-amber-50 hover:text-amber-900" aria-label="{{ $m->naam }} archiveren"
+                                    @click="ask('archiveModule', {{ $m->id }}, 'Module archiveren?', 'Bestaande klanten houden de module, maar je kunt hem niet meer kiezen bij nieuwe koppelingen.', 'Archiveren')">
+                                <x-icon name="archive" class="h-4 w-4" />Archiveren
+                            </button>
+                        @elseif($inUse > 0)
+                            <span class="inline-flex min-h-[44px] items-center text-xs text-zinc-400" title="Draai de nieuwste migraties om archiveren mogelijk te maken.">In gebruik</span>
+                        @endif
+                        @if(! $archived && $inUse === 0)
+                            <button type="button" class="btn btn-danger-ghost btn-icon ml-auto h-11 w-11" aria-label="{{ $m->naam }} verwijderen" title="Verwijderen"
+                                    @click="ask('deleteModule', {{ $m->id }}, 'Module verwijderen?', 'Weet je zeker dat je deze module wilt verwijderen? Dit kan niet ongedaan worden gemaakt.', 'Verwijderen', true)">
+                                <x-icon name="trash" class="h-4 w-4" />
+                            </button>
+                        @endif
+                    </div>
+                </li>
+            @endforeach
+        </ul>
+
+        <div class="table-wrap hidden md:block">
             <table class="table-base">
                 <caption class="sr-only">Modules ({{ $activeCount }} actief)</caption>
                 <thead class="table-head">

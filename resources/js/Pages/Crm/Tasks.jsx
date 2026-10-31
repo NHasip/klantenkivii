@@ -305,6 +305,35 @@ const BOARD_GRID_COLS = { 1: 'xl:grid-cols-1', 2: 'xl:grid-cols-2', 3: 'xl:grid-
 const VIEW_TO_URL = { list: 'lijst', board: 'bord', team: 'team' };
 const URL_TO_VIEW = { lijst: 'list', bord: 'board', team: 'team' };
 
+// Mobiel (onder md) is een kanbanbord onhandig: standaard de lijst, tenzij de gebruiker op mobiel zelf
+// een weergave koos (bewaard in localStorage). Desktop houdt het bord als standaard.
+const MOBILE_VIEW_KEY = 'kivii.tasks.mobileView';
+
+function isSmallScreen() {
+    return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 767.98px)').matches;
+}
+
+function initialView(fromUrl) {
+    if (fromUrl) return fromUrl;
+    if (!isSmallScreen()) return 'board';
+    try {
+        const stored = window.localStorage.getItem(MOBILE_VIEW_KEY);
+        if (stored && VIEW_TO_URL[stored]) return stored;
+    } catch {
+        // localStorage niet beschikbaar (privémodus): val terug op de lijst.
+    }
+    return 'list';
+}
+
+function rememberMobileView(view) {
+    if (!isSmallScreen()) return;
+    try {
+        window.localStorage.setItem(MOBILE_VIEW_KEY, view);
+    } catch {
+        // Niet kritiek.
+    }
+}
+
 function readUrlState() {
     if (typeof window === 'undefined') return {};
     const params = new URLSearchParams(window.location.search);
@@ -868,7 +897,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
     const [statusOptions, setStatusOptions] = useState(initial?.statusOptions ?? []);
     const [priorityOptions, setPriorityOptions] = useState(initial?.priorityOptions ?? []);
 
-    const [view, setView] = useState(urlInit.view ?? 'board'); // board | list | team
+    const [view, setView] = useState(() => initialView(urlInit.view)); // board | list | team
     const [filtersOpen, setFiltersOpen] = useState(false);
     const [groupBoardBy, setGroupBoardBy] = useState(urlInit.group ?? 'status'); // project | status
     const [filterCustomer, setFilterCustomer] = useState(customerFilter ?? null);
@@ -1639,7 +1668,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                         role={notice.tone === 'error' ? 'alert' : 'status'}
                         aria-live={notice.tone === 'error' ? 'assertive' : 'polite'}
                         className={cx(
-                            'fixed bottom-4 left-4 right-4 z-[60] rounded-2xl border bg-white p-4 text-sm shadow-pop sm:left-auto sm:w-96',
+                            'fixed bottom-[calc(1rem+var(--kivii-bottom-offset,0px))] left-4 right-4 z-[60] rounded-2xl border bg-white p-4 text-sm shadow-pop sm:left-auto sm:w-96',
                             notice.tone === 'error' ? 'border-rose-200' : 'border-emerald-200',
                         )}
                     >
@@ -1663,10 +1692,13 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                 type="button"
                                 aria-pressed={view === key}
                                 className={cx(
-                                    'inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600',
+                                    'tap-target inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600',
                                     view === key ? 'bg-white text-zinc-900 shadow-card ring-1 ring-black/5' : 'text-zinc-600 hover:text-zinc-900',
                                 )}
-                                onClick={() => setView(key)}
+                                onClick={() => {
+                                    setView(key);
+                                    rememberMobileView(key);
+                                }}
                             >
                                 <Icon name={icon} className={cx('h-4 w-4', view === key ? 'text-indigo-600' : 'text-zinc-400')} />
                                 {label}

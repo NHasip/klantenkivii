@@ -3,7 +3,7 @@ import { Head, router } from '@inertiajs/react';
 import axios from 'axios';
 import { useConfirm } from '../../../components/ConfirmProvider';
 import { Badge, Button, Card, EmptyState, PageHeader, cx, inputClasses, tableClasses } from '../../../components/ui';
-import { AdoptComparison, REQUEST_STATUS_META, RequestStatusBadge, VIA_LABELS, requestErrorMessage } from '../GarageCompanies/partials/MandateRequests';
+import { AdoptComparison, REQUEST_STATUS_META, TAP, RequestStatusBadge, VIA_LABELS, requestErrorMessage } from '../GarageCompanies/partials/MandateRequests';
 import { Notice, formatDateTime } from '../GarageCompanies/partials/showUtils';
 
 const FILTERS = [
@@ -14,7 +14,7 @@ const FILTERS = [
 
 const needsAction = (r) => r.status === 'ontvangen' || r.status === 'fout';
 
-function LinkCustomer({ request, customers, onLinked, disabled }) {
+function LinkCustomer({ request, customers, onLinked, disabled, mobile = false }) {
     const [query, setQuery] = useState(request.form?.bedrijfsnaam || '');
     const [value, setValue] = useState('');
     const [busy, setBusy] = useState(false);
@@ -37,10 +37,10 @@ function LinkCustomer({ request, customers, onLinked, disabled }) {
     };
 
     return (
-        <div className="min-w-[14rem] space-y-1.5">
-            <input type="search" className={cx(inputClasses, 'py-1 text-xs')} placeholder="Zoek klant..." value={query} onChange={(e) => setQuery(e.target.value)} aria-label={`Zoek klant voor ${request.kenmerk}`} />
-            <div className="flex items-center gap-1.5">
-                <select className={cx(inputClasses, 'py-1.5 text-sm')} value={value} onChange={(e) => setValue(e.target.value)} aria-label={`Klant voor ${request.kenmerk}`}>
+        <div className={cx('space-y-1.5', mobile ? 'w-full' : 'min-w-[14rem]')}>
+            <input type="search" className={cx(inputClasses, mobile ? 'min-h-[44px] text-base' : 'py-1 text-xs')} placeholder="Zoek klant..." value={query} onChange={(e) => setQuery(e.target.value)} aria-label={`Zoek klant voor ${request.kenmerk}`} />
+            <div className={cx('flex gap-1.5', mobile ? 'flex-col' : 'items-center')}>
+                <select className={cx(inputClasses, mobile ? 'min-h-[44px] text-base' : 'py-1.5 text-sm')} value={value} onChange={(e) => setValue(e.target.value)} aria-label={`Klant voor ${request.kenmerk}`}>
                     <option value="">Kies klant ({filtered.length})</option>
                     {filtered.map((c) => (
                         <option key={c.id} value={String(c.id)}>
@@ -48,7 +48,7 @@ function LinkCustomer({ request, customers, onLinked, disabled }) {
                         </option>
                     ))}
                 </select>
-                <Button size="sm" variant="secondary" icon="link" onClick={submit} loading={busy} disabled={!value || disabled}>
+                <Button size="sm" variant="secondary" icon="link" className={mobile ? cx(TAP, 'w-full') : ''} onClick={submit} loading={busy} disabled={!value || disabled}>
                     Koppelen
                 </Button>
             </div>
@@ -147,7 +147,99 @@ export default function Index({ available = true, requests = [], customers = [],
                         <EmptyState compact icon="file-text" title="Geen machtigingen" description={filter === 'aandacht' ? 'Er wacht niets op koppelen of verwerken.' : 'Geen verzoeken voor dit filter.'} />
                     </div>
                 ) : (
-                    <div className={tableClasses.wrapper}>
+                    <>
+                    {/* Kaarten op mobiel */}
+                    <ul className="divide-y divide-zinc-100 md:hidden" aria-label="Machtigingen">
+                        {visible.map((r) => {
+                            const canLink = r.status !== 'verwerkt' && r.status !== 'ingetrokken' && (!r.company || needsAction(r));
+                            return (
+                                <li key={r.id} className="space-y-3 p-4">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="font-mono text-sm font-semibold text-zinc-900">{r.kenmerk}</span>
+                                        <RequestStatusBadge status={r.status} />
+                                    </div>
+                                    {r.mandaat_id && <p className="-mt-2 text-xs text-zinc-500">Mandaat {r.mandaat_id}</p>}
+                                    {r.error && <p className="text-sm text-rose-700">{r.error}</p>}
+                                    <div>
+                                        {r.company ? (
+                                            <a href={r.company.url} className="inline-flex min-h-[44px] items-center font-medium text-indigo-700 hover:underline focus-ring">{r.company.naam}</a>
+                                        ) : (
+                                            <Badge tone="warning">Niet gekoppeld</Badge>
+                                        )}
+                                        {canLink && (
+                                            <div className="mt-2">
+                                                <LinkCustomer
+                                                    mobile
+                                                    request={r}
+                                                    customers={customers}
+                                                    disabled={busyId !== null}
+                                                    onLinked={{ url: urls.link.replace('__ID__', r.id), done: (text) => reload(text) }}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="rounded-lg bg-zinc-50 p-3 text-sm text-zinc-600">
+                                        <p className="text-xs font-medium text-zinc-500">Formulier</p>
+                                        {r.form?.bedrijfsnaam || r.form?.naam ? (
+                                            <>
+                                                <p className="font-medium text-zinc-800">{r.form.bedrijfsnaam || '-'}</p>
+                                                <p className="break-words">{[r.form.naam, r.form.email].filter(Boolean).join(' · ')}</p>
+                                                {r.iban_masked && <p className="font-mono text-xs">IBAN {r.iban_masked}</p>}
+                                            </>
+                                        ) : (
+                                            <p className="text-zinc-400">Nog niet ingevuld</p>
+                                        )}
+                                    </div>
+                                    <div className="text-xs text-zinc-600">
+                                        <p>{r.sent_at ? `Verstuurd ${formatDateTime(r.sent_at)}${r.sent_via ? ` (${VIA_LABELS[r.sent_via] || r.sent_via})` : ''}` : 'Niet verstuurd'}</p>
+                                        {r.completed_at && <p>Ingevuld {formatDateTime(r.completed_at)}</p>}
+                                    </div>
+                                    {(r.comparison?.length > 0 || r.can_process || r.can_revoke) && (
+                                        <div className="flex flex-wrap gap-2">
+                                            {r.comparison?.length > 0 && (
+                                                <Button
+                                                    size="sm"
+                                                    variant="secondary"
+                                                    icon="file-text"
+                                                    className={TAP}
+                                                    onClick={() => setOpenId(openId === r.id ? null : r.id)}
+                                                    aria-expanded={openId === r.id}
+                                                    aria-controls={`gegevens-kaart-${r.id}`}
+                                                >
+                                                    Gegevens
+                                                </Button>
+                                            )}
+                                            {r.can_process && (
+                                                <Button size="sm" icon="check" className={TAP} onClick={() => act(r, 'process')} loading={busyId === r.id} disabled={busyId !== null}>
+                                                    Verwerken
+                                                </Button>
+                                            )}
+                                            {r.can_revoke && (
+                                                <Button size="sm" variant="ghost" icon="x-circle" className={TAP} onClick={() => act(r, 'revoke')} disabled={busyId !== null}>
+                                                    Intrekken
+                                                </Button>
+                                            )}
+                                        </div>
+                                    )}
+                                    {openId === r.id && (
+                                        <div id={`gegevens-kaart-${r.id}`}>
+                                            <p className="mb-2 text-xs font-medium text-zinc-700">Gegevens van het formulier vergeleken met {r.company?.naam}</p>
+                                            <AdoptComparison
+                                                idScope="kaart-"
+                                                request={r}
+                                                url={urls.adopt?.replace('__ID__', r.id)}
+                                                onDone={(text) => {
+                                                    setOpenId(null);
+                                                    reload(text);
+                                                }}
+                                            />
+                                        </div>
+                                    )}
+                                </li>
+                            );
+                        })}
+                    </ul>
+                    <div className={cx(tableClasses.wrapper, 'hidden md:block')}>
                         <table className={tableClasses.table}>
                             <thead className={tableClasses.thead}>
                                 <tr>
@@ -252,6 +344,7 @@ export default function Index({ available = true, requests = [], customers = [],
                             </tbody>
                         </table>
                     </div>
+                    </>
                 )}
             </Card>
         </>

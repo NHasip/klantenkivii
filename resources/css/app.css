@@ -51,12 +51,33 @@
  */
 @layer components {
     /* Shell */
+    /*
+     * overflow-x: clip voorkomt pagina-brede horizontale scroll door te brede kinderen (tabellen, dropdowns),
+     * zonder een scrollcontainer te maken: de sticky kopbalk blijft dus werken. Vaste elementen (zijbalk) vallen erbuiten.
+     */
     .app-shell {
         @apply min-h-screen lg:pl-sidebar;
+        overflow-x: clip;
     }
 
     .app-container {
-        @apply mx-auto w-full max-w-content px-4 py-6 sm:px-6 sm:py-8 lg:px-10;
+        @apply mx-auto w-full min-w-0 max-w-content py-6 sm:py-8;
+        padding-left: max(1rem, env(safe-area-inset-left));
+        padding-right: max(1rem, env(safe-area-inset-right));
+    }
+
+    @screen sm {
+        .app-container {
+            padding-left: max(1.5rem, env(safe-area-inset-left));
+            padding-right: max(1.5rem, env(safe-area-inset-right));
+        }
+    }
+
+    @screen lg {
+        .app-container {
+            padding-left: 2.5rem;
+            padding-right: max(2.5rem, env(safe-area-inset-right));
+        }
     }
 
     .content-narrow {
@@ -170,7 +191,7 @@
 
     /* Formulieren */
     .input {
-        @apply block w-full rounded-xl border-zinc-300 bg-white text-sm text-zinc-900 shadow-sm transition-colors placeholder:text-zinc-400;
+        @apply block w-full rounded-xl border-zinc-300 bg-white text-base text-zinc-900 sm:text-sm shadow-sm transition-colors placeholder:text-zinc-400;
         @apply hover:border-zinc-400 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600;
         @apply disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-50 disabled:text-zinc-500;
     }
@@ -320,6 +341,127 @@
 
 [x-cloak] {
     display: none !important;
+}
+
+/*
+ * iOS Safari zoomt in bij focus op velden kleiner dan 16px. Onder sm alle formuliervelden op minimaal 16px,
+ * ook velden met een eigen text-sm/text-xs utility (vandaar !important). Desktop blijft ongewijzigd.
+ */
+@media (max-width: 639.98px) {
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']),
+    select,
+    textarea,
+    [contenteditable='true'] {
+        font-size: max(16px, 1em) !important;
+    }
+}
+
+/*
+ * Touch-apparaten: tikdoelen minimaal 44x44px (Apple HIG / WCAG 2.5.5). Alleen bij grove pointer, dus de
+ * muisweergave op desktop verandert niet. min-height/min-width wint van de vaste h-* en w-* maten.
+ */
+@media (pointer: coarse) {
+    .btn,
+    .btn-sm,
+    .btn-xs,
+    .tap-target,
+    [role='tab'] {
+        min-height: 44px;
+    }
+
+    .btn-icon,
+    .tap-target-icon {
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    .menu-item,
+    .nav-item {
+        min-height: 44px;
+    }
+
+    .checkbox {
+        height: 1.25rem;
+        width: 1.25rem;
+    }
+
+    /* Kleine tekstlinks (Alle taken, terug naar Klanten): onzichtbaar tikvlak van minstens 44px, zonder layoutverschuiving. */
+    .tap-link {
+        position: relative;
+    }
+
+    .tap-link::after {
+        content: '';
+        position: absolute;
+        left: -0.5rem;
+        right: -0.5rem;
+        top: 50%;
+        height: 44px;
+        min-width: 44px;
+        transform: translateY(-50%);
+    }
+}
+
+/*
+ * SVG-grafieken op Rapportages schalen mee met de breedte; op mobiel zouden asletters dan ~5px worden.
+ * Onder sm: grotere letters (in SVG-eenheden) en minder labels (.chart-tick-desktop verborgen, .chart-tick-mobile zichtbaar).
+ */
+.chart-tick-mobile {
+    display: none;
+}
+
+@media (max-width: 639.98px) {
+    .chart-tick-desktop {
+        display: none;
+    }
+
+    .chart-tick-mobile {
+        display: inline;
+    }
+
+    .chart-tick-lg {
+        font-size: 22px;
+    }
+
+    .chart-tick-y {
+        font-size: 20px;
+    }
+
+    .chart-tick-md {
+        font-size: 15px;
+    }
+
+    .chart-tick-last {
+        text-anchor: end;
+    }
+}
+
+/*
+ * Mobiele onderbalk (layouts/partials/header.blade.php, onder md). --kivii-bottom-offset is de hoogte ervan incl.
+ * home-indicator; vaste elementen onderaan (toasts, sticky actiebalken) schuiven daarmee omhoog.
+ */
+:root {
+    --kivii-bottom-offset: 0px;
+}
+
+@media (max-width: 767.98px) {
+    html:has(#kivii-bottom-nav) {
+        --kivii-bottom-offset: calc(3.5rem + env(safe-area-inset-bottom));
+        scroll-padding-bottom: var(--kivii-bottom-offset);
+    }
+
+    html:has(#kivii-bottom-nav) .app-container {
+        padding-bottom: calc(1.5rem + var(--kivii-bottom-offset));
+    }
+}
+
+/* Standalone (beginscherm-app): kopbalk onder de notch, onderkant boven de home-indicator. */
+.safe-top {
+    padding-top: env(safe-area-inset-top);
+}
+
+.safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
 }
 
 .tiptap {

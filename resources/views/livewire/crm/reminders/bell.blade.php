@@ -19,7 +19,7 @@
     $bellGroupHead = 'flex items-center justify-between gap-3 px-4 pb-1 pt-3';
     $bellGroupTitle = 'text-xs font-semibold text-zinc-500';
     $bellCount = 'inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-zinc-100 px-1.5 text-2xs font-semibold tabular-nums text-zinc-700';
-    $bellLink = 'focus-ring inline-flex items-center gap-1 rounded text-xs font-semibold text-indigo-700 hover:text-indigo-900';
+    $bellLink = 'tap-link focus-ring inline-flex items-center gap-1 rounded text-xs font-semibold text-indigo-700 hover:text-indigo-900';
 @endphp
 <div class="relative" wire:poll.30s
      x-data="{ open: false }"

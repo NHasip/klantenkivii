@@ -100,8 +100,10 @@ export default function Show({
     const closeMandateDialog = () => setMandateDialog({ open: false, resend: null });
 
     // Tabwissel zonder serververzoek: alle data staat al in de props.
+    // Nieuwe tab = nieuw history-item (terugknop gaat naar de vorige tab); zelfde tab vervangt alleen de URL.
     const changeTab = (key, anchor = null) => {
-        router.replace({
+        const visit = key !== activeTab ? router.push : router.replace;
+        visit.call(router, {
             url: tabUrl(key, anchor),
             props: (current) => ({ ...current, tab: key }),
             preserveState: true,
@@ -116,6 +118,26 @@ export default function Show({
             });
         }
     };
+
+    // Terug/vooruit tussen tabs: Inertia herstelt de props uit de history-snapshot, die verouderd kan zijn
+    // (bijv. na een opgeslagen notitie). Ververs daarom stil de data als we op dezelfde klantpagina blijven.
+    useEffect(() => {
+        const pathname = window.location.pathname;
+        let timer = null;
+        const onPopState = () => {
+            window.clearTimeout(timer);
+            timer = window.setTimeout(() => {
+                if (window.location.pathname === pathname) {
+                    router.reload({ preserveScroll: true, preserveState: true });
+                }
+            }, 0);
+        };
+        window.addEventListener('popstate', onPopState);
+        return () => {
+            window.clearTimeout(timer);
+            window.removeEventListener('popstate', onPopState);
+        };
+    }, []);
 
     useEffect(() => {
         const anchor = legacyTab?.anchor || (window.location.hash ? window.location.hash.slice(1) : null);

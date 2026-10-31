@@ -115,7 +115,52 @@ export default function EmailLogIndex({ available, rows, counts = {}, filter, se
                         <EmptyState compact icon="mail" title="Geen mails" description={search ? 'Geen mails gevonden voor deze zoekterm.' : EMPTY_TEXT[filter]} />
                     </div>
                 ) : (
-                    <div className={tableClasses.wrapper}>
+                    <>
+                    {/* Kaarten op mobiel */}
+                    <ul className="divide-y divide-zinc-100 md:hidden">
+                        {items.map((r) => {
+                            const meta = STATE_META[r.state] || { label: r.state, tone: 'neutral' };
+                            return (
+                                <li key={r.id} className="space-y-2 p-4">
+                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                        <Badge tone={meta.tone} dot>{meta.label}</Badge>
+                                        <span className="text-sm font-medium text-zinc-900">{r.type}</span>
+                                        <span className="ml-auto whitespace-nowrap text-xs text-zinc-500">
+                                            {r.state === 'planned' && r.at ? `Gepland ${formatDateTime(r.at)}` : formatDateTime(r.at)}
+                                        </span>
+                                    </div>
+                                    {r.company ? (
+                                        <a href={r.company.url} className="inline-flex min-h-[44px] items-center font-medium text-indigo-700 hover:underline focus-ring">{r.company.naam}</a>
+                                    ) : (
+                                        <p className="text-sm text-zinc-400">Geen klant</p>
+                                    )}
+                                    <dl className="space-y-1 text-sm">
+                                        <div className="flex gap-2">
+                                            <dt className="w-20 shrink-0 text-zinc-500">Aan</dt>
+                                            <dd className="min-w-0 break-words text-zinc-800">{r.to || <span className="text-zinc-400">Geen adres</span>}</dd>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <dt className="w-20 shrink-0 text-zinc-500">Onderwerp</dt>
+                                            <dd className="min-w-0 break-words text-zinc-800">{r.subject || <span className="text-zinc-400">-</span>}</dd>
+                                        </div>
+                                    </dl>
+                                    {r.reason && (
+                                        <p className="rounded-lg bg-zinc-50 p-3 text-sm text-zinc-800 ring-1 ring-inset ring-zinc-200">
+                                            <span className="block text-xs font-semibold uppercase tracking-wide text-zinc-500">Reden</span>
+                                            {r.reason}
+                                        </p>
+                                    )}
+                                    {r.raw && (
+                                        <details>
+                                            <summary className="flex min-h-[44px] cursor-pointer items-center text-sm text-zinc-600 hover:text-zinc-800">Technische melding</summary>
+                                            <p className="mt-1 whitespace-pre-wrap break-words rounded bg-zinc-50 p-2 font-mono text-xs text-zinc-600">{r.raw}</p>
+                                        </details>
+                                    )}
+                                </li>
+                            );
+                        })}
+                    </ul>
+                    <div className={cx(tableClasses.wrapper, 'hidden md:block')}>
                         <table className={tableClasses.table}>
                             <thead className={tableClasses.thead}>
                                 <tr>
@@ -166,6 +211,7 @@ export default function EmailLogIndex({ available, rows, counts = {}, filter, se
                             </tbody>
                         </table>
                     </div>
+                    </>
                 )}
                 <Pagination links={rows?.links} lastPage={rows?.last_page} />
             </Card>

@@ -258,7 +258,7 @@ function ContactActions({ company, large = false, reserve = false }) {
     return (
         <>
             {items.map((item) => {
-                if (!item.href) return reserve ? <span key={item.key} className="inline-block h-8 w-8" aria-hidden="true" /> : null;
+                if (!item.href) return reserve ? <span key={item.key} className="tap-target-icon inline-block h-8 w-8" aria-hidden="true" /> : null;
                 const link = (
                     <a href={item.href} className={buttonClasses({ variant: 'ghost', size, iconOnly: true })} aria-label={item.label} title={large ? item.tip : undefined}>
                         <Icon name={item.icon} className="h-4 w-4" />
@@ -372,7 +372,9 @@ function CompanyCard({ company, isTrashView, bulkEnabled, isSelected, onToggle, 
         >
             <div className="flex items-start gap-3">
                 {bulkEnabled ? (
-                    <input type="checkbox" className="checkbox mt-3 h-5 w-5 shrink-0" checked={isSelected} onChange={() => onToggle(company.id)} aria-label={`Selecteer ${company.bedrijfsnaam}`} />
+                    <label className="-mb-2 -ml-2.5 flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg">
+                        <input type="checkbox" className="checkbox h-5 w-5" checked={isSelected} onChange={() => onToggle(company.id)} aria-label={`Selecteer ${company.bedrijfsnaam}`} />
+                    </label>
                 ) : null}
                 <div className="min-w-0 flex-1">
                     <CompanyIdentity company={company} />
@@ -883,8 +885,9 @@ export default function Index({ companies, totals, statusCounts, trashCount, fil
 
             {/* Werkbalk: statuspillen, zoeken, filters en weergave */}
             <Card padded={false}>
-                <nav aria-label="Filter op status" className="scrollbar-none overflow-x-auto border-b border-zinc-100 px-3 py-3 sm:px-4">
-                    <ul className="flex min-w-max gap-1.5">
+                {/* Mobiel: pillen lopen door op meerdere regels (geen verborgen horizontale scroll). Vanaf sm: één scrollbare rij. */}
+                <nav aria-label="Filter op status" className="scrollbar-none border-b border-zinc-100 px-3 py-3 sm:overflow-x-auto sm:px-4">
+                    <ul className="flex flex-wrap gap-1.5 sm:min-w-max sm:flex-nowrap">
                         {STATUS_TABS.map((tab) => {
                             const active = activeStatus === tab.value;
                             const label = tab.value === 'alle' ? tab.label : safeStatusLabels[tab.value] || tab.label;

@@ -139,7 +139,31 @@ export default function Index({ maxRows = 200, fields = [], urls }) {
                             summary?.[key] ? <Badge key={key} tone={meta.tone}>{meta.label}: {summary[key]}</Badge> : null
                         )}
                     </div>
-                    <div className={tableClasses.wrapper}>
+                    <ul className="divide-y divide-zinc-100 border-t border-zinc-100 md:hidden" aria-label={mode === 'store' ? 'Resultaat import' : 'Resultaat controle'}>
+                        {results.map((r) => {
+                            const meta = STATUS_META[r.status] ?? STATUS_META.fout;
+                            return (
+                                <li key={r.rij} className="space-y-1.5 p-4">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="text-xs text-zinc-500">Rij {r.rij}</span>
+                                        <Badge tone={meta.tone}>{meta.label}</Badge>
+                                    </div>
+                                    <div className="font-medium text-zinc-900">{r.bedrijfsnaam || <span className="text-zinc-400">(leeg)</span>}</div>
+                                    {r.messages?.length ? (
+                                        <ul className="space-y-0.5 text-sm text-zinc-700">
+                                            {r.messages.map((m, i) => <li key={i}>{m}</li>)}
+                                        </ul>
+                                    ) : null}
+                                    {r.link ? (
+                                        <a href={r.link.url} className="inline-flex min-h-[44px] items-center font-medium text-indigo-700 hover:underline" target="_blank" rel="noreferrer">
+                                            {r.link.label}
+                                        </a>
+                                    ) : null}
+                                </li>
+                            );
+                        })}
+                    </ul>
+                    <div className={cx(tableClasses.wrapper, 'hidden md:block')}>
                         <table className={tableClasses.table}>
                             <thead className={tableClasses.thead}>
                                 <tr>

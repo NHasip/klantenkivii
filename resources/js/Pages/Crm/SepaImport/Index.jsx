@@ -34,7 +34,7 @@ function defaultChoice(row, info) {
     return { customer_id: String(row.match.id), replace: false };
 }
 
-function CustomerPicker({ row, value, onChange, customers, byId }) {
+function CustomerPicker({ row, value, onChange, customers, byId, mobile = false }) {
     const [query, setQuery] = useState('');
     const q = query.trim().toLowerCase();
     const candidateIds = new Set((row.candidates ?? []).map((c) => c.id));
@@ -42,9 +42,9 @@ function CustomerPicker({ row, value, onChange, customers, byId }) {
     const selected = value ? byId[value] : null;
 
     return (
-        <div className="min-w-[14rem] space-y-1.5">
+        <div className={cx('space-y-1.5', mobile ? 'w-full' : 'min-w-[14rem]')}>
             <select
-                className="input py-1.5 text-sm"
+                className={cx('input', mobile ? 'min-h-[44px] text-base' : 'py-1.5 text-sm')}
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 aria-label={`Klant voor rij ${row.rij}`}
@@ -72,7 +72,7 @@ function CustomerPicker({ row, value, onChange, customers, byId }) {
             </select>
             <input
                 type="search"
-                className="input py-1 text-xs"
+                className={cx('input', mobile ? 'min-h-[44px] text-base' : 'py-1 text-xs')}
                 placeholder="Zoek klant..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -228,7 +228,76 @@ export default function Index({ maxRows = 200, customers = [], urls }) {
                             preview.summary?.[key] ? <Badge key={key} tone={meta.tone}>{meta.label}: {preview.summary[key]}</Badge> : null
                         )}
                     </div>
-                    <div className={tableClasses.wrapper}>
+                    {/* Kaarten op mobiel */}
+                    <ul className="divide-y divide-zinc-100 border-t border-zinc-100 md:hidden" aria-label="Resultaat controle">
+                        {preview.results.map((r) => {
+                            const meta = PREVIEW_META[r.status] ?? PREVIEW_META.fout;
+                            const ch = choices[r.rij] ?? { customer_id: '', replace: false };
+                            const ci = ch.customer_id ? info[ch.customer_id] : null;
+                            const differs = ci && r.bedrag !== null && Math.abs(ci.crm_bedrag - r.bedrag) > 0.01;
+                            return (
+                                <li key={r.rij} className="space-y-3 p-4">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="text-xs text-zinc-500">Rij {r.rij}</span>
+                                        <Badge tone={meta.tone}>{meta.label}</Badge>
+                                        {r.status === 'match' && !r.zeker ? <Badge tone="warning">Onzeker</Badge> : null}
+                                    </div>
+                                    <div>
+                                        <div className="font-medium text-zinc-900">{r.klantnaam || <span className="text-zinc-400">(leeg)</span>}</div>
+                                        <div className="break-all font-mono text-xs text-zinc-500">{r.iban}</div>
+                                        <div className="text-xs text-zinc-500">Kenmerk: {r.kenmerk || '-'} · Datum: {formatDate(r.machtigingsdatum) || '-'}</div>
+                                    </div>
+                                    {r.status === 'fout' ? (
+                                        <p className="text-sm text-zinc-500">Niet te importeren</p>
+                                    ) : (
+                                        <div className="space-y-1.5">
+                                            <p className="text-xs font-medium text-zinc-500">Klant</p>
+                                            <CustomerPicker
+                                                mobile
+                                                row={r}
+                                                value={ch.customer_id}
+                                                onChange={(v) => setChoice(r.rij, { customer_id: v, replace: false })}
+                                                customers={customers}
+                                                byId={byId}
+                                            />
+                                            {ci?.actief_mandaat ? (
+                                                <select
+                                                    className="input min-h-[44px] text-base"
+                                                    value={ch.replace ? 'vervangen' : 'overslaan'}
+                                                    onChange={(e) => setChoice(r.rij, { replace: e.target.value === 'vervangen' })}
+                                                    aria-label={`Actief mandaat rij ${r.rij}`}
+                                                >
+                                                    <option value="overslaan">Actief mandaat: overslaan</option>
+                                                    <option value="vervangen">Actief mandaat: vervangen</option>
+                                                </select>
+                                            ) : null}
+                                        </div>
+                                    )}
+                                    {ci ? (
+                                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                                            {ci.actief_mandaat ? <Badge tone="warning">Actief mandaat</Badge> : <Badge>Geen actief mandaat</Badge>}
+                                            <span className="text-zinc-500">Kenmerk: {ci.kenmerk || '-'}</span>
+                                        </div>
+                                    ) : null}
+                                    <div className="text-sm">
+                                        <span className={cx(differs && 'font-semibold text-rose-700')}>
+                                            Geplakt: {r.bedrag !== null ? euro(r.bedrag) : (r.bedrag_raw || '-')}
+                                        </span>
+                                        {ci ? <span className="ml-3 text-zinc-500">CRM: {euro(ci.crm_bedrag)}</span> : null}
+                                        {differs ? <div className="text-xs text-rose-700">Wijkt af</div> : null}
+                                        {r.omschrijving ? <div className="mt-1 text-xs text-zinc-500">{r.omschrijving}</div> : null}
+                                    </div>
+                                    {r.messages?.length || r.warnings?.length ? (
+                                        <ul className="space-y-0.5 text-sm">
+                                            {r.messages.map((m, i) => <li key={`e${i}`} className="text-rose-700">{m}</li>)}
+                                            {r.warnings.map((m, i) => <li key={`w${i}`} className="text-amber-700">{m}</li>)}
+                                        </ul>
+                                    ) : null}
+                                </li>
+                            );
+                        })}
+                    </ul>
+                    <div className={cx(tableClasses.wrapper, 'hidden md:block')}>
                         <table className={tableClasses.table}>
                             <thead className={tableClasses.thead}>
                                 <tr>
@@ -327,7 +396,32 @@ export default function Index({ maxRows = 200, customers = [], urls }) {
                             result.summary?.[key] ? <Badge key={key} tone={meta.tone}>{meta.label}: {result.summary[key]}</Badge> : null
                         )}
                     </div>
-                    <div className={tableClasses.wrapper}>
+                    <ul className="divide-y divide-zinc-100 border-t border-zinc-100 md:hidden" aria-label="Resultaat import">
+                        {result.results.map((r) => {
+                            const meta = RESULT_META[r.status] ?? RESULT_META.fout;
+                            return (
+                                <li key={r.rij} className="space-y-1.5 p-4">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="text-xs text-zinc-500">Rij {r.rij}</span>
+                                        <Badge tone={meta.tone}>{meta.label}</Badge>
+                                    </div>
+                                    <div className="font-medium text-zinc-900">{r.klantnaam}</div>
+                                    <div className="break-all font-mono text-xs text-zinc-500">{r.iban}</div>
+                                    {r.klant ? (
+                                        <a href={r.klant.url} className="inline-flex min-h-[44px] items-center font-medium text-indigo-700 hover:underline" target="_blank" rel="noreferrer">
+                                            {r.klant.naam}
+                                        </a>
+                                    ) : null}
+                                    {r.messages?.length ? (
+                                        <ul className="space-y-0.5 text-sm text-zinc-700">
+                                            {r.messages.map((m, i) => <li key={i}>{m}</li>)}
+                                        </ul>
+                                    ) : null}
+                                </li>
+                            );
+                        })}
+                    </ul>
+                    <div className={cx(tableClasses.wrapper, 'hidden md:block')}>
                         <table className={tableClasses.table}>
                             <thead className={tableClasses.thead}>
                                 <tr>

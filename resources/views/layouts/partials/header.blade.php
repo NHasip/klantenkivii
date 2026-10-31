@@ -7,6 +7,8 @@
         ['route' => 'crm.tasks.index', 'match' => 'crm.tasks.*', 'label' => 'Taken', 'icon' => 'check-square'],
         ['route' => 'crm.reports.index', 'match' => 'crm.reports.*', 'label' => 'Rapportages', 'icon' => 'bar-chart'],
     ];
+    // Mobiele onderbalk: Dashboard, Klanten en Taken (plus Zoeken en Menu als knoppen).
+    $kiviiBottomItems = array_slice($kiviiNavItems, 0, 3);
     $kiviiSettingsItems = $kiviiIsAdmin ? [
         ['route' => 'crm.users.index', 'match' => 'crm.users.*', 'label' => 'Gebruikers', 'icon' => 'users'],
         ['route' => 'crm.modules.index', 'match' => 'crm.modules.*', 'label' => 'Modules', 'icon' => 'package'],
@@ -25,9 +27,11 @@
     - Root is sticky (top-0) en bevat: 2FA-banner, slanke topbalk (zoeken, meldingen, hamburger) en de zijbalk.
     - Zijbalk: vanaf lg vast links (w-sidebar = 16rem); daaronder een off-canvas drawer via de hamburger.
     - De layout zet de inhoudskolom in <div class="app-shell"> (lg:pl-sidebar) en <main class="app-container">.
+    - Onder md: vaste onderbalk (Dashboard, Klanten, Taken, Zoeken, Menu) met safe-area-inset-bottom; .app-container krijgt
+      dan extra ondermarge via --kivii-bottom-offset (resources/css/app.css).
     - Menu-exclusiviteit: elk menu stuurt 'kivii-menu-open' met zijn naam (mobile, search, bell, user) en sluit bij een ander.
 --}}
-<div x-data="{ mobileOpen: false }" class="sticky top-0 z-30"
+<div x-data="{ mobileOpen: false }" class="safe-top sticky top-0 z-30"
      @kivii-menu-open.window="if ($event.detail !== 'mobile') mobileOpen = false"
      @keydown.escape.window="if (mobileOpen) { mobileOpen = false; $refs.mobileButton.focus() }"
      @resize.window.debounce.150ms="if (mobileOpen && window.innerWidth >= 1024) mobileOpen = false">
@@ -143,8 +147,8 @@
 
     {{-- Topbalk in de inhoudskolom --}}
     <header class="border-b border-zinc-200/70 bg-canvas/85 backdrop-blur supports-[backdrop-filter]:bg-canvas/75">
-        <div class="flex h-14 items-center gap-2 px-4 sm:gap-3 sm:px-6 lg:px-10">
-            <button type="button" x-ref="mobileButton" class="-ml-2 inline-flex h-10 w-10 items-center justify-center rounded-xl text-zinc-700 hover:bg-zinc-200/60 lg:hidden {{ $kiviiFocus }}"
+        <div class="flex h-14 items-center gap-2 px-4 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:gap-3 sm:px-6 lg:px-10">
+            <button type="button" x-ref="mobileButton" class="tap-target-icon -ml-2 inline-flex h-10 w-10 items-center justify-center rounded-xl text-zinc-700 hover:bg-zinc-200/60 lg:hidden {{ $kiviiFocus }}"
                     @click="mobileOpen = true; $dispatch('kivii-menu-open', 'mobile')"
                     :aria-expanded="mobileOpen.toString()" aria-controls="app-sidebar" aria-label="Menu openen">
                 <x-icon name="menu" class="h-6 w-6" />
@@ -153,10 +157,10 @@
                 <img src="{{ asset('brand/kivii-mark.png') }}" alt="Kivii CRM" class="h-8 w-8 rounded-lg bg-white" />
             </a>
 
-            <div class="min-w-0 flex-1" x-data="kiviiSearch(@js(route('crm.search')))" @keydown.window="onKey($event)"
+            <div class="min-w-0 flex-1" x-data="kiviiSearch(@js(route('crm.search')))" @keydown.window="onKey($event)" @kivii-open-search.window="show()"
                  @kivii-menu-open.window="if ($event.detail !== 'search' && open) open = false">
                 <button type="button" x-ref="searchTrigger" @click="show()"
-                        class="group flex h-9 w-full max-w-md items-center gap-2.5 rounded-xl border border-zinc-200/80 bg-white px-3 text-sm text-zinc-500 shadow-sm transition-colors hover:border-zinc-300 hover:text-zinc-700 {{ $kiviiFocus }}"
+                        class="tap-target group flex h-9 w-full max-w-md items-center gap-2.5 rounded-xl border border-zinc-200/80 bg-white px-3 text-sm text-zinc-500 shadow-sm transition-colors hover:border-zinc-300 hover:text-zinc-700 {{ $kiviiFocus }}"
                         aria-label="Zoeken (Ctrl+K of /)" aria-haspopup="dialog">
                     <x-icon name="search" class="h-4 w-4 text-zinc-400 group-hover:text-zinc-500" />
                     <span class="flex-1 truncate text-left"><span class="sm:hidden">Zoeken</span><span class="hidden sm:inline">Zoek klant, taak, e-mail of KVK</span></span>
@@ -171,7 +175,7 @@
                                     <x-icon name="search" class="h-5 w-5 text-zinc-400" />
                                     <input x-ref="searchInput" type="search" x-model="q" @input="queue()"
                                            @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)" @keydown.enter.prevent="go()"
-                                           class="h-12 w-full border-0 bg-transparent text-sm focus:ring-0"
+                                           class="h-12 w-full border-0 bg-transparent text-base focus:ring-0 sm:text-sm"
                                            placeholder="Zoek klant, e-mail, telefoon, plaats, KVK, IBAN of taak"
                                            role="combobox" aria-controls="kivii-search-results" :aria-expanded="(flat.length > 0).toString()"
                                            :aria-activedescendant="flat.length ? 'kivii-search-item-' + active : null" autocomplete="off" />
@@ -213,7 +217,7 @@
 
     {{-- Zijbalk: vast vanaf lg, drawer op kleinere schermen --}}
     <aside id="app-sidebar"
-           class="fixed inset-y-0 left-0 z-40 flex w-[17.5rem] max-w-[85vw] flex-col border-r border-zinc-200/70 bg-white transition-[transform,visibility] duration-200 ease-out max-lg:invisible max-lg:-translate-x-full lg:w-sidebar lg:bg-white/70"
+           class="fixed inset-y-0 left-0 z-40 flex w-[17.5rem] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] max-w-[85vw] flex-col border-r border-zinc-200/70 bg-white transition-[transform,visibility] duration-200 ease-out max-lg:invisible max-lg:-translate-x-full lg:w-sidebar lg:bg-white/70"
            :class="mobileOpen && '!visible !translate-x-0 shadow-pop'"
            x-trap.noscroll="mobileOpen"
            :role="mobileOpen ? 'dialog' : null" :aria-modal="mobileOpen ? 'true' : null"
@@ -223,7 +227,7 @@
                 <img src="{{ asset('brand/kivii-mark.png') }}" alt="" class="h-8 w-8 rounded-lg bg-white shadow-sm ring-1 ring-black/5" />
                 <span class="text-[15px] font-semibold tracking-snug text-zinc-900">Kivii <span class="font-medium text-zinc-400">CRM</span></span>
             </a>
-            <button type="button" class="-mr-1 inline-flex h-9 w-9 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 lg:hidden {{ $kiviiFocus }}"
+            <button type="button" class="tap-target-icon -mr-1 inline-flex h-9 w-9 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 lg:hidden {{ $kiviiFocus }}"
                     @click="mobileOpen = false; $refs.mobileButton.focus()" aria-label="Menu sluiten">
                 <x-icon name="x" class="h-5 w-5" />
             </button>
@@ -295,4 +299,35 @@
             </div>
         </div>
     </aside>
+    {{-- Mobiele onderbalk (alleen onder md). Zoeken en Menu openen dezelfde zoekdialoog en drawer als de topbalk. --}}
+    <nav id="kivii-bottom-nav" aria-label="Snelmenu"
+         class="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-200/80 bg-white/95 pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] backdrop-blur supports-[backdrop-filter]:bg-white/85 md:hidden">
+        <ul class="grid h-14 grid-cols-5">
+            @foreach ($kiviiBottomItems as $item)
+                @php($isActive = request()->routeIs($item['match']))
+                <li>
+                    <a href="{{ route($item['route']) }}" @if ($isActive) aria-current="page" @endif
+                       class="flex h-full flex-col items-center justify-center gap-0.5 text-2xs font-medium {{ $isActive ? 'text-indigo-700' : 'text-zinc-500 hover:text-zinc-900' }} {{ $kiviiFocus }}">
+                        <x-icon :name="$item['icon']" class="h-5 w-5 {{ $isActive ? 'text-indigo-600' : 'text-zinc-400' }}" />
+                        {{ $item['label'] }}
+                    </a>
+                </li>
+            @endforeach
+            <li>
+                <button type="button" @click="$dispatch('kivii-open-search')"
+                        class="flex h-full w-full flex-col items-center justify-center gap-0.5 text-2xs font-medium text-zinc-500 hover:text-zinc-900 {{ $kiviiFocus }}">
+                    <x-icon name="search" class="h-5 w-5 text-zinc-400" />
+                    Zoeken
+                </button>
+            </li>
+            <li>
+                <button type="button" @click="mobileOpen = true; $dispatch('kivii-menu-open', 'mobile')"
+                        :aria-expanded="mobileOpen.toString()" aria-controls="app-sidebar"
+                        class="flex h-full w-full flex-col items-center justify-center gap-0.5 text-2xs font-medium text-zinc-500 hover:text-zinc-900 {{ $kiviiFocus }}">
+                    <x-icon name="menu" class="h-5 w-5 text-zinc-400" />
+                    Menu
+                </button>
+            </li>
+        </ul>
+    </nav>
 </div>

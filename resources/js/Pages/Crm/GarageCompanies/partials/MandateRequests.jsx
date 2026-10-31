@@ -292,7 +292,10 @@ const defaultSelection = (rows) => rows.filter((r) => !r.same && !r.crm).map((r)
  * Vergelijking formuliergegevens versus CRM met vinkjes. De server neemt alleen de gekozen
  * veldnamen aan en haalt de waarden zelf uit de opgeslagen inzending.
  */
-export function AdoptComparison({ request, url, onDone, canAdopt = true }) {
+/** Op mobiel minimaal 44px hoge tikdoelen; desktop blijft ongewijzigd. */
+export const TAP = 'max-md:min-h-[44px]';
+
+export function AdoptComparison({ request, url, onDone, canAdopt = true, idScope = '' }) {
     const rows = request.comparison || [];
     const signature = rows.map((r) => `${r.key}:${r.crm}`).join('|');
     const [selected, setSelected] = useState(() => defaultSelection(rows));
@@ -327,7 +330,47 @@ export function AdoptComparison({ request, url, onDone, canAdopt = true }) {
 
     return (
         <div className="space-y-3">
-            <div className="overflow-x-auto rounded-xl border border-zinc-200">
+            {/* Mobiel: per gegeven een blok onder elkaar */}
+            <ul className="divide-y divide-zinc-100 overflow-hidden rounded-xl border border-zinc-200 md:hidden" aria-label="Gegevens vergelijken">
+                {rows.map((row) => {
+                    const id = `overnemen-${idScope}m-${request.id}-${row.key}`;
+                    const canPick = editable && !row.same;
+                    const body = (
+                        <div className="min-w-0 flex-1 space-y-1.5">
+                            <p className="text-sm font-medium text-zinc-900">{row.label}</p>
+                            <div className="text-sm">
+                                <p className="text-xs text-zinc-500">Formulier</p>
+                                <p className="break-words text-zinc-800">{row.form}</p>
+                            </div>
+                            <div className="text-sm">
+                                <p className="text-xs text-zinc-500">Nu in CRM</p>
+                                {row.same ? (
+                                    <Badge tone="success">Gelijk</Badge>
+                                ) : row.crm ? (
+                                    <p className="break-words text-zinc-800">{row.crm}</p>
+                                ) : (
+                                    <p className="text-zinc-400">Leeg</p>
+                                )}
+                            </div>
+                        </div>
+                    );
+                    return (
+                        <li key={row.key} className={row.same ? 'bg-zinc-50/60' : 'bg-white'}>
+                            {canPick ? (
+                                <label htmlFor={id} className="flex min-h-[44px] cursor-pointer items-start gap-3 p-3">
+                                    <span className="flex h-11 w-11 shrink-0 items-center justify-center -m-2">
+                                        <input id={id} type="checkbox" className="checkbox h-5 w-5" checked={selected.includes(row.key)} onChange={() => toggle(row.key)} disabled={busy} />
+                                    </span>
+                                    {body}
+                                </label>
+                            ) : (
+                                <div className="flex items-start gap-3 p-3">{body}</div>
+                            )}
+                        </li>
+                    );
+                })}
+            </ul>
+            <div className="hidden overflow-x-auto rounded-xl border border-zinc-200 md:block">
                 <table className="w-full text-left text-xs">
                     <thead className="bg-zinc-50 text-zinc-500">
                         <tr>
@@ -339,7 +382,7 @@ export function AdoptComparison({ request, url, onDone, canAdopt = true }) {
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
                         {rows.map((row) => {
-                            const id = `overnemen-${request.id}-${row.key}`;
+                            const id = `overnemen-${idScope}${request.id}-${row.key}`;
                             return (
                                 <tr key={row.key} className={row.same ? 'text-zinc-500' : 'text-zinc-800'}>
                                     {editable && (
@@ -372,7 +415,7 @@ export function AdoptComparison({ request, url, onDone, canAdopt = true }) {
             {error && <Notice tone="danger">{error}</Notice>}
             {editable && rows.some((r) => !r.same) && (
                 <div className="flex justify-end">
-                    <Button size="sm" icon="check" onClick={submit} loading={busy} disabled={busy || selected.length === 0}>
+                    <Button size="sm" icon="check" className={cx(TAP, 'max-md:w-full')} onClick={submit} loading={busy} disabled={busy || selected.length === 0}>
                         Geselecteerde gegevens overnemen
                     </Button>
                 </div>
@@ -465,6 +508,7 @@ export function MandateRequestsCard({ requests = [], config, urls, onSend, onRes
                                                 <Button
                                                     variant="secondary"
                                                     size="sm"
+                                                    className={TAP}
                                                     icon="file-text"
                                                     onClick={() => setOpenId(openId === r.id ? null : r.id)}
                                                     aria-expanded={openId === r.id}
@@ -474,17 +518,17 @@ export function MandateRequestsCard({ requests = [], config, urls, onSend, onRes
                                                 </Button>
                                             )}
                                             {r.can_process && (
-                                                <Button size="sm" icon="check" onClick={() => act(r, 'process')} loading={busyId === r.id} disabled={busyId !== null}>
+                                                <Button size="sm" icon="check" className={TAP} onClick={() => act(r, 'process')} loading={busyId === r.id} disabled={busyId !== null}>
                                                     Verwerken
                                                 </Button>
                                             )}
                                             {r.can_resend && (
-                                                <Button variant="secondary" size="sm" icon="refresh" onClick={() => onResend(r)} disabled={busyId !== null}>
+                                                <Button variant="secondary" size="sm" icon="refresh" className={TAP} onClick={() => onResend(r)} disabled={busyId !== null}>
                                                     Opnieuw versturen
                                                 </Button>
                                             )}
                                             {r.can_revoke && (
-                                                <Button variant="ghost" size="sm" icon="x-circle" onClick={() => act(r, 'revoke')} disabled={busyId !== null}>
+                                                <Button variant="ghost" size="sm" icon="x-circle" className={TAP} onClick={() => act(r, 'revoke')} disabled={busyId !== null}>
                                                     Intrekken
                                                 </Button>
                                             )}

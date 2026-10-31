@@ -779,7 +779,7 @@ export default function Create({ statusOptions: rawStatusOptions, statusLabels, 
                 </aside>
 
                 {/* Mobiel: vaste balk onderaan met totaal en opslaan */}
-                <div className="sticky bottom-0 z-20 -mx-4 border-t border-zinc-200 bg-white/95 backdrop-blur sm:mx-0 sm:rounded-2xl sm:border sm:shadow-pop lg:hidden">
+                <div className="sticky bottom-[var(--kivii-bottom-offset,0px)] z-20 -mx-4 border-t border-zinc-200 bg-white/95 backdrop-blur sm:mx-0 sm:rounded-2xl sm:border sm:shadow-pop lg:hidden">
                     <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                         <div className="min-w-0 text-sm text-zinc-600">
                             <span className="font-semibold tabular-nums text-zinc-900">{formatEuro(totals.totaalExcl)}</span> p/m excl.

@@ -65,7 +65,7 @@ export default function CopyButton({ value, label = 'Kopieer' }) {
                     key={toast.id}
                     role="status"
                     aria-live="polite"
-                    className={`fixed bottom-4 left-1/2 z-[70] -translate-x-1/2 rounded-full px-3 py-1.5 text-xs font-semibold text-white shadow-lg ${
+                    className={`fixed bottom-[calc(1rem+var(--kivii-bottom-offset,0px))] left-1/2 z-[70] -translate-x-1/2 rounded-full px-3 py-1.5 text-xs font-semibold text-white shadow-lg ${
                         toast.ok ? 'bg-zinc-900' : 'bg-rose-600'
                     }`}
                 >
