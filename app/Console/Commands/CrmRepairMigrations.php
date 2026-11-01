@@ -21,7 +21,7 @@ use Throwable;
  */
 class CrmRepairMigrations extends Command
 {
-    protected $signature = 'crm:repair-migrations {--apply : Markeer de aanwezige migraties echt in de migrations-tabel}';
+    protected $signature = 'crm:repair-migrations {--apply : Markeer de aanwezige migraties echt in de migrations-tabel} {--mark=* : Markeer deze onzekere migratie(s) ook als uitgevoerd, zonder ze te draaien (exacte bestandsnaam zonder .php)}';
 
     protected $description = 'Controleer welke migraties al in de database staan maar niet in de migrations-tabel, en markeer ze (alleen met --apply).';
 
@@ -90,6 +90,15 @@ class CrmRepairMigrations extends Command
                 $present[$name] = $reason;
             } else {
                 $uncertain[$name] = $reason;
+            }
+        }
+
+        // Handmatig bevestigde onzekere migraties: alleen markeren, nooit uitvoeren.
+        foreach ((array) $this->option('mark') as $mark) {
+            $mark = preg_replace('/\.php$/', '', trim((string) $mark));
+            if ($mark !== '' && isset($uncertain[$mark])) {
+                $present[$mark] = 'handmatig bevestigd, wordt alleen gemarkeerd en niet uitgevoerd';
+                unset($uncertain[$mark]);
             }
         }
 
