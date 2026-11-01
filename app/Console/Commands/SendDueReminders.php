@@ -7,6 +7,8 @@ use App\Enums\ReminderStatus;
 use App\Mail\ReminderMail;
 use App\Models\Reminder;
 use App\Services\Mail\MicrosoftGraphMailer;
+use App\Services\Push\PushNotifier;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -24,6 +26,9 @@ class SendDueReminders extends Command
 
     public function handle(): int
     {
+        // Pushmeldingen gaan los van Microsoft 365: ook zonder mailkoppeling.
+        $this->pushDueReminders();
+
         // Geen SMTP-fallback: zonder koppeling niets proberen; de reminders blijven staan tot de koppeling er is.
         if (! MicrosoftGraphMailer::isConfigured()) {
             $this->warn('Microsoft 365-koppeling voor '.MicrosoftGraphMailer::sender().' is niet ingesteld; e-mail reminders worden niet verstuurd.');
@@ -92,5 +97,47 @@ class SendDueReminders extends Command
         $this->info('Verstuurd: '.$sent.($failed > 0 ? ', mislukt: '.$failed : ''));
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Pushmelding "Taak toegewezen of herinnering" voor herinneringen die nu aan de beurt zijn (alle kanalen).
+     * Elke herinnering krijgt hoogstens een push; herinneringen ouder dan een dag worden overgeslagen.
+     */
+    private function pushDueReminders(): void
+    {
+        try {
+            if (! PushNotifier::available() || ! Schema::hasColumn('reminders', 'push_sent_at')) {
+                return;
+            }
+
+            $reminders = Reminder::query()
+                ->where('status', ReminderStatus::Gepland)
+                ->whereNull('push_sent_at')
+                ->where('remind_at', '<=', now())
+                ->where('remind_at', '>=', now()->subDay())
+                ->whereNotNull('user_id')
+                ->orderBy('remind_at')
+                ->limit((int) $this->option('limit'))
+                ->get();
+
+            $notifier = app(PushNotifier::class);
+            foreach ($reminders as $reminder) {
+                // Eerst markeren: een fout bij de pushdienst mag nooit tot herhaalde meldingen leiden.
+                $reminder->forceFill(['push_sent_at' => now()])->saveQuietly();
+
+                $notifier->notifyUsers(
+                    [$reminder->user_id],
+                    PushNotifier::TYPE_TASK,
+                    'Herinnering',
+                    mb_substr((string) ($reminder->titel ?: 'Je hebt een herinnering.'), 0, 140),
+                    $reminder->garage_company_id
+                        ? route('crm.garage_companies.show', ['garageCompany' => $reminder->garage_company_id], false)
+                        : route('dashboard', [], false),
+                    'reminder-'.$reminder->id,
+                );
+            }
+        } catch (Throwable $e) {
+            Log::warning('Pushmeldingen voor herinneringen mislukt.', ['error' => class_basename($e)]);
+        }
     }
 }

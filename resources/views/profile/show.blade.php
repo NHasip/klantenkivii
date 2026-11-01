@@ -16,6 +16,7 @@
             Laravel\Fortify\Features::enabled(Laravel\Fortify\Features::updatePasswords()) ? ['id' => 'password', 'label' => 'Wachtwoord', 'icon' => 'key'] : null,
             $profileCan2fa ? ['id' => 'two-factor', 'label' => 'Tweestapsverificatie', 'icon' => 'shield', 'badge' => $profileHas2fa ? 'Aan' : 'Uit', 'tone' => $profileHas2fa ? 'success' : 'warning'] : null,
             ['id' => 'passkeys', 'label' => 'Passkeys', 'icon' => 'key', 'badge' => $profilePasskeyCount > 0 ? (string) $profilePasskeyCount : null, 'tone' => 'neutral'],
+            ['id' => 'push-notifications', 'label' => 'Meldingen', 'icon' => 'bell'],
             ['id' => 'sessions', 'label' => 'Sessies', 'icon' => 'globe'],
             $profileCanDelete ? ['id' => 'delete-account', 'label' => 'Account verwijderen', 'icon' => 'trash'] : null,
         ]));
@@ -117,6 +118,10 @@
 
                 <section id="passkeys" class="scroll-mt-20">
                     @include('profile.passkeys-form')
+                </section>
+
+                <section id="push-notifications" class="scroll-mt-20">
+                    @include('profile.push-notifications-form')
                 </section>
 
                 <section id="sessions" class="scroll-mt-20">

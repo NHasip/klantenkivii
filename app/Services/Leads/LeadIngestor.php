@@ -9,6 +9,7 @@ use App\Models\Activity;
 use App\Models\CustomerPerson;
 use App\Models\GarageCompany;
 use App\Models\User;
+use App\Services\Push\PushNotifier;
 use Illuminate\Support\Facades\DB;
 
 class LeadIngestor
@@ -23,7 +24,7 @@ class LeadIngestor
             ->orderBy('id')
             ->firstOrFail();
 
-        return DB::transaction(function () use ($data, $kanaal, $raw, $admin) {
+        $company = DB::transaction(function () use ($data, $kanaal, $raw, $admin) {
             $company = GarageCompany::query()
                 ->where('bedrijfsnaam', $data['bedrijfsnaam'])
                 ->where('hoofd_email', $data['email'])
@@ -98,6 +99,35 @@ class LeadIngestor
 
             return $company;
         });
+
+        $this->pushNewLead($company, $kanaal);
+
+        return $company;
+    }
+
+    /** Pushmelding voor admins; mag het binnenhalen van de lead nooit verstoren. */
+    private function pushNewLead(GarageCompany $company, string $kanaal): void
+    {
+        try {
+            $plaats = trim((string) $company->plaats);
+            $body = $company->bedrijfsnaam
+                .($plaats !== '' && mb_strtolower($plaats) !== 'onbekend' ? ' uit '.$plaats : '')
+                .match ($kanaal) {
+                    'webhook' => ' via het websiteformulier.',
+                    'imap' => ' via de mailbox.',
+                    default => '.',
+                };
+
+            app(PushNotifier::class)->notifyAdmins(
+                PushNotifier::TYPE_LEAD,
+                'Nieuwe demo-aanvraag',
+                $body,
+                route('crm.garage_companies.show', ['garageCompany' => $company->id], false),
+                'lead-'.$company->id,
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     /**

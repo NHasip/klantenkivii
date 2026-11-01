@@ -39,6 +39,8 @@ class MicrosoftGraphTransport extends AbstractTransport
     protected function doSend(SentMessage $message): void
     {
         if (! MicrosoftGraphMailer::isConfigured()) {
+            $this->pushFailure();
+
             throw new TransportException('De Microsoft-koppeling voor '.MicrosoftGraphMailer::sender().' is nog niet ingesteld. De e-mail is niet verstuurd.');
         }
 
@@ -54,8 +56,33 @@ class MicrosoftGraphTransport extends AbstractTransport
         try {
             $this->graph->sendMessage($payload);
         } catch (Throwable $e) {
+            $this->pushFailure();
+
             // De Nederlandse melding van de mailer behouden; het e-maillog vertaalt die verder (humanError).
             throw new TransportException($e->getMessage(), 0, $e);
+        }
+    }
+
+    /**
+     * Pushmelding "E-mail niet verstuurd" voor admins bij mails via de Laravel-mailer (herinneringen, taakmeldingen,
+     * wachtwoordherstel). Hoogstens eens per 15 minuten, zodat een storing geen stroom meldingen geeft.
+     */
+    private function pushFailure(): void
+    {
+        try {
+            if (! \Illuminate\Support\Facades\Cache::add('push:graph-transport-failure', 1, now()->addMinutes(15))) {
+                return;
+            }
+
+            app(\App\Services\Push\PushNotifier::class)->notifyAdmins(
+                \App\Services\Push\PushNotifier::TYPE_MAIL_FAILED,
+                'E-mail niet verstuurd',
+                'Een e-mail (bijv. herinnering of taakmelding) kon niet via Microsoft 365 worden verstuurd.',
+                route('profile.show', [], false).'#admin-mail',
+                'mail-transport',
+            );
+        } catch (Throwable $e) {
+            // Nooit de oorspronkelijke mailfout verbergen.
         }
     }
 

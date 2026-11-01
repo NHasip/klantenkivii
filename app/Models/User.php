@@ -74,6 +74,7 @@ class User extends Authenticatable
             'active' => 'boolean',
             'last_login_at' => 'datetime',
             'two_factor_confirmed_at' => 'datetime',
+            'push_preferences' => 'array',
         ];
     }
 
@@ -137,5 +138,25 @@ class User extends Authenticatable
     public function passkeys(): HasMany
     {
         return $this->hasMany(Passkey::class);
+    }
+
+    public function pushSubscriptions(): HasMany
+    {
+        return $this->hasMany(PushSubscription::class);
+    }
+
+    /**
+     * Staat dit pushmeldingstype aan? Niet opgeslagen betekent aan (standaard alles aan).
+     * Beheerderstypen gelden alleen voor admins.
+     */
+    public function wantsPush(string $type): bool
+    {
+        if (in_array($type, \App\Services\Push\PushNotifier::ADMIN_TYPES, true) && ! $this->isAdmin()) {
+            return false;
+        }
+
+        $prefs = is_array($this->push_preferences ?? null) ? $this->push_preferences : [];
+
+        return ! array_key_exists($type, $prefs) || (bool) $prefs[$type];
     }
 }

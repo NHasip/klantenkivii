@@ -13,6 +13,7 @@ use App\Http\Controllers\Crm\TasksController;
 use App\Http\Controllers\Crm\UsersController;
 use App\Http\Controllers\Auth\PasskeyLoginController;
 use App\Http\Controllers\Profile\PasskeyController;
+use App\Http\Controllers\Profile\PushSubscriptionController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -186,4 +187,17 @@ Route::middleware(['auth', 'active', 'admin.2fa'])->group(function () {
         ->name('profile.passkeys.store');
     Route::delete('/user/profile/passkeys/{passkey}', [PasskeyController::class, 'destroy'])
         ->name('profile.passkeys.destroy');
+
+    // Pushmeldingen op dit apparaat (iPhone-beginschermapp en desktopbrowsers).
+    Route::middleware('throttle:20,1')->group(function () {
+        Route::post('/user/profile/push/abonnement', [PushSubscriptionController::class, 'store'])
+            ->name('profile.push.store');
+        Route::delete('/user/profile/push/abonnement', [PushSubscriptionController::class, 'destroy'])
+            ->name('profile.push.destroy');
+        Route::post('/user/profile/push/test', [PushSubscriptionController::class, 'test'])
+            ->middleware('throttle:5,1')
+            ->name('profile.push.test');
+        Route::patch('/user/profile/push/voorkeuren', [PushSubscriptionController::class, 'preferences'])
+            ->name('profile.push.preferences');
+    });
 });

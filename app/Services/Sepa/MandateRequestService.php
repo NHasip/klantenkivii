@@ -13,6 +13,7 @@ use App\Models\SepaMandateRequest;
 use App\Models\User;
 use App\Services\EmailTemplateRenderer;
 use App\Services\Forms\FormPayloadNormalizer;
+use App\Services\Push\PushNotifier;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -181,7 +182,7 @@ class MandateRequestService
 
         $akkoord = self::truthy($fields['akkoord'] ?? null);
 
-        return DB::transaction(function () use ($ref, $formKenmerk, $iban, $payload, $fields, $akkoord, &$note) {
+        $result = DB::transaction(function () use ($ref, $formKenmerk, $iban, $payload, $fields, $akkoord, &$note) {
             $request = null;
             $byRef = null;
 
@@ -254,6 +255,38 @@ class MandateRequestService
 
             return ['request' => $request, 'reason' => $reason];
         });
+
+        $this->pushReceived($result['request']);
+
+        return $result;
+    }
+
+    /** Pushmelding voor admins na een inzending; zonder IBAN of e-mailadres en zonder de webhook te verstoren. */
+    private function pushReceived(SepaMandateRequest $request): void
+    {
+        try {
+            $request->refresh();
+            $company = $request->garage_company_id ? GarageCompany::query()->find($request->garage_company_id) : null;
+            $naam = $company?->bedrijfsnaam ?: 'Onbekende klant';
+
+            if ($request->status === SepaMandateRequest::STATUS_VERWERKT) {
+                $title = 'Machtiging ontvangen';
+                $body = $naam.': machtiging '.$request->kenmerk.' is ontvangen en verwerkt.';
+            } else {
+                $title = 'Machtiging ontvangen, controle nodig';
+                $body = $naam.': machtiging '.$request->kenmerk.' wacht op controle.';
+            }
+
+            app(PushNotifier::class)->notifyAdmins(
+                PushNotifier::TYPE_MANDATE,
+                $title,
+                $body,
+                route('crm.mandate_requests.index', [], false),
+                'mandate-'.$request->id,
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     private function uniqueRef(): string
