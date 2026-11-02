@@ -1,9 +1,11 @@
 import './bootstrap';
 
 import { createInertiaApp, router } from '@inertiajs/react';
+import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ConfirmProvider } from './components/ConfirmProvider';
 import { FlashToast } from './components/FlashToast';
+import { PageErrorBoundary } from './components/PageErrorBoundary';
 
 const pages = import.meta.glob('./Pages/**/*.jsx');
 
@@ -44,6 +46,19 @@ router.on('invalid', (event) => {
     if (target && reload(target)) event.preventDefault();
 });
 
+// Zelfde weergave als de standaard van Inertia (pagina + eventuele layout), zodat de error boundary er omheen kan.
+function renderPage(Component, pageProps, key) {
+    const child = createElement(Component, { key, ...pageProps });
+    if (typeof Component.layout === 'function') return Component.layout(child);
+    if (Array.isArray(Component.layout)) {
+        return Component.layout
+            .concat(child)
+            .reverse()
+            .reduce((children, Layout) => createElement(Layout, { children, ...pageProps }));
+    }
+    return child;
+}
+
 createInertiaApp({
     title: (title) => (title ? `${title} - Kivii CRM` : 'Kivii CRM'),
     resolve: async (name) => {
@@ -57,7 +72,14 @@ createInertiaApp({
     setup({ el, App, props }) {
         createRoot(el).render(
             <ConfirmProvider>
-                <App {...props} />
+                <App {...props}>
+                    {/* Renderfout in een pagina: melding met "Opnieuw laden" in plaats van een lege pagina. */}
+                    {({ Component, props: pageProps, key }) => (
+                        <PageErrorBoundary resetKey={`${key ?? ''}|${typeof window !== 'undefined' ? window.location.href : ''}`}>
+                            {renderPage(Component, pageProps, key)}
+                        </PageErrorBoundary>
+                    )}
+                </App>
                 <FlashToast />
             </ConfirmProvider>
         );

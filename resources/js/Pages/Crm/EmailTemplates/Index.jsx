@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Head, router, useForm } from '@inertiajs/react';
 import { EditorContent, useEditor } from '@tiptap/react';
+import { isEditorUsable, safeGetHTML, safeSetContent } from '../../../components/editorSafe';
 import StarterKit from '@tiptap/starter-kit';
 import LinkExtension from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -133,7 +134,7 @@ export default function Index({ templates = [], variables, urls, previewCustomer
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedTemplate?.id, isNew]);
 
-    const editor = useEditor({
+    const rawEditor = useEditor({
         // Zorgt dat de actieve status van de toolbarknoppen meebeweegt met de cursor.
         shouldRerenderOnTransaction: true,
         extensions: [
@@ -162,17 +163,20 @@ export default function Index({ templates = [], variables, urls, previewCustomer
         },
     });
 
+    // Een al vernietigde editor (kan in WebKit/iPhone kort voorkomen) behandelen als 'nog geen editor'.
+    const editor = isEditorUsable(rawEditor) ? rawEditor : null;
+
     useEffect(() => {
-        if (!editor) return;
+        if (!isEditorUsable(editor)) return;
         const nextHtml = form.data.body_html?.trim() ? form.data.body_html : EMPTY_BODY;
-        if (editor.getHTML() !== nextHtml) {
-            editor.commands.setContent(nextHtml, { emitUpdate: false });
+        if (safeGetHTML(editor, nextHtml) !== nextHtml) {
+            safeSetContent(editor, nextHtml, { emitUpdate: false });
         }
         // Pas vastleggen zodra de editor de geladen template toont (niet de vorige/lege staat).
         const source = baselineRef.current.source;
         const sourceHtml = String(source ?? '').trim() ? source : EMPTY_BODY;
         if (baselineRef.current.body === null && nextHtml === sourceHtml) {
-            baselineRef.current.body = editor.getHTML();
+            baselineRef.current.body = safeGetHTML(editor, nextHtml);
         }
     }, [editor, form.data.body_html]);
 
@@ -246,7 +250,7 @@ export default function Index({ templates = [], variables, urls, previewCustomer
 
     const submitTemplate = (method, url, options = {}) => {
         if (saving || deleting) return;
-        const latestHtml = editor ? editor.getHTML() : form.data.body_html;
+        const latestHtml = safeGetHTML(editor, form.data.body_html);
         const payload = {
             ...form.data,
             name: String(form.data.name || '').trim(),
@@ -376,7 +380,7 @@ export default function Index({ templates = [], variables, urls, previewCustomer
         editor?.chain().focus().insertContent(text).run();
     };
 
-    const currentSource = `${form.data.subject || ''}\u0000${editor ? editor.getHTML() : form.data.body_html || ''}`;
+    const currentSource = `${form.data.subject || ''}\u0000${safeGetHTML(editor, form.data.body_html || '')}`;
 
     const loadPreview = async (companyId = previewCompanyId) => {
         if (!companyId || !urls.preview) return;
@@ -388,7 +392,7 @@ export default function Index({ templates = [], variables, urls, previewCustomer
             const response = await window.axios.post(urls.preview, {
                 garage_company_id: Number(companyId),
                 subject: form.data.subject || '',
-                body_html: editor ? editor.getHTML() : form.data.body_html || '',
+                body_html: safeGetHTML(editor, form.data.body_html || ''),
             });
             if (seq !== previewSeqRef.current) return;
             setPreview(response.data);
@@ -449,7 +453,7 @@ export default function Index({ templates = [], variables, urls, previewCustomer
     const visibleTemplates = query ? templates.filter((t) => `${t.name ?? ''} ${t.subject ?? ''}`.toLowerCase().includes(query)) : templates;
 
     // Live voorbeeld met voorbeeldgegevens: direct bij elke toetsaanslag, zonder serververzoek.
-    const liveBody = editor ? editor.getHTML() : form.data.body_html || '';
+    const liveBody = safeGetHTML(editor, form.data.body_html || '');
     const liveSubject = fillSample(form.data.subject || '', variables, false);
     const liveHtml = fillSample(liveBody, variables, true);
     const showLive = previewMode === 'sample';

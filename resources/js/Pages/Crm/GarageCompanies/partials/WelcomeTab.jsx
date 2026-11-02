@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { isEditorUsable } from '../../../../components/editorSafe';
 import { createPortal } from 'react-dom';
 import { EditorContent } from '@tiptap/react';
 import { Badge, Button, Card, Field, IconTile, cx } from '../../../../components/ui';
@@ -6,7 +7,9 @@ import { CURRENT_DRAFT, FormField, Notice, ToolbarButton, WELCOME_STATUS_LABELS,
 
 const TOKENS = ['{{ naam }}', '{{ bedrijfsnaam }}', '{{ loginnaam }}', '{{ activatielink }}', '{{ reset_link }}', '{{ weblink }}'];
 
-function EditorToolbar({ editor }) {
+function EditorToolbar({ editor: rawEditor }) {
+    // Vernietigde editor (schema null) niet aanspreken: isActive() zou dan een renderfout geven.
+    const editor = isEditorUsable(rawEditor) ? rawEditor : null;
     const disabled = !editor;
     const setLink = () => {
         if (!editor) return;

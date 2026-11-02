@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useMemo, useState } from 'react';
 import { useEditor } from '@tiptap/react';
+import { isEditorUsable, safeGetHTML, safeSetContent } from '../../../components/editorSafe';
 import StarterKit from '@tiptap/starter-kit';
 import LinkExtension from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -867,10 +868,12 @@ export default function Show({
     });
 
     useEffect(() => {
-        if (!welcomeEditor) return;
+        // Null-safe: in WebKit (iPhone) kan hier nog een vernietigde editor zitten (schema null); getHTML() gooide dan
+        // een fout tijdens het renderen en bleef de hele klantpagina leeg.
+        if (!isEditorUsable(welcomeEditor)) return;
         const nextHtml = welcomeForm.data.body_html?.trim() ? welcomeForm.data.body_html : '<p></p>';
-        if (welcomeEditor.getHTML() !== nextHtml) {
-            welcomeEditor.commands.setContent(nextHtml, false);
+        if (safeGetHTML(welcomeEditor, nextHtml) !== nextHtml) {
+            safeSetContent(welcomeEditor, nextHtml, false);
         }
     }, [welcomeEditor, welcomeForm.data.body_html]);
 
@@ -954,9 +957,7 @@ export default function Show({
     const applyTemplate = (template, { close = true, send = false } = {}) => {
         if (!template) return;
         welcomeForm.setData((data) => ({ ...data, subject: template.subject, body_html: template.body_html, template_id: template.id }));
-        if (welcomeEditor) {
-            welcomeEditor.commands.setContent(template.body_html || '<p></p>', false);
-        }
+        safeSetContent(welcomeEditor, template.body_html || '<p></p>', false);
         setSelectedTemplateId(template.id);
         if (close) setTemplatePickerOpen(false);
         if (send) {
