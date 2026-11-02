@@ -148,7 +148,7 @@ function ModulesSection({ form, totals, extraUsersHint, onToggle, onUpdateRow, o
                         className={cx(
                             'flex flex-col gap-2 rounded-b-2xl border-t border-zinc-200 bg-zinc-50 px-5 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-6',
                             pinned &&
-                                'max-md:fixed max-md:inset-x-0 max-md:bottom-[var(--kivii-bottom-offset,0px)] max-md:z-30 max-md:rounded-none max-md:bg-white/95 max-md:shadow-[0_-6px_16px_-8px_rgba(24,24,27,0.18)] max-md:backdrop-blur',
+                                'max-md:fixed max-md:inset-x-0 max-md:bottom-[var(--kivii-bottom-offset,0px)] max-md:z-20 max-md:rounded-none max-md:bg-white/95 max-md:shadow-[0_-6px_16px_-8px_rgba(24,24,27,0.18)] max-md:backdrop-blur',
                         )}
                     >
                         <p className="text-sm text-zinc-600 sm:mr-auto">

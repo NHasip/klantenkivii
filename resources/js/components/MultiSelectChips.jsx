@@ -102,7 +102,7 @@ export function MultiSelectChips({ id, options = [], value = [], onChange, place
                         {o.name}
                         <button
                             type="button"
-                            className="tap-area inline-flex h-4 w-4 items-center justify-center rounded-full leading-none text-indigo-800 hover:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
+                            className="inline-flex h-4 w-4 shrink-0 items-center [@media(pointer:coarse)]:h-8 [@media(pointer:coarse)]:w-8 justify-center rounded-full leading-none text-indigo-800 hover:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
                             aria-label={`Verwijder ${o.name}`}
                             onClick={(e) => {
                                 e.stopPropagation();

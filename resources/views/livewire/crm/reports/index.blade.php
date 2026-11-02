@@ -291,10 +291,10 @@
                     <x-icon name="download" class="h-3.5 w-3.5" /> CSV
                 </button>
             </div>
-            <div class="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-600 [@media(pointer:coarse)]:gap-y-3">
-                <a href="{{ $customersUrl }}?status=actief" class="tap-link inline-flex items-center gap-1.5 rounded hover:text-zinc-900 hover:underline focus-ring"><span class="h-2.5 w-2.5 rounded-sm bg-emerald-500" aria-hidden="true"></span>Nieuw actief <span class="font-semibold tabular-nums text-zinc-900">{{ $nf($flowInTotal) }}</span></a>
-                <a href="{{ $customersUrl }}?status=opgezegd" class="tap-link inline-flex items-center gap-1.5 rounded hover:text-zinc-900 hover:underline focus-ring"><span class="h-2.5 w-2.5 rounded-sm bg-rose-500" aria-hidden="true"></span>Opgezegd</a>
-                <a href="{{ $customersUrl }}?status=verloren" class="tap-link inline-flex items-center gap-1.5 rounded hover:text-zinc-900 hover:underline focus-ring"><span class="h-2.5 w-2.5 rounded-sm bg-rose-300" aria-hidden="true"></span>Verloren</a>
+            <div class="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-600 [@media(pointer:coarse)]:gap-y-0">
+                <a href="{{ $customersUrl }}?status=actief" class="tap-row inline-flex items-center gap-1.5 rounded hover:text-zinc-900 hover:underline focus-ring"><span class="h-2.5 w-2.5 rounded-sm bg-emerald-500" aria-hidden="true"></span>Nieuw actief <span class="font-semibold tabular-nums text-zinc-900">{{ $nf($flowInTotal) }}</span></a>
+                <a href="{{ $customersUrl }}?status=opgezegd" class="tap-row inline-flex items-center gap-1.5 rounded hover:text-zinc-900 hover:underline focus-ring"><span class="h-2.5 w-2.5 rounded-sm bg-rose-500" aria-hidden="true"></span>Opgezegd</a>
+                <a href="{{ $customersUrl }}?status=verloren" class="tap-row inline-flex items-center gap-1.5 rounded hover:text-zinc-900 hover:underline focus-ring"><span class="h-2.5 w-2.5 rounded-sm bg-rose-300" aria-hidden="true"></span>Verloren</a>
                 <span class="text-zinc-500">Uit: <span class="font-semibold tabular-nums text-zinc-900">{{ $nf($flowOutTotal) }}</span></span>
             </div>
             <svg viewBox="0 0 {{ $flowW }} {{ $flowH }}" class="h-auto w-full" role="img" aria-label="Staafgrafiek instroom en uitstroom per maand, laatste 12 maanden">

@@ -13,7 +13,8 @@
 
     /* Sticky kopbalk mag gefocuste elementen of ankers niet afdekken (WCAG 2.4.11). */
     html {
-        scroll-padding-top: 5rem;
+        /* --kivii-header-h: echte hoogte van de sticky kopbalk (incl. 2FA-banner en notch), gezet door resources/js/shell.js. */
+        scroll-padding-top: calc(var(--kivii-header-h, 3.5rem) + 1.5rem);
     }
 
     body {
@@ -319,6 +320,65 @@
     .nav-item[aria-current='page'] svg {
         @apply text-indigo-600;
     }
+
+    /*
+     * Tikvlakken op touch (alleen bij grove pointer). In @layer components, zodat utilities (h-*, display, enz.)
+     * op hetzelfde element altijd winnen.
+     * - .tap-target: minimaal 44px hoog.
+     * - .tap-link: losse kleine tekstlink; onzichtbaar tikvlak van 44px hoog, horizontaal precies zo breed als de
+     *   link zelf (geen overlap met buren links of rechts). Niet gebruiken in dichte lijsten onder elkaar: daar
+     *   .tap-row / .tap-row-block (echte hoogte van 44px), zodat tikvlakken van buren elkaar niet overlappen.
+     * - .tap-area: klein icoon (Esc-hint, logo); onzichtbaar, gecentreerd tikvlak van 44x44px.
+     */
+    .tap-row-block {
+        display: block;
+    }
+
+    @media (pointer: coarse) {
+        .tap-target {
+            min-height: 44px;
+        }
+
+        .tap-row {
+            display: inline-flex;
+            align-items: center;
+            min-height: 44px;
+        }
+
+        .tap-row-block {
+            display: flex;
+            align-items: center;
+            min-height: 44px;
+        }
+
+        .tap-link {
+            position: relative;
+        }
+
+        .tap-link::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 50%;
+            height: max(100%, 44px);
+            transform: translateY(-50%);
+        }
+
+        .tap-area {
+            position: relative;
+        }
+
+        .tap-area::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 44px;
+            height: 44px;
+            transform: translate(-50%, -50%);
+        }
+    }
 }
 
 @layer utilities {
@@ -437,7 +497,6 @@
     .btn,
     .btn-sm,
     .btn-xs,
-    .tap-target,
     [role='tab'] {
         min-height: 44px;
     }
@@ -464,35 +523,12 @@
         min-height: 44px;
     }
 
-    /* Kleine tekstlinks (Alle taken, terug naar Klanten): onzichtbaar tikvlak van minstens 44px, zonder layoutverschuiving. */
-    .tap-link {
-        position: relative;
-    }
-
-    .tap-link::after {
-        content: '';
-        position: absolute;
-        left: -0.5rem;
-        right: -0.5rem;
-        top: 50%;
-        height: 44px;
-        min-width: 44px;
-        transform: translateY(-50%);
-    }
-
-    /* Kleine icoonknoppen (chip-kruisje, Esc-hint): onzichtbaar, gecentreerd tikvlak van 44x44px. */
-    .tap-area {
-        position: relative;
-    }
-
-    .tap-area::after {
-        content: '';
-        position: absolute;
-        left: 50%;
-        top: 50%;
-        width: 44px;
-        height: 44px;
-        transform: translate(-50%, -50%);
+    /*
+     * iOS stuurt geen click naar document bij een tik op een niet-interactief vlak; daardoor sluiten Alpine-menu's
+     * met @click.outside (gebruikersmenu, meldingen) niet. cursor: pointer maakt elk vlak "klikbaar" voor Safari.
+     */
+    body {
+        cursor: pointer;
     }
 }
 
@@ -539,12 +575,15 @@
 }
 
 @media (max-width: 767.98px) {
+    /* .has-bottom-nav staat vast op <html> in de layouts (ook iOS < 15.4 zonder :has); :has als vangnet. */
+    html.has-bottom-nav,
     html:has(#kivii-bottom-nav) {
         /* h-14 (3.5rem) + border-t (1px) + home-indicator, gelijk aan de echte hoogte van #kivii-bottom-nav. */
         --kivii-bottom-offset: calc(3.5rem + 1px + env(safe-area-inset-bottom));
         scroll-padding-bottom: var(--kivii-bottom-offset);
     }
 
+    html.has-bottom-nav .app-container,
     html:has(#kivii-bottom-nav) .app-container {
         padding-bottom: calc(1.5rem + var(--kivii-bottom-offset));
     }

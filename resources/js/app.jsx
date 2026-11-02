@@ -14,6 +14,36 @@ router.on('navigate', (event) => {
     window.dispatchEvent(new CustomEvent('kivii-navigate', { detail: { url } }));
 });
 
+// Verlopen sessie of CSRF-token: Inertia krijgt dan een niet-Inertia-antwoord (419-pagina, of de inlogpagina na een
+// redirect) en zou dat in een modal tonen. In plaats daarvan een volledige paginalading: naar het inloggen of de
+// huidige pagina opnieuw (met verse tokens).
+router.on('invalid', (event) => {
+    const response = event?.detail?.response;
+    const status = Number(response?.status || 0);
+    const finalUrl = response?.request?.responseURL || '';
+    let finalPath = '';
+    try {
+        finalPath = finalUrl ? new URL(finalUrl, window.location.href).pathname : '';
+    } catch (e) {
+        finalPath = '';
+    }
+    const landedOnLogin = /\/login\/?$/.test(finalPath);
+    const method = String(response?.config?.method || 'get').toLowerCase();
+    const reload = (url) => (window.kiviiReload ? window.kiviiReload(url) : ((window.location.href = url || window.location.href), true));
+
+    let target = null;
+    if (landedOnLogin) {
+        target = finalUrl;
+    } else if (status === 401 || status === 419) {
+        target = window.location.href;
+    } else if (status === 403 && method === 'get' && finalUrl) {
+        // Geen toegang tot de gevraagde pagina: die pagina volledig tonen in plaats van in een modal.
+        target = finalUrl;
+    }
+    // kiviiReload weigert een tweede herlaadactie binnen 10s; dan de standaardmodal laten zien (geen "dode" knop).
+    if (target && reload(target)) event.preventDefault();
+});
+
 createInertiaApp({
     title: (title) => (title ? `${title} - Kivii CRM` : 'Kivii CRM'),
     resolve: async (name) => {

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full has-bottom-nav">{{-- has-bottom-nav: de kop (layouts/partials/header) rendert altijd #kivii-bottom-nav; vaste klasse voor iOS zonder :has. --}}
 <head>
     @include('layouts.partials.head')
 

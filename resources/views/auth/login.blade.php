@@ -31,7 +31,7 @@
             </div>
 
             <label for="remember_me" class="flex w-fit cursor-pointer items-center gap-2">
-                <x-checkbox id="remember_me" name="remember" />
+                <x-checkbox id="remember_me" name="remember" :checked="session()->hasOldInput() ? (bool) old('remember') : true" />
                 <span class="text-sm text-zinc-700">Ingelogd blijven</span>
             </label>
 

@@ -94,7 +94,7 @@
                 if (main) main.focus({ preventScroll: true });
             }
         },
-     }" class="safe-top sticky top-0 z-30"
+     }" id="kivii-header" class="safe-top sticky top-0 z-30"
      @kivii-navigate.window="syncNav($event.detail && $event.detail.url)"
      @kivii-menu-open.window="if ($event.detail !== 'mobile' && $event.detail !== 'user') closeMobile(false)"
      @keydown.escape.window="if (mobileOpen) closeMobile()"
@@ -258,9 +258,10 @@
 
     @if ($kiviiNeeds2fa)
         <div class="border-b border-amber-200 bg-amber-50 text-amber-950" role="alert">
-            <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm sm:px-6 lg:px-10">
-                <span class="flex items-center gap-2"><x-icon name="shield" class="h-4 w-4 text-amber-700" /><span><strong class="font-semibold">Beveilig je admin-account.</strong> Tweestapsverificatie (2FA) staat nog niet aan.</span></span>
-                <a href="{{ route('profile.show') }}#two-factor" class="inline-flex h-8 items-center rounded-lg bg-amber-900 px-3 text-xs font-semibold text-white hover:bg-amber-950 {{ $kiviiFocus }}">2FA instellen</a>
+            {{-- Onder sm compact op één regel (korte tekst + knop), zodat de sticky kop laag blijft. --}}
+            <div class="flex items-center justify-between gap-2 px-4 py-1.5 text-sm sm:flex-wrap sm:px-6 sm:py-2 lg:px-10">
+                <span class="flex min-w-0 items-center gap-2"><x-icon name="shield" class="h-4 w-4 shrink-0 text-amber-700" /><span class="truncate sm:hidden"><strong class="font-semibold">2FA staat uit</strong></span><span class="hidden sm:inline"><strong class="font-semibold">Beveilig je admin-account.</strong> Tweestapsverificatie (2FA) staat nog niet aan.</span></span>
+                <a href="{{ route('profile.show') }}#two-factor" class="inline-flex h-8 shrink-0 items-center rounded-lg bg-amber-900 px-3 text-xs font-semibold text-white hover:bg-amber-950 {{ $kiviiFocus }}"><span class="sm:hidden">Instellen</span><span class="hidden sm:inline">2FA instellen</span></a>
             </div>
         </div>
     @endif

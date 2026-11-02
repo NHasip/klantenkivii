@@ -423,7 +423,9 @@ export function Tooltip({ content, side = 'top', children, className = '' }) {
                 role="tooltip"
                 className={cx(
                     'pointer-events-none absolute left-1/2 z-50 w-max max-w-xs -translate-x-1/2 rounded-lg bg-zinc-900 px-2.5 py-1.5 text-xs font-medium text-white shadow-pop',
-                    'invisible opacity-0 transition-opacity duration-100 group-focus-within/tt:visible group-focus-within/tt:opacity-100 group-hover/tt:visible group-hover/tt:opacity-100',
+                    // Hover alleen op apparaten met echte hover: op iOS zou een tik eerst de tooltip tonen en pas de tweede
+                    // tik klikken. Toetsenbordfocus (focus-visible) toont hem overal.
+                    'invisible opacity-0 transition-opacity duration-100 group-has-[:focus-visible]/tt:visible group-has-[:focus-visible]/tt:opacity-100 [@media(hover:hover)]:group-hover/tt:visible [@media(hover:hover)]:group-hover/tt:opacity-100',
                     side === 'bottom' ? 'top-full mt-2' : 'bottom-full mb-2',
                 )}
             >

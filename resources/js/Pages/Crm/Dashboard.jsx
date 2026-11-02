@@ -147,7 +147,7 @@ function CustomerChip({ company, size = 'xs' }) {
         </>
     );
     return company.url ? (
-        <a href={company.url} className={cx('tap-link inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md text-xs font-medium text-zinc-700 hover:text-indigo-700 hover:underline', LINK_FOCUS)}>
+        <a href={company.url} className={cx('tap-row inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md text-xs font-medium text-zinc-700 hover:text-indigo-700 hover:underline', LINK_FOCUS)}>
             {content}
         </a>
     ) : (
@@ -169,9 +169,9 @@ function Row({ leading, title, href, meta, aside, overdue = false }) {
             {leading ? <div className="shrink-0 pt-0.5">{leading}</div> : null}
             <div className="min-w-0 flex-1">
                 {href ? (
-                    // truncate op een binnenste span: het tikvlak (tap-link::after) valt anders weg door overflow: hidden.
-                    <a href={href} className={cx('tap-link block rounded text-sm font-medium text-zinc-900 hover:text-indigo-700', LINK_FOCUS)} title={typeof title === 'string' ? title : undefined}>
-                        <span className="block truncate">{title}</span>
+                    // tap-row-block: op touch echt 44px hoog (geen onzichtbaar tikvlak dat buren overlapt); truncate op de span.
+                    <a href={href} className={cx('tap-row-block rounded text-sm font-medium text-zinc-900 hover:text-indigo-700', LINK_FOCUS)} title={typeof title === 'string' ? title : undefined}>
+                        <span className="block min-w-0 truncate">{title}</span>
                     </a>
                 ) : (
                     <div className="truncate text-sm font-medium text-zinc-900">{title}</div>
@@ -280,8 +280,8 @@ function DemoEndingRow({ item }) {
                 <Avatar name={item.bedrijfsnaam} size="md" />
                 <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                        <a href={item.url} className={cx('tap-link min-w-0 max-w-full rounded text-sm font-semibold text-zinc-900 hover:text-indigo-700', LINK_FOCUS)} title={item.bedrijfsnaam}>
-                            <span className="block truncate">{item.bedrijfsnaam}</span>
+                        <a href={item.url} className={cx('tap-row min-w-0 max-w-full rounded text-sm font-semibold text-zinc-900 hover:text-indigo-700', LINK_FOCUS)} title={item.bedrijfsnaam}>
+                            <span className="block min-w-0 truncate">{item.bedrijfsnaam}</span>
                         </a>
                         <Badge tone={tone === 'brand' ? 'neutral' : tone}>{daysLeftLabel(item.days_left)}</Badge>
                     </div>

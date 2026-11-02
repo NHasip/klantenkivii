@@ -24,6 +24,33 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
+        // Verlopen sessie of CSRF-token bij een Inertia-verzoek: geen 419-foutpagina of inlogpagina in een modal,
+        // maar terug naar de pagina met een melding (419) of een volledige paginalading naar het inloggen (401).
+        $exceptions->respond(function (\Symfony\Component\HttpFoundation\Response $response, \Throwable $e, \Illuminate\Http\Request $request) {
+            if (! $request->header('X-Inertia')) {
+                return $response;
+            }
+
+            if ($e instanceof \Illuminate\Auth\AuthenticationException) {
+                return \Inertia\Inertia::location(route('login'));
+            }
+
+            $isTokenMismatch = $e instanceof \Illuminate\Session\TokenMismatchException
+                || $e->getPrevious() instanceof \Illuminate\Session\TokenMismatchException
+                || $response->getStatusCode() === 419;
+
+            if ($isTokenMismatch) {
+                // Een GET-bezoek kan niet "terug": dan de pagina zelf volledig opnieuw laden.
+                if ($request->isMethod('GET')) {
+                    return \Inertia\Inertia::location($request->fullUrl());
+                }
+
+                return back(303)->with('error', 'Je sessie was verlopen. Probeer het opnieuw.');
+            }
+
+            return $response;
+        });
+
         $exceptions->reportable(function (\Throwable $e) {
             if (! app()->environment('production')) {
                 return;

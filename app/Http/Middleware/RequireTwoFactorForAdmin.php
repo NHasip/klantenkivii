@@ -26,8 +26,16 @@ class RequireTwoFactorForAdmin
         $twoFactorEnabled = self::userHasTwoFactor($user);
 
         if (! $twoFactorEnabled && ! $request->routeIs('profile.show')) {
-            return redirect()->to('/user/profile')
-                ->with('status', '2FA is verplicht voor admin accounts. Schakel dit in via je profiel.');
+            // De profielpagina toont hierop een duidelijke (oranje) uitleg waarom je bent doorgestuurd.
+            $request->session()->flash('two_factor_required', $request->path());
+
+            // Inertia- en Livewire-verzoeken: volledige paginalading naar de (Blade) profielpagina, anders opent die
+            // in een modal of reageert de knop schijnbaar niet.
+            if ($request->header('X-Inertia')) {
+                return \Inertia\Inertia::location(route('profile.show').'#two-factor');
+            }
+
+            return redirect()->to(route('profile.show').'#two-factor');
         }
 
         return $next($request);

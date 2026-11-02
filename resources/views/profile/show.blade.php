@@ -25,6 +25,22 @@
     <x-page-header title="Profiel en beveiliging" icon="user"
         :description="$profileIsAdmin ? 'Beheer je accountgegevens, beveiliging en de systeeminstellingen voor alle gebruikers.' : 'Beheer je accountgegevens en beveiliging.'" />
 
+    {{-- Doorgestuurd door RequireTwoFactorForAdmin: uitleggen waarom, zodat de CRM-knoppen niet "dood" lijken. --}}
+    @if (session('two_factor_required') && ! $profileHas2fa)
+        <div class="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm" role="alert">
+            <div class="flex items-start gap-3">
+                <x-icon name="shield" class="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+                <div class="min-w-0 flex-1">
+                    <p class="font-semibold">Je bent doorgestuurd naar je profiel.</p>
+                    <p class="mt-0.5">Voor admin-accounts is tweestapsverificatie (2FA) verplicht. Zolang 2FA uit staat, brengt elke CRM-pagina je hierheen terug. Schakel 2FA in bij Tweestapsverificatie; daarna werkt alles weer.</p>
+                    @if ($profileCan2fa)
+                        <a href="#two-factor" class="mt-2 inline-flex min-h-[36px] items-center rounded-lg bg-amber-900 px-3 text-xs font-semibold text-white hover:bg-amber-950 focus-ring [@media(pointer:coarse)]:min-h-[44px]">Naar Tweestapsverificatie</a>
+                    @endif
+                </div>
+            </div>
+        </div>
+    @endif
+
     {{-- Snelle navigatie op mobiel: horizontaal scrollbare chips. --}}
     <nav class="-mx-4 mb-6 overflow-x-auto px-4 lg:hidden" aria-label="Snelle navigatie profiel">
         <ul class="flex gap-2 whitespace-nowrap">

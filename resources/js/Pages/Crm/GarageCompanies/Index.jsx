@@ -229,9 +229,9 @@ function CompanyIdentity({ company, size = 'md', linked = true }) {
             <Avatar name={name} size={size} />
             <div className="min-w-0">
                 {linked && company.show_url ? (
-                    // tap-link: 44px tikvlak op touch; truncate op de span, anders knipt overflow het tikvlak af.
-                    <Link href={company.show_url} className="tap-link block rounded font-semibold text-zinc-900 hover:text-indigo-700" title={name}>
-                        <span className="block truncate">{name}</span>
+                    // tap-row-block: op touch echt 44px hoog, zonder onzichtbaar tikvlak over de regel eronder; truncate op de span.
+                    <Link href={company.show_url} className="tap-row-block rounded font-semibold text-zinc-900 hover:text-indigo-700" title={name}>
+                        <span className="block min-w-0 truncate">{name}</span>
                     </Link>
                 ) : (
                     <span className="block truncate font-semibold text-zinc-900" title={name}>

@@ -7,6 +7,7 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities';
 import { useDialog } from '../../components/useDialog';
 import { MultiSelectChips } from '../../components/MultiSelectChips';
+import { TOAST_POSITION } from '../../components/FlashToast';
 import { useConfirm } from '../../components/ConfirmProvider';
 import { Avatar, Badge, Button, EmptyState, FilePicker, IconTile, PageHeader, Skeleton, Spinner, StatusDot, buttonClasses, cx, inputClasses, tableClasses } from '../../components/ui';
 import { Icon } from '../../components/icons';
@@ -261,7 +262,7 @@ function CustomerChip({ customer, stopDrag = false, className = '' }) {
             title={`Klant openen: ${customer.naam}`}
             onPointerDown={stopDrag ? (e) => e.stopPropagation() : undefined}
             className={cx(
-                'tap-link inline-flex max-w-full items-center gap-1.5 rounded-full bg-white py-0.5 pl-0.5 pr-2.5 text-xs font-medium text-zinc-700 ring-1 ring-inset ring-zinc-200 transition-colors hover:bg-indigo-50 hover:text-indigo-900 hover:ring-indigo-200 focus-ring',
+                'inline-flex max-w-full items-center gap-1.5 rounded-full [@media(pointer:coarse)]:min-h-[32px] bg-white py-0.5 pl-0.5 pr-2.5 text-xs font-medium text-zinc-700 ring-1 ring-inset ring-zinc-200 transition-colors hover:bg-indigo-50 hover:text-indigo-900 hover:ring-indigo-200 focus-ring',
                 className,
             )}
         >
@@ -980,8 +981,8 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
     }, [fetchTasks]);
 
     useEffect(() => {
-        if (!notice || notice.tone === 'error') return undefined;
-        const handler = setTimeout(() => setNotice(null), 4000);
+        if (!notice) return undefined;
+        const handler = setTimeout(() => setNotice(null), notice.tone === 'error' ? 8000 : 4000);
         return () => clearTimeout(handler);
     }, [notice]);
 
@@ -1665,11 +1666,12 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                 />
 
                 {notice ? (
+                    <div className={TOAST_POSITION}>
                     <div
                         role={notice.tone === 'error' ? 'alert' : 'status'}
                         aria-live={notice.tone === 'error' ? 'assertive' : 'polite'}
                         className={cx(
-                            'fixed bottom-[calc(1rem+var(--kivii-bottom-offset,0px))] left-4 right-4 z-[60] rounded-2xl border bg-white p-4 text-sm shadow-pop sm:left-auto sm:w-96',
+                            'pointer-events-auto w-full rounded-2xl border bg-white p-4 text-sm shadow-pop sm:w-96',
                             notice.tone === 'error' ? 'border-rose-200' : 'border-emerald-200',
                         )}
                     >
@@ -1678,6 +1680,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                             <div className="min-w-0 flex-1 pt-1.5 text-zinc-800">{notice.text}</div>
                             <Button variant="ghost" size="xs" iconOnly icon="x" aria-label="Melding sluiten" onClick={() => setNotice(null)} />
                         </div>
+                    </div>
                     </div>
                 ) : null}
 

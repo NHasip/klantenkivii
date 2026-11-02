@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from '@inertiajs/react';
 import StatusBadge from '../../../../components/StatusBadge';
 import { Icon } from '../../../../components/icons';
@@ -109,13 +110,39 @@ function ActionButton({ action, className = '' }) {
 
 function MoreMenu({ actions }) {
     const [open, setOpen] = useState(false);
+    const [position, setPosition] = useState(null);
     const rootRef = useRef(null);
     const buttonRef = useRef(null);
+    const menuRef = useRef(null);
+
+    // Het menu staat via een portal in <body> (vast gepositioneerd onder de knop): de kop-sectie heeft overflow-hidden
+    // en zou het menu anders afknippen.
+    useLayoutEffect(() => {
+        if (!open) return undefined;
+        const place = () => {
+            const rect = buttonRef.current?.getBoundingClientRect();
+            if (!rect) return;
+            const top = rect.bottom + 8;
+            const bottomOffset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--kivii-bottom-offset')) || 0;
+            setPosition({
+                top,
+                right: Math.max(8, document.documentElement.clientWidth - rect.right),
+                maxHeight: Math.max(160, window.innerHeight - top - bottomOffset - 12),
+            });
+        };
+        place();
+        window.addEventListener('resize', place);
+        window.addEventListener('scroll', place, true);
+        return () => {
+            window.removeEventListener('resize', place);
+            window.removeEventListener('scroll', place, true);
+        };
+    }, [open]);
 
     useEffect(() => {
         if (!open) return undefined;
         const onPointer = (event) => {
-            if (!rootRef.current?.contains(event.target)) setOpen(false);
+            if (!rootRef.current?.contains(event.target) && !menuRef.current?.contains(event.target)) setOpen(false);
         };
         const onKey = (event) => {
             if (event.key === 'Escape') {
@@ -150,8 +177,13 @@ function MoreMenu({ actions }) {
                 <Icon name="more-horizontal" className="h-4 w-4 text-zinc-500" />
                 Meer
             </button>
-            {open ? (
-                <div id="klant-meer-acties" className="menu-panel absolute right-0 top-full z-30 mt-2 w-60">
+            {open && position ? createPortal(
+                <div
+                    id="klant-meer-acties"
+                    ref={menuRef}
+                    className="menu-panel fixed z-40 w-60 overflow-y-auto"
+                    style={{ top: position.top, right: position.right, maxHeight: position.maxHeight }}
+                >
                     {actions.map((action) =>
                         action.href ? (
                             <a key={action.key} href={action.href} className="menu-item" onClick={() => setOpen(false)}>
@@ -165,7 +197,8 @@ function MoreMenu({ actions }) {
                             </button>
                         ),
                     )}
-                </div>
+                </div>,
+                document.body,
             ) : null}
         </div>
     );
@@ -452,7 +485,7 @@ export default function CustomerHeader({
                 </dl>
             </section>
 
-            <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-20 -mx-4 bg-canvas/90 px-4 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10">
+            <div className="sticky top-[var(--kivii-header-h,calc(3.5rem+env(safe-area-inset-top)))] z-20 -mx-4 bg-canvas/90 px-4 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10">
                 {/* Mobiel: volledige breedte keuzelijst in plaats van een onzichtbaar scrollende tabbalk. */}
                 <div className="py-2 sm:hidden">
                     <label htmlFor={`${tabsIdBase}-picker`} className="sr-only">

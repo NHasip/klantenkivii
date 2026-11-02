@@ -24,8 +24,7 @@ class EnsureUserIsActive
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
-            return redirect()->route('login')
-                ->with('status', 'Je account is gedeactiveerd. Neem contact op met de beheerder.');
+            return $this->toLogin($request, 'Je account is gedeactiveerd. Neem contact op met de beheerder.');
         }
 
         if ($user->isCustomerAccount()) {
@@ -33,11 +32,23 @@ class EnsureUserIsActive
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
-            return redirect()->route('login')
-                ->with('status', 'Dit account heeft geen toegang tot het CRM.');
+            return $this->toLogin($request, 'Dit account heeft geen toegang tot het CRM.');
         }
 
         return $next($request);
     }
-}
 
+    /**
+     * Inertia-verzoek: volledige paginalading naar het inloggen (anders opent de inlogpagina in een modal).
+     */
+    private function toLogin(Request $request, string $message): Response
+    {
+        $request->session()->flash('status', $message);
+
+        if ($request->header('X-Inertia')) {
+            return \Inertia\Inertia::location(route('login'));
+        }
+
+        return redirect()->route('login');
+    }
+}

@@ -7,6 +7,13 @@ import { router } from '@inertiajs/react';
  * paginalading toont de Blade-layout de melding al; latere bezoeken (ook redirects)
  * tonen hem via de 'success'- en 'navigate'-events.
  */
+/**
+ * Gedeelde positie voor toasts: vaste laag zonder eigen tikvlak. Onder sm bovenaan, onder de (sticky) kopbalk
+ * (--kivii-header-h, incl. notch); vanaf sm rechtsonder boven de onderbalk.
+ */
+export const TOAST_POSITION =
+    'pointer-events-none fixed inset-x-4 z-[65] flex justify-center max-sm:top-[calc(var(--kivii-header-h,calc(3.5rem+env(safe-area-inset-top)))+0.5rem)] sm:bottom-[calc(1rem+var(--kivii-bottom-offset,0px))] sm:left-auto sm:justify-end';
+
 export function FlashToast() {
     const [toast, setToast] = useState(null);
 
@@ -42,8 +49,9 @@ export function FlashToast() {
     }, []);
 
     useEffect(() => {
-        if (!toast || toast.tone === 'error') return undefined;
-        const handler = setTimeout(() => setToast(null), 5000);
+        if (!toast) return undefined;
+        // Fouten blijven langer staan (8s), maar verdwijnen ook vanzelf zodat ze geen knoppen blijven afdekken.
+        const handler = setTimeout(() => setToast(null), toast.tone === 'error' ? 8000 : 5000);
         return () => clearTimeout(handler);
     }, [toast]);
 
@@ -52,11 +60,14 @@ export function FlashToast() {
     const isError = toast.tone === 'error';
 
     return (
+        // Buitenste laag laat tikken door (pointer-events-none); alleen de kaart zelf is klikbaar. Onder sm bovenaan
+        // onder de kopbalk, zodat de melding geen opslaan-balken boven de onderbalk afdekt.
+        <div className={TOAST_POSITION}>
         <div
             key={toast.id}
             role={isError ? 'alert' : 'status'}
             aria-live={isError ? 'assertive' : 'polite'}
-            className={`fixed bottom-[calc(1rem+var(--kivii-bottom-offset,0px))] left-4 right-4 z-[65] rounded-xl border bg-white p-4 text-sm shadow-lg sm:left-auto sm:w-96 ${
+            className={`pointer-events-auto w-full rounded-xl border bg-white p-4 text-sm shadow-lg sm:w-96 ${
                 isError ? 'border-rose-200' : 'border-emerald-200'
             }`}
         >
@@ -82,6 +93,7 @@ export function FlashToast() {
                     </svg>
                 </button>
             </div>
+        </div>
         </div>
     );
 }
