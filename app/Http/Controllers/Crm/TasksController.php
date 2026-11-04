@@ -267,6 +267,12 @@ class TasksController
     /** Verplaatst een taak naar de prullenbak (na Task::TRASH_DAYS dagen automatisch definitief weg). */
     public function destroyTask(Task $task): JsonResponse
     {
+        if (! Task::supportsTrash()) {
+            $melding = 'De prullenbak is nog niet beschikbaar. Draai eerst php artisan migrate op de server.';
+
+            return response()->json(['message' => $melding, 'errors' => ['prullenbak' => [$melding]]], 422);
+        }
+
         $task->delete();
 
         return response()->json(['deleted' => $task->id]);
@@ -274,6 +280,12 @@ class TasksController
 
     public function trash(): JsonResponse
     {
+        if (! Task::supportsTrash()) {
+            $melding = 'De prullenbak is nog niet beschikbaar. Draai eerst php artisan migrate op de server.';
+
+            return response()->json(['message' => $melding, 'errors' => ['prullenbak' => [$melding]]], 422);
+        }
+
         $tasks = Task::onlyTrashed()
             ->with(['project:id,naam,kleur', ...$this->customerRelation()])
             ->orderByDesc('deleted_at')
@@ -296,6 +308,12 @@ class TasksController
 
     public function restoreTask(int $task): JsonResponse
     {
+        if (! Task::supportsTrash()) {
+            $melding = 'De prullenbak is nog niet beschikbaar. Draai eerst php artisan migrate op de server.';
+
+            return response()->json(['message' => $melding, 'errors' => ['prullenbak' => [$melding]]], 422);
+        }
+
         $model = Task::onlyTrashed()->findOrFail($task);
         $model->restore();
 
@@ -304,6 +322,12 @@ class TasksController
 
     public function forceDeleteTask(int $task): JsonResponse
     {
+        if (! Task::supportsTrash()) {
+            $melding = 'De prullenbak is nog niet beschikbaar. Draai eerst php artisan migrate op de server.';
+
+            return response()->json(['message' => $melding, 'errors' => ['prullenbak' => [$melding]]], 422);
+        }
+
         $model = Task::onlyTrashed()->findOrFail($task);
         $model->deleteAttachmentFiles();
         // Toewijzingen, reacties en bijlagen verdwijnen via cascadeOnDelete.

@@ -1170,9 +1170,9 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
         try {
             const { data } = await axios.get('/taken/prullenbak');
             setTrash({ loading: false, tasks: data.tasks ?? [], days: data.days ?? 60, canForceDelete: Boolean(data.can_force_delete), busyId: null });
-        } catch {
+        } catch (error) {
             setTrash((prev) => ({ ...prev, loading: false }));
-            setNotice({ tone: 'error', text: 'Prullenbak laden mislukt.' });
+            setNotice({ tone: 'error', text: firstError(error, 'Prullenbak laden mislukt.') });
         }
     }, []);
 
