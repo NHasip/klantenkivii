@@ -913,6 +913,7 @@ class GarageCompaniesController
         if ($withTasks) {
             DB::table('tasks')
                 ->whereIn('garage_company_id', $companyIds)
+                ->when(Schema::hasColumn('tasks', 'deleted_at'), fn ($q) => $q->whereNull('deleted_at'))
                 ->whereNull('afgerond_op')
                 ->where('status', '<>', 'afgerond')
                 ->get(['garage_company_id', 'titel', 'deadline'])

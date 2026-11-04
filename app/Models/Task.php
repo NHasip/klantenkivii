@@ -4,15 +4,24 @@ namespace App\Models;
 
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Prunable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 class Task extends Model
 {
+    use Prunable, SoftDeletes;
+
+    /** Aantal dagen dat een taak in de prullenbak blijft voordat hij definitief wordt verwijderd. */
+    public const TRASH_DAYS = 60;
+
     protected $fillable = [
         'task_project_id',
         'garage_company_id',
@@ -84,5 +93,25 @@ class Task extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /** Taken die langer dan TRASH_DAYS in de prullenbak staan (via php artisan model:prune). */
+    public function prunable(): Builder
+    {
+        return static::onlyTrashed()->where('deleted_at', '<=', now()->subDays(self::TRASH_DAYS));
+    }
+
+    /** Wordt aangeroepen vlak voor definitief verwijderen: bijlagebestanden van schijf halen. */
+    protected function pruning(): void
+    {
+        $this->deleteAttachmentFiles();
+    }
+
+    public function deleteAttachmentFiles(): void
+    {
+        $paths = $this->attachments()->pluck('path')->filter()->all();
+        if ($paths !== []) {
+            Storage::disk('local')->delete($paths);
+        }
     }
 }

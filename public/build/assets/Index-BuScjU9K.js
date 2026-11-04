@@ -1,4 +1,4 @@
-import{r as e}from"./rolldown-runtime-XKyaHtl9.js";import{n as t,t as n}from"./jsx-runtime-D7wvD04q.js";import{t as r}from"./index.esm-CtEh_kDw.js";import{t as i}from"./bootstrap-CIWWkWOf.js";import{n as a}from"./app-sQKfU9Wa.js";import{C as o,T as s,a as c,i as l,l as u,o as d,p as f,s as p}from"./ui-CX1fQuSk.js";var m=e(t(),1),h=n(),g=`[
+import{r as e}from"./rolldown-runtime-XKyaHtl9.js";import{n as t,t as n}from"./jsx-runtime-D7wvD04q.js";import{t as r}from"./index.esm-CtEh_kDw.js";import{t as i}from"./bootstrap-CIWWkWOf.js";import{n as a}from"./app-NzkiWjwY.js";import{C as o,T as s,a as c,i as l,l as u,o as d,p as f,s as p}from"./ui-CX1fQuSk.js";var m=e(t(),1),h=n(),g=`[
   {
     "bedrijfsnaam": "Voorbeeld Garage B.V.",
     "status": "actief",

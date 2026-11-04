@@ -916,6 +916,8 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
     const [notice, setNotice] = useState(null);
 
     const [showProjectModal, setShowProjectModal] = useState(false);
+    const [showTrash, setShowTrash] = useState(false);
+    const [trash, setTrash] = useState({ loading: false, tasks: [], days: 60, canForceDelete: false, busyId: null });
     const [projectForm, setProjectForm] = useState({ naam: '', omschrijving: '', deadline: '', kleur: '' });
     const [projectErrors, setProjectErrors] = useState({});
     const [projectSaving, setProjectSaving] = useState(false);
@@ -1139,7 +1141,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
         if (!selectedTask || detailSaving) return;
         const ok = await confirm({
             title: 'Taak verwijderen',
-            message: `Weet je zeker dat je "${selectedTask.titel?.trim() || 'deze taak'}" wilt verwijderen? Reacties en bijlagen worden ook verwijderd. Dit kan niet ongedaan worden gemaakt.`,
+            message: `"${selectedTask.titel?.trim() || 'Deze taak'}" gaat naar de prullenbak. Je kunt hem daar 60 dagen lang terugzetten; daarna wordt hij automatisch definitief verwijderd.`,
             confirmText: 'Verwijderen',
             cancelText: 'Annuleren',
             tone: 'danger',
@@ -1155,13 +1157,63 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
             setSelectedTaskId(null);
             setSelectedTask(null);
             setDetailErrors({});
-            setNotice({ tone: 'success', text: 'Taak verwijderd.' });
+            setNotice({ tone: 'success', text: 'Taak naar de prullenbak verplaatst.' });
         } catch (error) {
             setNotice({ tone: 'error', text: firstError(error, 'Verwijderen mislukt.') });
         } finally {
             setDetailSaving(false);
         }
     }, [confirm, selectedTask, detailSaving]);
+
+    const loadTrash = useCallback(async () => {
+        setTrash((prev) => ({ ...prev, loading: true }));
+        try {
+            const { data } = await axios.get('/taken/prullenbak');
+            setTrash({ loading: false, tasks: data.tasks ?? [], days: data.days ?? 60, canForceDelete: Boolean(data.can_force_delete), busyId: null });
+        } catch {
+            setTrash((prev) => ({ ...prev, loading: false }));
+            setNotice({ tone: 'error', text: 'Prullenbak laden mislukt.' });
+        }
+    }, []);
+
+    const openTrash = useCallback(() => {
+        setShowTrash(true);
+        loadTrash();
+    }, [loadTrash]);
+    const closeTrash = useCallback(() => setShowTrash(false), []);
+
+    const restoreTrashed = useCallback(async (item) => {
+        setTrash((prev) => ({ ...prev, busyId: item.id }));
+        try {
+            await axios.patch(`/taken/prullenbak/${item.id}/herstellen`);
+            setTrash((prev) => ({ ...prev, busyId: null, tasks: prev.tasks.filter((t) => t.id !== item.id) }));
+            setNotice({ tone: 'success', text: 'Taak teruggezet.' });
+            fetchTasks();
+        } catch (error) {
+            setTrash((prev) => ({ ...prev, busyId: null }));
+            setNotice({ tone: 'error', text: firstError(error, 'Terugzetten mislukt.') });
+        }
+    }, [fetchTasks]);
+
+    const forceDeleteTrashed = useCallback(async (item) => {
+        const ok = await confirm({
+            title: 'Definitief verwijderen',
+            message: `"${item.titel?.trim() || 'Deze taak'}" wordt definitief verwijderd, inclusief reacties en bijlagen. Dit kan niet ongedaan worden gemaakt.`,
+            confirmText: 'Definitief verwijderen',
+            cancelText: 'Annuleren',
+            tone: 'danger',
+        });
+        if (!ok) return;
+        setTrash((prev) => ({ ...prev, busyId: item.id }));
+        try {
+            await axios.delete(`/taken/prullenbak/${item.id}`);
+            setTrash((prev) => ({ ...prev, busyId: null, tasks: prev.tasks.filter((t) => t.id !== item.id) }));
+            setNotice({ tone: 'success', text: 'Taak definitief verwijderd.' });
+        } catch (error) {
+            setTrash((prev) => ({ ...prev, busyId: null }));
+            setNotice({ tone: 'error', text: firstError(error, 'Verwijderen mislukt.') });
+        }
+    }, [confirm]);
 
     const completeAppointment = useCallback((appointment) => {
         if (!appointment?.done_url) return;
@@ -1672,6 +1724,7 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
     const closeTaskModal = useCallback(() => setShowTaskModal(false), []);
     const projectDialogRef = useDialog(showProjectModal, closeProjectModal);
     const taskDialogRef = useDialog(showTaskModal, closeTaskModal);
+    const trashDialogRef = useDialog(showTrash, closeTrash);
     const detailDialogRef = useDialog(Boolean(selectedTaskId), closeTask);
 
     return (
@@ -1683,6 +1736,9 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                     description="Plan, verdeel en volg taken per status, project of collega."
                     actions={
                         <>
+                            <Button variant="ghost" icon="trash" onClick={openTrash}>
+                                Prullenbak
+                            </Button>
                             <Button variant="secondary" icon="layers" onClick={() => setShowProjectModal(true)}>
                                 Nieuw project
                             </Button>
@@ -2155,6 +2211,69 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                     </div>
                 )}
             </div>
+
+            {showTrash ? createPortal(
+                <div
+                    className="fixed inset-0 z-[60] flex items-end justify-center bg-zinc-900/40 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
+                    onMouseDown={(e) => {
+                        if (e.target === e.currentTarget) closeTrash();
+                    }}
+                >
+                    <div ref={trashDialogRef} role="dialog" aria-modal="true" aria-labelledby="trash-modal-title" tabIndex={-1} className="max-h-dvh-90 w-full max-w-xl overflow-y-auto rounded-t-2xl bg-white p-5 shadow-pop sm:rounded-2xl sm:p-6">
+                        <ModalHeader
+                            id="trash-modal-title"
+                            icon="trash"
+                            title="Prullenbak"
+                            description={`Verwijderde taken blijven ${trash.days} dagen bewaard en worden daarna automatisch definitief verwijderd.`}
+                            onClose={closeTrash}
+                        />
+                        <div className="mt-5">
+                            {trash.loading ? (
+                                <div className="space-y-3" aria-busy="true">
+                                    <Skeleton className="h-16 w-full rounded-xl" />
+                                    <Skeleton className="h-16 w-full rounded-xl" />
+                                </div>
+                            ) : trash.tasks.length === 0 ? (
+                                <p className="rounded-xl bg-zinc-50 px-4 py-8 text-center text-sm text-zinc-500">De prullenbak is leeg.</p>
+                            ) : (
+                                <ul className="divide-y divide-zinc-100 rounded-xl border border-zinc-200">
+                                    {trash.tasks.map((item) => {
+                                        const daysLeft = item.purge_at ? Math.max(0, Math.ceil((new Date(item.purge_at) - Date.now()) / 86400000)) : null;
+                                        const busy = trash.busyId === item.id;
+                                        return (
+                                            <li key={item.id} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                                                <div className="min-w-0">
+                                                    <p className="truncate text-sm font-medium text-zinc-900">{item.titel?.trim() || 'Taak zonder titel'}</p>
+                                                    <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-zinc-500">
+                                                        {item.project ? (
+                                                            <span className="inline-flex items-center gap-1">
+                                                                <ProjectDot kleur={item.project.kleur} className="h-2 w-2" />
+                                                                {item.project.naam}
+                                                            </span>
+                                                        ) : null}
+                                                        {item.klant ? <span>{item.klant}</span> : null}
+                                                        {item.deleted_at ? <span>Verwijderd {new Date(item.deleted_at).toLocaleDateString('nl-NL')}</span> : null}
+                                                        {daysLeft !== null ? <span>Nog {daysLeft} {daysLeft === 1 ? 'dag' : 'dagen'}</span> : null}
+                                                    </p>
+                                                </div>
+                                                <div className="flex shrink-0 gap-2">
+                                                    <Button variant="secondary" size="sm" icon="refresh" className="flex-1 sm:flex-none" onClick={() => restoreTrashed(item)} disabled={busy}>
+                                                        Terugzetten
+                                                    </Button>
+                                                    {trash.canForceDelete ? (
+                                                        <Button variant="danger-ghost" size="sm" iconOnly icon="trash" onClick={() => forceDeleteTrashed(item)} disabled={busy} aria-label="Definitief verwijderen" title="Definitief verwijderen" />
+                                                    ) : null}
+                                                </div>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            )}
+                        </div>
+                    </div>
+                </div>,
+                document.body,
+            ) : null}
 
             {showProjectModal ? createPortal(
                 <div

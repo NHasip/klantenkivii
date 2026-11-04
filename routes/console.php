@@ -20,3 +20,6 @@ Schedule::command('crm:demo-sequence')->dailyAt('08:45')->timezone('Europe/Amste
 // Testmodus: mails na 2, 5 en 13 minuten. Stopt direct als er geen actieve testreeks is.
 Schedule::command('crm:demo-sequence --test')->everyMinute()->withoutOverlapping()
     ->when(fn () => (bool) config('crm.schedule.demo_sequence'));
+
+// Taken die langer dan 60 dagen in de prullenbak staan definitief verwijderen.
+Schedule::command('model:prune', ['--model' => [\App\Models\Task::class]])->dailyAt('03:15')->timezone('Europe/Amsterdam')->withoutOverlapping();

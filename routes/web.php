@@ -77,6 +77,9 @@ Route::middleware(['auth', 'active', 'admin.2fa'])->group(function () {
 
     Route::get('/taken', [TasksController::class, 'index'])->name('crm.tasks.index');
     Route::get('/taken/data', [TasksController::class, 'data'])->name('crm.tasks.data');
+    Route::get('/taken/prullenbak', [TasksController::class, 'trash'])->name('crm.tasks.trash');
+    Route::patch('/taken/prullenbak/{task}/herstellen', [TasksController::class, 'restoreTask'])->whereNumber('task')->name('crm.tasks.restore');
+    Route::delete('/taken/prullenbak/{task}', [TasksController::class, 'forceDeleteTask'])->whereNumber('task')->middleware('admin')->name('crm.tasks.force_delete');
     Route::get('/taken/klanten', [TasksController::class, 'customers'])->name('crm.tasks.customers');
     Route::post('/taken/projects', [TasksController::class, 'storeProject'])->name('crm.tasks.projects.store');
     Route::post('/taken/tasks', [TasksController::class, 'storeTask'])->name('crm.tasks.tasks.store');

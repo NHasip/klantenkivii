@@ -264,18 +264,52 @@ class TasksController
         ]);
     }
 
+    /** Verplaatst een taak naar de prullenbak (na Task::TRASH_DAYS dagen automatisch definitief weg). */
     public function destroyTask(Task $task): JsonResponse
     {
-        $paths = $task->attachments()->pluck('path')->filter()->all();
-
-        // Toewijzingen, reacties en bijlagen verdwijnen via cascadeOnDelete.
         $task->delete();
 
-        if ($paths !== []) {
-            Storage::disk('local')->delete($paths);
-        }
-
         return response()->json(['deleted' => $task->id]);
+    }
+
+    public function trash(): JsonResponse
+    {
+        $tasks = Task::onlyTrashed()
+            ->with(['project:id,naam,kleur', ...$this->customerRelation()])
+            ->orderByDesc('deleted_at')
+            ->limit(200)
+            ->get();
+
+        return response()->json([
+            'days' => Task::TRASH_DAYS,
+            'can_force_delete' => (bool) auth()->user()?->isAdmin(),
+            'tasks' => $tasks->map(fn (Task $task) => [
+                'id' => $task->id,
+                'titel' => $task->titel,
+                'project' => $task->project ? ['naam' => $task->project->naam, 'kleur' => $task->project->kleur] : null,
+                'klant' => Task::supportsCustomer() ? $task->garageCompany?->bedrijfsnaam : null,
+                'deleted_at' => $task->deleted_at?->toIso8601String(),
+                'purge_at' => $task->deleted_at?->copy()->addDays(Task::TRASH_DAYS)->toIso8601String(),
+            ])->values(),
+        ]);
+    }
+
+    public function restoreTask(int $task): JsonResponse
+    {
+        $model = Task::onlyTrashed()->findOrFail($task);
+        $model->restore();
+
+        return response()->json(['restored' => $model->id]);
+    }
+
+    public function forceDeleteTask(int $task): JsonResponse
+    {
+        $model = Task::onlyTrashed()->findOrFail($task);
+        $model->deleteAttachmentFiles();
+        // Toewijzingen, reacties en bijlagen verdwijnen via cascadeOnDelete.
+        $model->forceDelete();
+
+        return response()->json(['deleted' => $model->id]);
     }
 
     public function reorder(Request $request): JsonResponse
