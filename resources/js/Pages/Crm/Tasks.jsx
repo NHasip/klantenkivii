@@ -1135,6 +1135,34 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
         }
     }, [selectedTask, detailSaving]);
 
+    const deleteSelectedTask = useCallback(async () => {
+        if (!selectedTask || detailSaving) return;
+        const ok = await confirm({
+            title: 'Taak verwijderen',
+            message: `Weet je zeker dat je "${selectedTask.titel?.trim() || 'deze taak'}" wilt verwijderen? Reacties en bijlagen worden ook verwijderd. Dit kan niet ongedaan worden gemaakt.`,
+            confirmText: 'Verwijderen',
+            cancelText: 'Annuleren',
+            tone: 'danger',
+        });
+        if (!ok) return;
+        const id = selectedTask.id;
+        setDetailSaving(true);
+        try {
+            await axios.delete(`/taken/tasks/${id}`);
+            setTasks((prev) => prev.filter((t) => t.id !== id));
+            openTaskSeqRef.current += 1;
+            detailBaselineRef.current = '';
+            setSelectedTaskId(null);
+            setSelectedTask(null);
+            setDetailErrors({});
+            setNotice({ tone: 'success', text: 'Taak verwijderd.' });
+        } catch (error) {
+            setNotice({ tone: 'error', text: firstError(error, 'Verwijderen mislukt.') });
+        } finally {
+            setDetailSaving(false);
+        }
+    }, [confirm, selectedTask, detailSaving]);
+
     const completeAppointment = useCallback((appointment) => {
         if (!appointment?.done_url) return;
         // Hergebruikt de bestaande route op de klantpagina (markTaskDone).
@@ -2409,6 +2437,9 @@ export default function Tasks({ initial, filters, customerFilter, urls }) {
                                         <Button variant="secondary" size="sm" icon="check" onClick={completeSelectedTask} disabled={detailSaving}>
                                             Afronden
                                         </Button>
+                                    ) : null}
+                                    {selectedTask ? (
+                                        <Button variant="danger-ghost" size="sm" iconOnly icon="trash" onClick={deleteSelectedTask} disabled={detailSaving} aria-label="Taak verwijderen" title="Taak verwijderen" />
                                     ) : null}
                                     <Button variant="ghost" size="sm" iconOnly icon="x" onClick={closeTask} aria-label="Taakdetails sluiten" />
                                 </div>

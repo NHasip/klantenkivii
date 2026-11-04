@@ -264,6 +264,20 @@ class TasksController
         ]);
     }
 
+    public function destroyTask(Task $task): JsonResponse
+    {
+        $paths = $task->attachments()->pluck('path')->filter()->all();
+
+        // Toewijzingen, reacties en bijlagen verdwijnen via cascadeOnDelete.
+        $task->delete();
+
+        if ($paths !== []) {
+            Storage::disk('local')->delete($paths);
+        }
+
+        return response()->json(['deleted' => $task->id]);
+    }
+
     public function reorder(Request $request): JsonResponse
     {
         $data = $request->validate([

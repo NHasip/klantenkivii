@@ -82,6 +82,7 @@ Route::middleware(['auth', 'active', 'admin.2fa'])->group(function () {
     Route::post('/taken/tasks', [TasksController::class, 'storeTask'])->name('crm.tasks.tasks.store');
     Route::patch('/taken/tasks/reorder', [TasksController::class, 'reorder'])->name('crm.tasks.tasks.reorder');
     Route::patch('/taken/tasks/{task}', [TasksController::class, 'updateTask'])->name('crm.tasks.tasks.update');
+    Route::delete('/taken/tasks/{task}', [TasksController::class, 'destroyTask'])->name('crm.tasks.tasks.destroy');
     Route::patch('/taken/tasks/{task}/status', [TasksController::class, 'updateStatus'])->name('crm.tasks.tasks.status');
     Route::post('/taken/tasks/{task}/attachments', [TasksController::class, 'storeAttachment'])->name('crm.tasks.attachments.store');
     Route::get('/taken/attachments/{attachment}/download', [TasksController::class, 'downloadAttachment'])->name('crm.tasks.attachments.download');
