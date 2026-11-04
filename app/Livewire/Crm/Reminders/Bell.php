@@ -40,6 +40,7 @@ class Bell extends Component
             ->whereNull('popup_dismissed_at')
             ->where('remind_at', '<=', now())
             ->whereIn('channel', [ReminderChannel::Popup, ReminderChannel::Beide])
+            ->where(fn ($q) => $q->whereNull('garage_company_id')->orWhereHas('garageCompany'))
             ->with('garageCompany:id,bedrijfsnaam')
             ->orderBy('remind_at')
             ->limit(8)
@@ -208,7 +209,7 @@ class Bell extends Component
                         ->map(fn ($r) => [
                             'label' => $r->garageCompany?->bedrijfsnaam ?? $r->kenmerk,
                             'meta' => 'Kenmerk '.$r->kenmerk.' · '.$r->completed_at?->format('d-m-Y H:i'),
-                            'url' => $r->garage_company_id
+                            'url' => $r->garageCompany
                                 ? route('crm.garage_companies.show', ['garageCompany' => $r->garage_company_id, 'tab' => 'abonnement'])
                                 : ($overview ?? route('dashboard')),
                             'overdue' => false,

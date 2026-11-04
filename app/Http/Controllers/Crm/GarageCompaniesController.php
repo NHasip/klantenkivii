@@ -1782,7 +1782,7 @@ class GarageCompaniesController
             'garage_company_id' => $garageCompany->id,
             'type' => ActivityType::Demo,
             'titel' => "Demo verlengd met {$extraDagen} ".($extraDagen === 1 ? 'dag' : 'dagen'),
-            'inhoud' => $data['demo_verleng_notitie'] ?: null,
+            'inhoud' => ($data['demo_verleng_notitie'] ?? null) ?: null,
             'created_by' => auth()->id(),
         ]);
 
