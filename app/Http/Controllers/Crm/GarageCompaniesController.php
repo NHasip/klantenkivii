@@ -2478,6 +2478,9 @@ class GarageCompaniesController
             'body_html' => $data['body_html'] ?? '',
             'body_text' => $this->htmlToText($data['body_html'] ?? ''),
         ]);
+        if (Schema::hasColumn('outbound_emails', 'edited_at')) {
+            $draft->forceFill(['edited_at' => now()])->save();
+        }
 
         return back()->with('status', 'Welkomstmail concept opgeslagen.');
     }
@@ -2605,7 +2608,10 @@ class GarageCompaniesController
             ->orderByDesc('id')
             ->first();
 
-        if ($draft) {
+        // Niet handmatig aangepast concept altijd opnieuw opbouwen, zodat het de actuele klantgegevens toont
+        // (bijvoorbeeld een concept dat al bestond voordat login of wachtwoord werd ingevuld).
+        $tracksEdits = Schema::hasColumn('outbound_emails', 'edited_at');
+        if ($draft && (! $tracksEdits || $draft->edited_at !== null)) {
             return $draft;
         }
 
@@ -2644,6 +2650,9 @@ class GarageCompaniesController
                 'body_html' => $rendered['html'],
                 'body_text' => $rendered['text'],
             ]);
+            if (Schema::hasColumn('outbound_emails', 'edited_at') && $draft->edited_at !== null) {
+                $draft->forceFill(['edited_at' => null])->save();
+            }
         } else {
             $draft = OutboundEmail::create([
                 'garage_company_id' => $garageCompany->id,
@@ -2685,7 +2694,8 @@ class GarageCompaniesController
         $storedLoginPassword = is_string($garageCompany->login_password) ? trim($garageCompany->login_password) : '';
         $welcomePassword = $storedLoginPassword !== ''
             ? $storedLoginPassword
-            : 'Gebruik de activatielink om een wachtwoord te kiezen.';
+            // Alleen zichtbaar in het concept: versturen wordt geblokkeerd zolang het wachtwoord ontbreekt.
+            : '[Nog invullen: wachtwoord bij Overzicht > Kivii login]';
 
         return [
             'naam' => $naam ?: $garageCompany->bedrijfsnaam,

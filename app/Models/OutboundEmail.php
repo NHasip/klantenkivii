@@ -19,6 +19,7 @@ class OutboundEmail extends Model
         'sent_at',
         'last_error',
         'created_by',
+        'edited_at',
     ];
 
     protected function casts(): array
