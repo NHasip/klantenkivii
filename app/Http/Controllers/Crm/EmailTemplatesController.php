@@ -102,7 +102,7 @@ class EmailTemplatesController
         $values = [
             'naam' => $naam !== '' ? $naam : (string) $company->bedrijfsnaam,
             'bedrijfsnaam' => (string) $company->bedrijfsnaam,
-            'loginnaam' => $company->login_email ?: '-',
+            'loginnaam' => $company->login_email ?: ($company->hoofd_email ?: '-'),
             'wachtwoord' => '(verborgen in voorbeeld)',
             'activatielink' => $activatielink,
             'reset_link' => $activatielink,

@@ -37,14 +37,24 @@ class WelcomeEmailLoginTest extends TestCase
         return [$user, $company];
     }
 
-    public function test_send_is_blocked_without_login_data(): void
+    public function test_loginnaam_falls_back_to_demo_request_email(): void
+    {
+        [$user, $company] = $this->setUpCompany(['login_password' => 'Geheim123!']);
+
+        $this->actingAs($user)->post(route('crm.garage_companies.welcome.send', $company))
+            ->assertSessionHas('status', 'Welkomstmail verstuurd.');
+
+        $sent = OutboundEmail::query()->where('garage_company_id', $company->id)->where('status', 'sent')->first();
+        $this->assertStringContainsString('klant@example.test', $sent->body_html);
+        $this->assertStringNotContainsString('Loginnaam:</strong> -', $sent->body_html);
+    }
+
+    public function test_send_is_blocked_without_password(): void
     {
         [$user, $company] = $this->setUpCompany();
 
         $this->actingAs($user)->post(route('crm.garage_companies.welcome.send', $company))
-            ->assertSessionHas('status', fn ($s) => str_contains($s, 'Niet verstuurd') && str_contains($s, 'login e-mail') && str_contains($s, 'wachtwoord'));
-
-        $this->assertFalse(OutboundEmail::query()->where('garage_company_id', $company->id)->where('status', 'sent')->exists());
+            ->assertSessionHas('status', fn ($st) => str_contains($st, 'Niet verstuurd') && str_contains($st, 'wachtwoord') && ! str_contains($st, 'login e-mail'));
     }
 
     public function test_send_works_with_login_data_and_mail_contains_it(): void

@@ -2690,7 +2690,8 @@ class GarageCompaniesController
         return [
             'naam' => $naam ?: $garageCompany->bedrijfsnaam,
             'bedrijfsnaam' => $garageCompany->bedrijfsnaam,
-            'loginnaam' => $garageCompany->login_email ?: '-',
+            // Loginnaam = login e-mail, anders het e-mailadres uit de demo-aanvraag (hoofd e-mail).
+            'loginnaam' => $garageCompany->login_email ?: ($garageCompany->hoofd_email ?: '-'),
             'wachtwoord' => $welcomePassword,
             'reset_link' => $passwordSetupLink,
             'activatielink' => $passwordSetupLink,
@@ -2708,7 +2709,7 @@ class GarageCompaniesController
     private function missingWelcomeLoginFields(GarageCompany $garageCompany, string $content): array
     {
         $missing = [];
-        if (preg_match('/\{\{\s*loginnaam\s*\}\}/', $content) && ! filled($garageCompany->login_email)) {
+        if (preg_match('/\{\{\s*loginnaam\s*\}\}/', $content) && ! filled($garageCompany->login_email) && ! filled($garageCompany->hoofd_email)) {
             $missing[] = 'login e-mail';
         }
         $password = is_string($garageCompany->login_password) ? trim($garageCompany->login_password) : '';
