@@ -15,5 +15,7 @@ return [
 
     // SEPA-machtiging via het Elementor-formulier op kivii.nl.
     'mandate_form_url' => env('CRM_MANDATE_FORM_URL', 'https://kivii.nl/incasso-machtiging/'),
+    // Ontvangstmelding van ingevulde incassoformulieren (verstuurd via Microsoft Graph vanuit info@kivii.nl).
+    'mandate_notify_email' => env('CRM_MANDATE_NOTIFY_EMAIL', 'info@kivii.nl'),
     'mandate_valid_days' => (int) env('CRM_MANDATE_VALID_DAYS', 30),
 ];

@@ -2492,6 +2492,17 @@ class GarageCompaniesController
             return back()->withErrors(['to_email' => 'Vul een geldig e-mailadres in als ontvanger.']);
         }
 
+        // Het concept is al ingevuld; controleer daarom de bron-template op {{ loginnaam }} / {{ wachtwoord }}.
+        $welcomeTemplate = ($draft->template_id ? EmailTemplate::query()->find($draft->template_id) : null)
+            ?? EmailTemplate::query()->where('key', 'welcome_customer')->first();
+        $missingLogin = $this->missingWelcomeLoginFields(
+            $garageCompany,
+            $welcomeTemplate ? $welcomeTemplate->subject.' '.$welcomeTemplate->body_html.' '.($welcomeTemplate->body_text ?? '') : '',
+        );
+        if ($missingLogin !== []) {
+            return back()->with('status', 'Niet verstuurd: vul eerst bij Overzicht > Kivii login de '.implode(' en het ', $missingLogin).' van de klant in. De welkomstmail toont die gegevens.');
+        }
+
         // Geen SMTP-fallback: zonder Microsoft-koppeling geen verzendpoging (het concept blijft bewaard).
         if (! MicrosoftGraphMailer::isConfigured()) {
             return back()->with('status', 'Niet verstuurd: de Microsoft-koppeling voor '.MicrosoftGraphMailer::sender().' is nog niet ingesteld. Vraag een beheerder dit in te stellen.');
@@ -2686,6 +2697,26 @@ class GarageCompaniesController
             'weblink' => 'https://web.kivii.nl/',
             'modules' => \App\Services\Crm\DemoMailSequenceService::moduleNames($garageCompany),
         ];
+    }
+
+    /**
+     * Velden die de welkomstmail gebruikt maar die bij de klant nog leeg zijn.
+     * Klanten loggen in op Kivii (niet in de CRM), dus de activatielink is geen vervanging voor het wachtwoord.
+     *
+     * @return list<string>
+     */
+    private function missingWelcomeLoginFields(GarageCompany $garageCompany, string $content): array
+    {
+        $missing = [];
+        if (preg_match('/\{\{\s*loginnaam\s*\}\}/', $content) && ! filled($garageCompany->login_email)) {
+            $missing[] = 'login e-mail';
+        }
+        $password = is_string($garageCompany->login_password) ? trim($garageCompany->login_password) : '';
+        if (preg_match('/\{\{\s*wachtwoord\s*\}\}/', $content) && $password === '') {
+            $missing[] = 'wachtwoord';
+        }
+
+        return $missing;
     }
 
     private function passwordSetupLink(?User $user, bool $issueToken): string

@@ -13,9 +13,11 @@ use App\Models\SepaMandateRequest;
 use App\Models\User;
 use App\Services\EmailTemplateRenderer;
 use App\Services\Forms\FormPayloadNormalizer;
+use App\Services\Mail\MicrosoftGraphMailer;
 use App\Services\Push\PushNotifier;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
@@ -39,7 +41,7 @@ class MandateRequestService
         'bic' => ['bic', 'bic_optioneel', 'bic_code'],
         'email' => ['email', 'e_mailadres', 'emailadres', 'e_mail', 'mail'],
         'telefoon' => ['telefoon', 'telefoonnummer', 'phone', 'tel', 'mobiel'],
-        'plaats_van_tekenen' => ['plaats_van_tekenen', 'ondertekend_te', 'plaats_ondertekening'],
+        'plaats_van_tekenen' => ['plaats_van_tekenen', 'plaats_tekenen', 'ondertekend_te', 'plaats_ondertekening'],
         'datum_van_tekenen' => ['datum_van_tekenen', 'datum', 'datum_ondertekening', 'date'],
         'akkoord' => ['akkoord', 'consent', 'toestemming', 'machtiging', 'acceptance', 'ik_machtig_kivii'],
     ];
@@ -162,7 +164,16 @@ class MandateRequestService
      */
     public function ingest(array $input): array
     {
-        $fields = FormPayloadNormalizer::map(FormPayloadNormalizer::flatten($input), self::FIELD_ALIASES);
+        $flat = FormPayloadNormalizer::flatten($input);
+        $fields = FormPayloadNormalizer::map($flat, self::FIELD_ALIASES);
+        if (! filled($fields['akkoord'] ?? null)) {
+            $fields['akkoord'] = self::findConsent($flat);
+        }
+        if (! filled($fields['akkoord'] ?? null)) {
+            unset($fields['akkoord']);
+            // Alleen veldnamen loggen (geen waarden), zodat een gewijzigd formulier snel te herkennen is.
+            Log::warning('Machtiging webhook: geen akkoordveld herkend.', ['velden' => array_keys($flat)]);
+        }
         $fields = array_map(fn ($v) => is_string($v) ? mb_substr(trim($v), 0, 255) : (is_scalar($v) || $v === null ? $v : null), $fields);
         // Strakkere maximale lengtes per veld (publiek formulier).
         foreach (self::FIELD_MAX as $key => $max) {
@@ -257,8 +268,118 @@ class MandateRequestService
         });
 
         $this->pushReceived($result['request']);
+        $this->mailReceived($result['request']);
 
         return $result;
+    }
+
+    /**
+     * Akkoordvinkje herkennen als Elementor het veld onder het label doorstuurt,
+     * bijvoorbeeld "Ik machtig Kivii voor doorlopende SEPA-incasso en ga akkoord".
+     */
+    public static function findConsent(array $flat): mixed
+    {
+        foreach ($flat as $key => $value) {
+            $key = (string) $key;
+            if (! filled($value) || str_contains($key, 'kenmerk')) {
+                continue;
+            }
+            if (str_contains($key, 'akkoord') || str_starts_with($key, 'ik_machtig') || str_contains($key, 'consent') || str_contains($key, 'acceptance') || str_contains($key, 'toestemming')) {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    /** Ontvangstmelding naar de eigen mailbox (info@kivii.nl). Alleen via Microsoft Graph; nooit het volledige IBAN. */
+    private function mailReceived(SepaMandateRequest $request): void
+    {
+        try {
+            $to = (string) config('crm.mandate_notify_email', MicrosoftGraphMailer::sender());
+            if ($to === '' || ! MicrosoftGraphMailer::isConfigured()) {
+                return;
+            }
+
+            $request->refresh();
+            $payload = (array) ($request->payload ?? []);
+            $company = $request->garage_company_id ? GarageCompany::query()->find($request->garage_company_id) : null;
+            $e = fn ($v) => e((string) $v);
+
+            $rows = '';
+            foreach (self::formFieldList($payload) as $field) {
+                $rows .= '<tr><td style="padding:4px 12px 4px 0;color:#6b7280;vertical-align:top">'.$e($field['label']).'</td>'
+                    .'<td style="padding:4px 0;color:#111827">'.nl2br($e($field['value'] !== '' ? $field['value'] : '-')).'</td></tr>';
+            }
+
+            $statusText = match ($request->status) {
+                SepaMandateRequest::STATUS_VERWERKT => 'Ontvangen en automatisch verwerkt.',
+                SepaMandateRequest::STATUS_FOUT => 'Fout: '.($request->error ?: 'controle nodig').'.',
+                default => 'Ontvangen, wacht op controle'.($request->error ? ': '.$request->error : '.'),
+            };
+            $url = route('crm.mandate_requests.index', ['search' => $request->kenmerk]);
+            $naam = $payload['bedrijfsnaam'] ?? $company?->bedrijfsnaam ?? 'onbekend';
+
+            $html = '<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5">'
+                .'<p>Er is een incassomachtiging ingevuld via kivii.nl.</p>'
+                .'<p><strong>Kenmerk:</strong> '.$e($request->kenmerk).'<br>'
+                .'<strong>Klant in CRM:</strong> '.$e($company?->bedrijfsnaam ?: 'nog niet gekoppeld').'<br>'
+                .'<strong>Status:</strong> '.$e($statusText).'</p>'
+                .'<table style="border-collapse:collapse">'.$rows.'</table>'
+                .'<p><a href="'.$e($url).'">Bekijk in de CRM</a></p>'
+                .'</div>';
+
+            $replyTo = filter_var($payload['email'] ?? '', FILTER_VALIDATE_EMAIL) ? $payload['email'] : null;
+            app(MicrosoftGraphMailer::class)->send($to, 'Incassomachtiging ingevuld: '.$naam.' ('.$request->kenmerk.')', $html, $replyTo);
+        } catch (\Throwable $e) {
+            Log::warning('Machtiging webhook: ontvangstmail niet verstuurd.', ['reason' => class_basename($e)]);
+        }
+    }
+
+    /**
+     * Alle ingevulde formuliervelden in vaste volgorde, voor de CRM-weergave en de ontvangstmail.
+     *
+     * @return list<array{key:string,label:string,value:string}>
+     */
+    public static function formFieldList(array $payload): array
+    {
+        $labels = [
+            'bedrijfsnaam' => 'Bedrijfsnaam',
+            'naam' => 'Voor- en achternaam',
+            'adres' => 'Straat en huisnummer',
+            'postcode' => 'Postcode',
+            'plaats' => 'Plaats',
+            'land' => 'Land',
+            'iban_laatste4' => 'IBAN',
+            'bic' => 'BIC',
+            'email' => 'E-mailadres',
+            'telefoon' => 'Telefoonnummer',
+            'plaats_van_tekenen' => 'Plaats van tekenen',
+            'datum_van_tekenen' => 'Datum van tekenen',
+            'kenmerk' => 'Kenmerk op formulier',
+            'akkoord' => 'Akkoord SEPA-incasso',
+            'ontvangen_op' => 'Ontvangen op',
+        ];
+
+        $list = [];
+        foreach ($labels as $key => $label) {
+            $value = $payload[$key] ?? null;
+            if ($key === 'akkoord') {
+                $value = self::truthy($value) ? 'Ja' : 'Nee';
+            } elseif ($key === 'iban_laatste4') {
+                $value = filled($value) ? '**** '.$value : '';
+            } elseif ($key === 'ontvangen_op' && filled($value)) {
+                try {
+                    $value = Carbon::parse((string) $value)->timezone('Europe/Amsterdam')->format('d-m-Y H:i');
+                } catch (\Throwable) {
+                }
+            } elseif ($key === 'kenmerk' && ! filled($value)) {
+                continue;
+            }
+            $list[] = ['key' => $key, 'label' => $label, 'value' => is_scalar($value) ? trim((string) $value) : ''];
+        }
+
+        return $list;
     }
 
     /** Pushmelding voor admins na een inzending; zonder IBAN of e-mailadres en zonder de webhook te verstoren. */
@@ -728,6 +849,7 @@ class MandateRequestService
                 'plaats' => $payload['plaats'] ?? null,
                 'datum_van_tekenen' => $payload['datum_van_tekenen'] ?? null,
             ],
+            'form_fields' => $payload !== [] ? self::formFieldList($payload) : [],
             'can_revoke' => in_array($status, [SepaMandateRequest::STATUS_OPEN, SepaMandateRequest::STATUS_ONTVANGEN, SepaMandateRequest::STATUS_FOUT, SepaMandateRequest::STATUS_VERLOPEN], true),
             'can_resend' => $request->garage_company_id !== null && in_array($status, [SepaMandateRequest::STATUS_OPEN, SepaMandateRequest::STATUS_VERLOPEN], true),
             'can_process' => $request->garage_company_id !== null && $payload !== [] && in_array($status, [SepaMandateRequest::STATUS_ONTVANGEN, SepaMandateRequest::STATUS_FOUT], true),

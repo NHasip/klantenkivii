@@ -12,6 +12,32 @@ const FILTERS = [
     ...Object.entries(REQUEST_STATUS_META).map(([key, meta]) => ({ key, label: meta.label })),
 ];
 
+function FormFields({ request }) {
+    const fields = request.form_fields || [];
+    if (!fields.length) return <p className="text-sm text-zinc-400">Geen formuliergegevens ontvangen.</p>;
+    return (
+        <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+            {fields.map((f) => (
+                <div key={f.key} className="min-w-0">
+                    <dt className="text-xs font-medium text-zinc-500">{f.label}</dt>
+                    <dd className={cx('break-words text-zinc-800', f.key === 'akkoord' && f.value === 'Nee' && 'font-medium text-red-600', f.key === 'iban_laatste4' && 'font-mono')}>
+                        {f.value || '-'}
+                    </dd>
+                </div>
+            ))}
+        </dl>
+    );
+}
+
+function FormToggle({ request, open, onToggle }) {
+    if (!request.form_fields?.length) return null;
+    return (
+        <button type="button" className="mt-1 text-xs font-medium text-indigo-700 hover:underline focus-ring" onClick={onToggle} aria-expanded={open} aria-controls={`formulier-${request.id}`}>
+            {open ? 'Formulier verbergen' : 'Formulier bekijken'}
+        </button>
+    );
+}
+
 const needsAction = (r) => r.status === 'ontvangen' || r.status === 'fout';
 
 function LinkCustomer({ request, customers, onLinked, disabled, mobile = false }) {
@@ -64,6 +90,8 @@ export default function Index({ available = true, requests = [], customers = [],
     const [busyId, setBusyId] = useState(null);
     const [message, setMessage] = useState(null);
     const [openId, setOpenId] = useState(null);
+    const [formOpenId, setFormOpenId] = useState(null);
+    const toggleForm = (id) => setFormOpenId((cur) => (cur === id ? null : id));
 
     const counts = useMemo(() => {
         const c = { alle: requests.length, aandacht: requests.filter(needsAction).length };
@@ -185,6 +213,12 @@ export default function Index({ available = true, requests = [], customers = [],
                                                 <p className="font-medium text-zinc-800">{r.form.bedrijfsnaam || '-'}</p>
                                                 <p className="break-words">{[r.form.naam, r.form.email].filter(Boolean).join(' · ')}</p>
                                                 {r.iban_masked && <p className="font-mono text-xs">IBAN {r.iban_masked}</p>}
+                                                <FormToggle request={r} open={formOpenId === r.id} onToggle={() => toggleForm(r.id)} />
+                                                {formOpenId === r.id && (
+                                                    <div id={`formulier-${r.id}`} className="mt-3 border-t border-zinc-200 pt-3">
+                                                        <FormFields request={r} />
+                                                    </div>
+                                                )}
                                             </>
                                         ) : (
                                             <p className="text-zinc-400">Nog niet ingevuld</p>
@@ -286,6 +320,7 @@ export default function Index({ available = true, requests = [], customers = [],
                                                         <p className="font-medium text-zinc-800">{r.form.bedrijfsnaam || '-'}</p>
                                                         <p>{[r.form.naam, r.form.email].filter(Boolean).join(' · ')}</p>
                                                         {r.iban_masked && <p className="font-mono">IBAN {r.iban_masked}</p>}
+                                                        <FormToggle request={r} open={formOpenId === r.id} onToggle={() => toggleForm(r.id)} />
                                                     </>
                                                 ) : (
                                                     <span className="text-zinc-400">Nog niet ingevuld</span>
@@ -322,6 +357,16 @@ export default function Index({ available = true, requests = [], customers = [],
                                                 </div>
                                             </td>
                                         </tr>
+                                        {formOpenId === r.id && (
+                                            <tr id={`formulier-${r.id}`}>
+                                                <td colSpan={6} className="bg-zinc-50/60 px-4 py-3">
+                                                    <div className="max-w-3xl">
+                                                        <p className="mb-2 text-xs font-medium text-zinc-700">Ingevuld formulier {r.kenmerk}</p>
+                                                        <FormFields request={r} />
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
                                         {openId === r.id && (
                                             <tr id={`gegevens-${r.id}`}>
                                                 <td colSpan={6} className="bg-zinc-50/60 px-4 py-3">
