@@ -94,6 +94,39 @@ class GarageCompany extends Model
 
             $builder->whereNull($builder->getModel()->getTable().'.deleted_at');
         });
+
+        // Nieuwe klant zonder login e-mail: neem het hoofd e-mailadres (uit de demo-aanvraag) over.
+        static::creating(function (GarageCompany $company) {
+            if (! filled($company->login_email)) {
+                $company->login_email = static::suggestedLoginEmail($company->hoofd_email);
+            }
+        });
+    }
+
+    /**
+     * Hoofd e-mail als login e-mail, maar alleen als geen ander account dat adres al gebruikt
+     * (login e-mail moet uniek zijn onder de gebruikers).
+     */
+    public static function suggestedLoginEmail(?string $hoofdEmail, ?int $ignoreUserId = null): ?string
+    {
+        $email = trim((string) $hoofdEmail);
+        if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return null;
+        }
+
+        try {
+            if (! Schema::hasColumn('garage_companies', 'login_email')) {
+                return null;
+            }
+            $taken = DB::table('users')
+                ->whereRaw('LOWER(email) = ?', [mb_strtolower($email)])
+                ->when($ignoreUserId, fn ($q) => $q->where('id', '<>', $ignoreUserId))
+                ->exists();
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return $taken ? null : $email;
     }
 
     public static function hasTrashColumn(): bool

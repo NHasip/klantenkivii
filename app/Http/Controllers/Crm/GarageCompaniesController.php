@@ -338,7 +338,7 @@ class GarageCompaniesController
             'plaats.required_with' => 'Vul de plaats in als je een IBAN opgeeft.',
         ]);
 
-        $data['login_email'] = $data['login_email'] ?: null;
+        $data['login_email'] = $data['login_email'] ?: GarageCompany::suggestedLoginEmail($data['email'] ?? $data['hoofd_email'] ?? null);
         $data['login_password'] = $data['login_password'] ?: null;
         // Kolommen plaats en hoofd_telefoon zijn verplicht in de database; bij een lead lege tekst opslaan.
         $data['land'] = ($data['land'] ?? null) ?: 'Nederland';
@@ -1385,6 +1385,13 @@ class GarageCompaniesController
 
         $data['login_email'] = $data['login_email'] ?: null;
         $data['login_password'] = $data['login_password'] ?: null;
+        // Leeg gelaten login e-mail: hoofd e-mail overnemen (als dat adres nog niet bij een ander account hoort).
+        if (empty($data['login_email'])) {
+            $data['login_email'] = GarageCompany::suggestedLoginEmail(
+                $data['hoofd_email'] ?? $garageCompany->hoofd_email,
+                $garageCompany->eigenaar_user_id,
+            );
+        }
         if (empty($data['login_email']) && ! empty($data['login_password'])) {
             return back()->withErrors(['login_email' => 'Vul een login e-mail in voordat je een wachtwoord zet.'])->withInput();
         }

@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useMemo, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useEditor } from '@tiptap/react';
 import { isEditorUsable, safeGetHTML, safeSetContent } from '../../../components/editorSafe';
 import StarterKit from '@tiptap/starter-kit';
@@ -184,7 +184,8 @@ export default function Show({
         website: garageCompany.website || '',
         hoofd_email: garageCompany.hoofd_email || '',
         hoofd_telefoon: garageCompany.hoofd_telefoon || '',
-        login_email: garageCompany.login_email || '',
+        // Leeg: hoofd e-mail voorstellen als login e-mail (wordt bij opslaan overgenomen).
+        login_email: garageCompany.login_email || garageCompany.hoofd_email || '',
         login_password: '',
         status: normalizedCompanyStatus,
         bron: garageCompany.bron || sourceOptions?.[0] || '',
@@ -196,6 +197,19 @@ export default function Show({
     });
 
     const overviewForm = useForm(overviewInitialData());
+    // Login e-mail volgt het hoofd e-mailadres zolang die gelijk waren (of login leeg was).
+    const prevHoofdEmailRef = useRef(overviewForm.data.hoofd_email);
+    useEffect(() => {
+        const prev = prevHoofdEmailRef.current;
+        const next = overviewForm.data.hoofd_email;
+        prevHoofdEmailRef.current = next;
+        if (prev === next) return;
+        const login = overviewForm.data.login_email || '';
+        if (login === '' || login.toLowerCase() === String(prev || '').toLowerCase()) {
+            overviewForm.setData('login_email', next);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [overviewForm.data.hoofd_email]);
     const [headerPanel, setHeaderPanel] = useState(null);
     const [editingOverview, setEditingOverview] = useState(false);
     const [showPasswordField, setShowPasswordField] = useState(false);

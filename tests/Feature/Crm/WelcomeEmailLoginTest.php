@@ -103,4 +103,42 @@ class WelcomeEmailLoginTest extends TestCase
         $this->assertStringContainsString('login@akca.test', $sent->body_html);
         $this->assertStringContainsString('Geheim123!', $sent->body_html);
     }
+
+    public function test_new_company_gets_hoofd_email_as_login_email(): void
+    {
+        [, $company] = $this->setUpCompany();
+        $this->assertSame('klant@example.test', $company->fresh()->login_email);
+    }
+
+    public function test_login_email_not_taken_over_when_used_by_other_account(): void
+    {
+        User::factory()->create(['email' => 'bezet@example.test']);
+        [, $company] = $this->setUpCompany(['hoofd_email' => 'bezet@example.test']);
+        $this->assertNull($company->fresh()->login_email);
+    }
+
+    public function test_existing_login_email_is_kept(): void
+    {
+        [, $company] = $this->setUpCompany(['login_email' => 'eigen@example.test']);
+        $this->assertSame('eigen@example.test', $company->fresh()->login_email);
+    }
+
+    public function test_saving_existing_company_without_login_email_takes_hoofd_email(): void
+    {
+        [$user, $company] = $this->setUpCompany();
+        // Bestaande klant van voor deze wijziging: login e-mail leeg.
+        \Illuminate\Support\Facades\DB::table('garage_companies')->where('id', $company->id)->update(['login_email' => null]);
+
+        $this->actingAs($user)->patch(route('crm.garage_companies.update', $company), [
+            'bedrijfsnaam' => 'AKCA Test', 'primary_voornaam' => 'Doygun', 'primary_achternaam' => 'Akyuz',
+            'plaats' => 'Almere', 'land' => 'Nederland', 'hoofd_email' => 'klant@example.test',
+            'hoofd_telefoon' => '0612345678', 'status' => 'demo_aangevraagd', 'bron' => 'website_formulier',
+            'login_email' => '', 'login_password' => 'Geheim123!',
+        ])->assertSessionHasNoErrors();
+
+        $company->refresh();
+        $this->assertSame('klant@example.test', $company->login_email);
+        $this->assertNotNull($company->eigenaar_user_id);
+        $this->assertTrue(User::find($company->eigenaar_user_id)->isCustomerAccount());
+    }
 }
