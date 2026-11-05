@@ -2,6 +2,7 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import { Icon } from '../../../components/icons';
 import StatusBadge, { FOCUS_SCOPE } from '../../../components/StatusBadge';
+import { generatePassword } from '../../../components/generatePassword';
 import { Avatar, Button, Card, CardHeader, EmptyState, IconTile, PageHeader, buttonClasses, cx, inputClasses } from '../../../components/ui';
 
 function formatEuro(value) {
@@ -81,19 +82,6 @@ function ibanLooksValid(raw) {
         for (const digit of code) remainder = (remainder * 10 + Number(digit)) % 97;
     }
     return remainder === 1;
-}
-
-function generatePassword(length = 12) {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
-    const values = new Uint32Array(length);
-    const result = [];
-    if (window.crypto && window.crypto.getRandomValues) {
-        window.crypto.getRandomValues(values);
-        for (let i = 0; i < length; i += 1) result.push(chars[values[i] % chars.length]);
-    } else {
-        for (let i = 0; i < length; i += 1) result.push(chars[Math.floor(Math.random() * chars.length)]);
-    }
-    return result.join('');
 }
 
 /* ------------------------------------------------------------------ Bouwstenen */

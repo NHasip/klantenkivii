@@ -1,0 +1,1 @@
+function e(e=12){let t=`ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%`,n=new Uint32Array(e),r=[];if(window.crypto&&window.crypto.getRandomValues){window.crypto.getRandomValues(n);for(let i=0;i<e;i+=1)r.push(t[n[i]%62])}else for(let n=0;n<e;n+=1)r.push(t[Math.floor(Math.random()*62)]);return r.join(``)}export{e as t};

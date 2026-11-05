@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from '@inertiajs/react';
 import { isNoopStatusChange, translateStatusText } from '../../../../components/StatusBadge';
 import { Icon } from '../../../../components/icons';
+import { generatePassword } from '../../../../components/generatePassword';
 import { ActivityItem, ActivityList, Avatar, Badge, Button, Card, CardHeader, EmptyState, IconTile, KeyValue, StatusDot, cx } from '../../../../components/ui';
 import {
     CRM_TASK_PRIORITY,
@@ -94,6 +95,7 @@ function OverviewReadOnly({ company, status, onEdit }) {
 }
 
 function OverviewForm({ form, status, sourceOptions, showPasswordField, setShowPasswordField, onSubmit, onCancel }) {
+    const [showGeneratedPassword, setShowGeneratedPassword] = React.useState(false);
     return (
         <Card as="form" onSubmit={onSubmit} noValidate aria-labelledby="overview-form-title">
             <div className="mb-5">
@@ -139,15 +141,39 @@ function OverviewForm({ form, status, sourceOptions, showPasswordField, setShowP
                                 name="login_password"
                                 id="overviewForm-login-password"
                                 label="Nieuw login wachtwoord"
-                                type="password"
+                                type={showGeneratedPassword ? 'text' : 'password'}
                                 autoComplete="new-password"
                                 hint="Minimaal 8 tekens. Het huidige wachtwoord wordt nooit getoond."
                             />
+                            <div className="mt-2 flex flex-wrap gap-2">
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    icon="refresh"
+                                    onClick={() => {
+                                        form.setData('login_password', generatePassword());
+                                        setShowGeneratedPassword(true);
+                                    }}
+                                >
+                                    Genereer
+                                </Button>
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    iconOnly
+                                    icon="eye"
+                                    aria-label={showGeneratedPassword ? 'Wachtwoord verbergen' : 'Wachtwoord tonen'}
+                                    aria-pressed={showGeneratedPassword}
+                                    aria-controls="overviewForm-login-password"
+                                    onClick={() => setShowGeneratedPassword((prev) => !prev)}
+                                />
+                            </div>
                             <button
                                 type="button"
                                 className="mt-1 text-xs font-semibold text-zinc-700 underline-offset-2 hover:underline"
                                 onClick={() => {
                                     form.setData('login_password', '');
+                                    setShowGeneratedPassword(false);
                                     setShowPasswordField(false);
                                 }}
                             >
