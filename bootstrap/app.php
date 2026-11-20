@@ -21,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => \App\Http\Middleware\EnsureAdmin::class,
             'admin.2fa' => \App\Http\Middleware\RequireTwoFactorForAdmin::class,
             'leads.webhook' => \App\Http\Middleware\VerifyLeadsWebhookToken::class,
+            'passkeys.host' => \App\Http\Middleware\EnsurePasskeyHost::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

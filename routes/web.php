@@ -24,7 +24,7 @@ Route::get('/', function () {
 Route::redirect('/dashboard-old', '/dashboard', 301);
 Route::redirect('/taken-old', '/taken', 301);
 
-Route::middleware(['guest', 'throttle:10,1'])->group(function () {
+Route::middleware(['passkeys.host', 'guest', 'throttle:10,1'])->group(function () {
     Route::post('/auth/passkey/options', [PasskeyLoginController::class, 'options'])->name('auth.passkeys.options');
     Route::post('/auth/passkey/verify', [PasskeyLoginController::class, 'verify'])->name('auth.passkeys.verify');
 });
@@ -185,12 +185,14 @@ Route::middleware(['auth', 'active', 'admin.2fa'])->group(function () {
         ->middleware('admin')
         ->name('crm.email_templates.delete_post');
 
-    Route::post('/user/profile/passkeys/options', [PasskeyController::class, 'options'])
-        ->name('profile.passkeys.options');
-    Route::post('/user/profile/passkeys', [PasskeyController::class, 'store'])
-        ->name('profile.passkeys.store');
-    Route::delete('/user/profile/passkeys/{passkey}', [PasskeyController::class, 'destroy'])
-        ->name('profile.passkeys.destroy');
+    Route::middleware('passkeys.host')->group(function () {
+        Route::post('/user/profile/passkeys/options', [PasskeyController::class, 'options'])
+            ->name('profile.passkeys.options');
+        Route::post('/user/profile/passkeys', [PasskeyController::class, 'store'])
+            ->name('profile.passkeys.store');
+        Route::delete('/user/profile/passkeys/{passkey}', [PasskeyController::class, 'destroy'])
+            ->name('profile.passkeys.destroy');
+    });
 
     // Pushmeldingen op dit apparaat (iPhone-beginschermapp en desktopbrowsers).
     Route::middleware('throttle:20,1')->group(function () {

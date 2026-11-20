@@ -9,13 +9,14 @@
         $profileHas2fa = \App\Http\Middleware\RequireTwoFactorForAdmin::userHasTwoFactor($profileUser);
         $profileCan2fa = Laravel\Fortify\Features::canManageTwoFactorAuthentication();
 
-        $profilePasskeyCount = \Illuminate\Support\Facades\Schema::hasTable('passkeys') && $profileUser ? $profileUser->passkeys()->count() : 0;
+        $profilePasskeysAvailable = \App\Http\Middleware\EnsurePasskeyHost::allowed();
+        $profilePasskeyCount = $profilePasskeysAvailable && \Illuminate\Support\Facades\Schema::hasTable('passkeys') && $profileUser ? $profileUser->passkeys()->count() : 0;
 
         $profileNav = array_values(array_filter([
             Laravel\Fortify\Features::canUpdateProfileInformation() ? ['id' => 'profile-info', 'label' => 'Profiel', 'icon' => 'user'] : null,
             Laravel\Fortify\Features::enabled(Laravel\Fortify\Features::updatePasswords()) ? ['id' => 'password', 'label' => 'Wachtwoord', 'icon' => 'key'] : null,
             $profileCan2fa ? ['id' => 'two-factor', 'label' => 'Tweestapsverificatie', 'icon' => 'shield', 'badge' => $profileHas2fa ? 'Aan' : 'Uit', 'tone' => $profileHas2fa ? 'success' : 'warning'] : null,
-            ['id' => 'passkeys', 'label' => 'Passkeys', 'icon' => 'key', 'badge' => $profilePasskeyCount > 0 ? (string) $profilePasskeyCount : null, 'tone' => 'neutral'],
+            $profilePasskeysAvailable ? ['id' => 'passkeys', 'label' => 'Passkeys', 'icon' => 'key', 'badge' => $profilePasskeyCount > 0 ? (string) $profilePasskeyCount : null, 'tone' => 'neutral'] : null,
             ['id' => 'push-notifications', 'label' => 'Meldingen', 'icon' => 'bell'],
             ['id' => 'sessions', 'label' => 'Sessies', 'icon' => 'globe'],
             $profileCanDelete ? ['id' => 'delete-account', 'label' => 'Account verwijderen', 'icon' => 'trash'] : null,
@@ -132,9 +133,11 @@
                     </section>
                 @endif
 
-                <section id="passkeys" class="scroll-mt-20">
-                    @include('profile.passkeys-form')
-                </section>
+                @if ($profilePasskeysAvailable)
+                    <section id="passkeys" class="scroll-mt-20">
+                        @include('profile.passkeys-form')
+                    </section>
+                @endif
 
                 <section id="push-notifications" class="scroll-mt-20">
                     @include('profile.push-notifications-form')

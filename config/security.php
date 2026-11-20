@@ -1,5 +1,9 @@
 <?php
 
+// Passkeys zijn alleen actief op dit domein. rpId en origin volgen hier vast uit
+// (niet uit APP_URL of de Host-header), zodat ze nergens anders werken.
+$passkeyHost = strtolower(trim((string) env('PASSKEYS_HOST', 'klanten.necmardemo.nl')));
+
 return [
     'attachments' => [
         'virus_scan' => (bool) env('ATTACHMENTS_VIRUS_SCAN', false),
@@ -12,8 +16,9 @@ return [
 
     'passkeys' => [
         'rp_name' => env('PASSKEYS_RP_NAME', env('APP_NAME', 'Kivii CRM')),
-        'rp_id' => env('PASSKEYS_RP_ID'),
-        'origins' => array_filter(array_map('trim', explode(',', (string) env('PASSKEYS_ALLOWED_ORIGINS', '')))),
+        'host' => $passkeyHost,
+        'rp_id' => $passkeyHost,
+        'origins' => $passkeyHost !== '' ? ['https://'.$passkeyHost] : [],
         'user_verification' => env('PASSKEYS_USER_VERIFICATION', 'required'),
     ],
 ];

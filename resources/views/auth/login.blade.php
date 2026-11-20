@@ -40,6 +40,8 @@
             </x-button>
         </form>
 
+        @php($passkeysAvailable = \App\Http\Middleware\EnsurePasskeyHost::allowed())
+        @if ($passkeysAvailable)
         <div class="my-6 flex items-center gap-3" aria-hidden="true">
             <div class="h-px flex-1 bg-zinc-200"></div>
             <span class="text-xs font-medium text-zinc-400">of</span>
@@ -54,8 +56,10 @@
             <p class="mt-2 text-center text-xs text-zinc-500">Vul eerst je e-mailadres in en bevestig daarna op je apparaat.</p>
             <p id="passkey-login-status" class="mt-2 min-h-[1rem] text-center text-xs text-zinc-600" role="status" aria-live="polite"></p>
         </div>
+        @endif
     </x-authentication-card>
 
+    @if ($passkeysAvailable)
     <script>
     (() => {
         let simpleWebAuthnPromise = null;
@@ -134,4 +138,5 @@
         });
     })();
     </script>
+    @endif
 </x-guest-layout>
